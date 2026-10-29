@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Vndb.Core/Vndb.Core.csproj" />
+    <Project Path="src/Vndb.Contracts/Vndb.Contracts.csproj" />
+    <Project Path="src/Vndb.Client/Vndb.Client.csproj" />
+    <Project Path="src/Vndb.Local/Vndb.Local.csproj" />
+    <Project Path="src/Vndb.Desktop/Vndb.Desktop.csproj" />
+    <Project Path="src/Vndb.Cli/Vndb.Cli.csproj" />
+    <Project Path="src/Vndb.Admin/Vndb.Admin.csproj" />
+    <Project Path="src/Vndb.Library/Vndb.Library.csproj" />
+    <Project Path="src/Vndb.Web/Vndb.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Vndb.Acceptance/Vndb.Acceptance.csproj" />
+    <Project Path="tests/Vndb.Tests/Vndb.Tests.csproj" />
+    <Project Path="tests/Vndb.FakeGame/Vndb.FakeGame.csproj" />
+    <Project Path="tests/Vndb.Desktop.Smoke/Vndb.Desktop.Smoke.csproj" />
+  </Folder>
+</Solution>

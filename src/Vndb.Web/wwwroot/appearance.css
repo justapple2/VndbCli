@@ -1,0 +1,30 @@
+:root { --primary:#6551cd; --primary-hover:#5743b9; --on-primary:#fff; --input-line:#7e899e; --warning:#78550a; --warning-soft:#fff0cb; color-scheme:light; }
+:root[data-theme="dark"] { --paper:#12141d; --panel:#171a25; --light:#1c1f2c; --ink:#ececf4; --muted:#adb3c9; --line:#424b62; --accent:#b9aaff; --accent-hover:#d0c5ff; --accent-soft:#322c4d; --primary:#7160c9; --primary-hover:#6251b9; --success:#abe0c4; --success-soft:#243d33; --danger:#ff9aab; --danger-soft:#422635; --cover:#292f43; --focus:#b9aaff; --input-line:#7c87a3; --warning:#f2d187; --warning-soft:#3b3321; color-scheme:dark; }
+html,body { color:var(--ink); background:var(--paper); }
+button,input,select,textarea { font:inherit; } textarea { max-width:100%; }
+input:not([type="checkbox"]):not([type="file"]),select,textarea { color:var(--ink); background:var(--light); border-color:var(--input-line)!important; }
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible { outline:3px solid var(--focus); outline-offset:3px; }
+.primary,.page-heading>.primary { background:var(--primary); color:var(--on-primary); }.primary:hover { background:var(--primary-hover); }
+.skip { color:var(--paper); background:var(--ink); }
+.notice:not(.error) { color:var(--ink); background:var(--accent-soft); }
+.toast { background:var(--ink); color:var(--paper); }
+.counter,.chip,.producer-link:hover,.nav-item:hover { background:var(--panel); color:var(--ink); }
+.nav-item.selected { background:var(--accent-soft); color:var(--accent); }
+.tabs button.active,.manager-tabs button.active { color:var(--accent); }
+dialog { color:var(--ink); background:var(--light); border-color:var(--line); }dialog::backdrop { background:rgb(8 10 16 / 65%); }
+.empty,.cover-placeholder,.detail-cover,.cover-wrap { background:var(--cover); color:var(--muted); }
+.manager-block pre,.tool-evidence pre,pre { color:var(--ink); background:var(--panel); border-radius:8px; padding:12px; }
+.play-status,.status,.status-pill,.play-count { font-size:var(--font-caption); }
+.play-status.completed,.play-status.played { background:var(--success-soft); color:var(--success); }
+.play-status.playing,.play-status.on_hold { background:var(--warning-soft); color:var(--warning); }
+.small,.form-help,.form-help.small,.form-help.error { font-size:var(--font-caption); }
+.page-heading,.topbar { gap:12px; }.topbar { position:relative; }.topbar .crumb { min-width:0; overflow-wrap:anywhere; }
+.appearance-menu { margin-left:auto; flex-shrink:0; }.appearance-menu>summary { cursor:pointer; padding:8px 12px; border:1px solid var(--input-line); border-radius:8px; }
+.appearance-controls { display:grid; gap:14px; position:absolute; z-index:30; right:16px; top:calc(100% - 4px); width:min(300px,calc(100vw - 32px)); padding:18px; background:var(--light); border:1px solid var(--input-line); border-radius:12px; box-shadow:0 8px 24px rgb(0 0 0 / 20%); }
+.appearance-controls label:not(.check-label) { display:grid; gap:6px; }.appearance-controls select { width:100%; padding:8px; }.appearance-controls .small { margin:0; color:var(--muted); }
+.vn-card { transition:border-color 120ms ease-out,box-shadow 120ms ease-out; }.vn-card:focus-within { box-shadow:0 0 0 1px var(--focus); }
+.workspace main,.detail-info,.manager-toolbar>label,.detail-layout>* { min-width:0; }.manager-toolbar select { max-width:100%; }
+@media(max-width:600px) { .topbar .crumb { flex:1; font-size:var(--font-caption); }.page-heading { align-items:start; flex-wrap:wrap; }.detail-actions button { white-space:normal; }dialog { max-height:calc(100dvh - 24px); overflow:auto; } }
+:root[data-reduced-motion="true"] * { animation:none!important; transition:none!important; scroll-behavior:auto!important; }
+:root[data-reduced-motion="true"] .primary:hover,:root[data-reduced-motion="true"] .book-card:hover .cover-wrap { transform:none!important; }
+@media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important; transition:none!important; scroll-behavior:auto!important; }.primary:hover,.book-card:hover .cover-wrap { transform:none!important; } }

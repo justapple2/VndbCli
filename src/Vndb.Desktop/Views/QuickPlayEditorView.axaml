@@ -1,0 +1,41 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:Vndb.Desktop.ViewModels" xmlns:c="using:Vndb.Desktop.Controls"
+             x:Class="Vndb.Desktop.Views.QuickPlayEditorView" x:DataType="vm:QuickPlayEditorViewModel" KeyboardNavigation.TabNavigation="Cycle">
+  <Grid RowDefinitions="Auto,*,Auto" RowSpacing="16">
+    <Grid ColumnDefinitions="*,Auto"><StackPanel Classes="compact"><TextBlock Text="更新游玩记录" Classes="section-title" /><TextBlock Text="{Binding Title}" Classes="strong wrap" /></StackPanel><Button x:Name="CloseEditor" Grid.Column="1" Classes="quiet icon" Command="{Binding CloseCommand}" AutomationProperties.Name="关闭游玩编辑"><c:AppIcon Kind="Close" /></Button></Grid>
+    <ScrollViewer Grid.Row="1"><StackPanel Classes="form">
+      <TextBlock Text="{Binding TargetSummary}" Classes="caption wrap" AutomationProperties.Name="本次编辑目标" />
+      <TextBlock Text="选择已有记录（重玩请另建）" />
+      <ComboBox x:Name="PlayPicker" ItemsSource="{Binding Plays}" SelectedItem="{Binding SelectedPlay}" IsEnabled="{Binding CanChooseRecord}" AutomationProperties.Name="快速编辑游玩记录"><ComboBox.ItemTemplate><DataTemplate x:DataType="vm:PlayChoice"><TextBlock Text="{Binding Label}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+      <Button Content="新建一次游玩／重玩" Command="{Binding NewRecordCommand}" IsEnabled="{Binding CanChooseRecord}" />
+      <StackPanel Classes="form" IsEnabled="{Binding Editable}">
+        <TextBlock Text="游玩状态" /><ComboBox ItemsSource="{Binding States}" SelectedItem="{Binding SelectedState}" AutomationProperties.Name="快速游玩状态"><ComboBox.ItemTemplate><DataTemplate x:DataType="vm:PlayStateChoice"><TextBlock Text="{Binding Label}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+        <TextBlock Text="开始日期／结束日期（未知可留空）" Classes="wrap" />
+        <DatePicker SelectedDate="{Binding StartedOn}" AutomationProperties.Name="快速开始日期" /><DatePicker SelectedDate="{Binding FinishedOn}" AutomationProperties.Name="快速结束日期" />
+        <Button Content="清空日期" Classes="quiet" Command="{Binding ClearDatesCommand}" />
+        <CheckBox Content="手工时长已知（不含自动会话）" IsChecked="{Binding DurationKnown}" />
+        <Grid ColumnDefinitions="*,Auto,*,Auto" ColumnSpacing="8" IsEnabled="{Binding DurationKnown}"><NumericUpDown Value="{Binding Hours}" Minimum="0" Increment="1" FormatString="0" AutomationProperties.Name="手工游玩小时" /><TextBlock Grid.Column="1" Text="小时" VerticalAlignment="Center" /><NumericUpDown Grid.Column="2" Value="{Binding Minutes}" Minimum="0" Maximum="59" Increment="1" FormatString="0" AutomationProperties.Name="手工游玩分钟" /><TextBlock Grid.Column="3" Text="分钟" VerticalAlignment="Center" /></Grid>
+      </StackPanel>
+      <Expander Header="评价与备注" IsExpanded="True" HorizontalContentAlignment="Stretch" IsEnabled="{Binding Editable}"><StackPanel Classes="form">
+        <TextBlock Text="个人评分（未知留空，0–10）" /><NumericUpDown Value="{Binding Score}" Minimum="0" Maximum="10" Increment="0.1" FormatString="0.############################" AutomationProperties.Name="个人评分" />
+        <TextBlock Text="个人评价" /><TextBox Text="{Binding Review}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" MaxLength="20000" AutomationProperties.Name="本次游玩感想" />
+        <TextBlock Text="备注一" /><TextBox Text="{Binding Notes}" AcceptsReturn="True" TextWrapping="Wrap" MaxLength="10000" AutomationProperties.Name="本次游玩备注一" />
+        <TextBlock Text="备注二" /><TextBox Text="{Binding ExtraNotes}" AcceptsReturn="True" TextWrapping="Wrap" MaxLength="10000" AutomationProperties.Name="本次游玩备注二" />
+        <TextBlock Text="游玩语言" /><TextBox Text="{Binding Language}" MaxLength="40" AutomationProperties.Name="本次游玩语言" />
+      </StackPanel></Expander>
+      <Button Content="放弃当前未保存修改" Classes="quiet" Command="{Binding ResetUnsavedCommand}" IsVisible="{Binding IsDirty}" IsEnabled="{Binding Editable}" />
+      <Border Classes="panel"><TextBlock Text="{Binding TimeSummary}" Classes="caption wrap" /></Border>
+      <TextBlock Text="原表来源由Web保留；自动会话及调整记录单独计算。未记录时长与零分钟含义不同。" Classes="caption wrap" />
+    </StackPanel></ScrollViewer>
+    <StackPanel Grid.Row="2" Classes="form">
+      <TextBlock Text="{Binding Message}" Classes="wrap" AutomationProperties.Name="快速编辑结果" AutomationProperties.LiveSetting="Polite" />
+      <Border Classes="detail-record" IsVisible="{Binding ConfirmClose}"><StackPanel Classes="compact">
+        <TextBlock Text="未保存的修改尚未写入。" Classes="strong wrap" />
+        <Button Content="继续编辑" Command="{Binding ContinueEditingCommand}" /><Button Content="放弃修改并返回" Command="{Binding DiscardAndCloseCommand}" />
+      </StackPanel></Border>
+      <ProgressBar IsIndeterminate="True" IsVisible="{Binding Busy}" Height="3" />
+      <Button Classes="primary" Content="保存并同步Web" Command="{Binding SaveCommand}" />
+      <Button Content="重试待同步原稿" Command="{Binding RetryCommand}" IsVisible="{Binding HasDraft}" IsEnabled="{Binding CanRetry}" />
+      <Button Content="保留冲突原稿，重新读取" Command="{Binding ReloadConflictCommand}" IsVisible="{Binding Conflict}" IsEnabled="{Binding !Busy}" />
+    </StackPanel>
+  </Grid>
+</UserControl>

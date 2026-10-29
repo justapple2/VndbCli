@@ -1,0 +1,26 @@
+<Application xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Vndb.Desktop.ViewModels" xmlns:views="using:Vndb.Desktop.Views" x:Class="Vndb.Desktop.App" RequestedThemeVariant="Default">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://Vndb.Desktop/Resources/Tokens.axaml" />
+        <ResourceInclude Source="avares://Vndb.Desktop/Resources/Icons.axaml" />
+        <ResourceInclude Source="avares://Vndb.Desktop/Resources/Templates.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+  <Application.DataTemplates>
+    <DataTemplate DataType="{x:Type vm:PublicCatalogPageView}" x:DataType="vm:PublicCatalogPageView"><views:PublicCatalogView DataContext="{Binding Owner.PublicCatalog}" /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:ShelfPage}" x:DataType="vm:ShelfPage"><views:ShelfView DataContext="{Binding Owner}" /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:QueryPage}" x:DataType="vm:QueryPage"><views:QueryView DataContext="{Binding Owner}" /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:LaunchPage}" x:DataType="vm:LaunchPage"><views:LaunchView DataContext="{Binding Owner}" /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:OrganizePage}" x:DataType="vm:OrganizePage"><views:OrganizeView DataContext="{Binding Owner}" /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:SettingsPage}" x:DataType="vm:SettingsPage"><views:SettingsView DataContext="{Binding Owner}" /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:SessionPage}" x:DataType="vm:SessionPage"><views:SessionView DataContext="{Binding Owner}" /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:RegistrationPage}" x:DataType="vm:RegistrationPage"><views:RegistrationView DataContext="{Binding Owner.Registration}" /></DataTemplate>
+  </Application.DataTemplates>
+  <Application.Styles>
+    <FluentTheme><FluentTheme.Palettes><ColorPaletteResources x:Key="Light" Accent="{StaticResource AccentSeed}" /><ColorPaletteResources x:Key="Dark" Accent="{StaticResource AccentSeed}" /></FluentTheme.Palettes></FluentTheme>
+    <StyleInclude Source="avares://Vndb.Desktop/Resources/Styles.axaml" />
+  </Application.Styles>
+</Application>

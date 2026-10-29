@@ -1,0 +1,32 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:Vndb.Desktop.ViewModels" xmlns:views="using:Vndb.Desktop.Views" xmlns:c="using:Vndb.Desktop.Controls"
+        x:Class="Vndb.Desktop.MainWindow" x:DataType="vm:MainViewModel" Title="VN Library · 个人视觉小说管理"
+        Width="1400" Height="900" MinWidth="800" MinHeight="640" WindowDecorations="BorderOnly" ExtendClientAreaToDecorationsHint="True" ExtendClientAreaTitleBarHeightHint="0">
+  <Window.KeyBindings><KeyBinding Gesture="Escape" Command="{Binding EscapeCommand}" /><KeyBinding Gesture="F5" Command="{Binding RefreshCommand}" /></Window.KeyBindings>
+  <Grid RowDefinitions="48,*,Auto">
+    <Border Background="{DynamicResource SidebarBrush}" WindowDecorationProperties.ElementRole="TitleBar" x:Name="DragRegion">
+      <Grid ColumnDefinitions="*,Auto" Margin="20,0,6,0">
+        <StackPanel Classes="inline" VerticalAlignment="Center"><c:AppIcon Kind="Book" Foreground="{DynamicResource AccentBrush}" /><TextBlock Text="VN LIBRARY" Classes="strong" /><TextBlock Text="PERSONAL COLLECTION" Classes="caption" Margin="12,0,0,0" /></StackPanel>
+        <StackPanel Grid.Column="1" Classes="inline" Spacing="2" VerticalAlignment="Center">
+          <Button x:Name="ThemeButton" Theme="{StaticResource ChromeButton}" Click="ToggleTheme" WindowDecorationProperties.ElementRole="User" AutomationProperties.Name="切换明暗主题" ToolTip.Tip="切换明暗主题"><c:AppIcon x:Name="ThemeIcon" Kind="Moon" /></Button>
+          <Button x:Name="MinimizeButton" Theme="{StaticResource ChromeButton}" Click="Minimize" WindowDecorationProperties.ElementRole="User" AutomationProperties.Name="最小化" ToolTip.Tip="最小化"><c:AppIcon Kind="Minimize" /></Button>
+          <Button x:Name="MaximizeButton" Theme="{StaticResource ChromeButton}" Click="Maximize" WindowDecorationProperties.ElementRole="User" AutomationProperties.Name="最大化或还原" ToolTip.Tip="最大化／还原"><c:AppIcon x:Name="MaximizeIcon" Kind="Maximize" /></Button>
+          <Button x:Name="CloseButton" Classes="close" Theme="{StaticResource ChromeButton}" Click="CloseWindow" WindowDecorationProperties.ElementRole="User" AutomationProperties.Name="关闭窗口" ToolTip.Tip="关闭"><c:AppIcon Kind="Close" /></Button>
+        </StackPanel>
+      </Grid>
+    </Border>
+    <Grid Grid.Row="1" x:Name="Workspace" IsEnabled="{Binding !QuickEditorOpen}">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="212" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+      <Border Classes="sidebar"><Grid RowDefinitions="Auto,*,Auto" RowSpacing="16">
+        <TextBlock Text="你的收藏" Classes="caption nav-caption" Margin="14,0" />
+        <ListBox Grid.Row="1" x:Name="Navigation" Classes="navigation" ItemsSource="{Binding NavigationEntries}" SelectedItem="{Binding SelectedNavigation}" ItemTemplate="{StaticResource NavigationTemplate}" ItemContainerTheme="{StaticResource NavigationItem}" AutomationProperties.Name="主导航" />
+        <StackPanel Grid.Row="2" Classes="compact" Margin="12,0"><c:AppIcon Kind="Folder" HorizontalAlignment="Left" Foreground="{DynamicResource MutedBrush}" /><TextBlock Text="游戏位置留在本机" Classes="caption nav-caption" /><TextBlock Text="资料与感想同步 Web" Classes="caption nav-caption" /></StackPanel>
+      </Grid></Border>
+      <Grid Grid.Column="1" Classes="page-content" RowDefinitions="Auto,*" RowSpacing="20">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><StackPanel Classes="compact"><TextBlock Text="{Binding SelectedNavigation.Title}" Classes="heading" /><TextBlock Text="{Binding SelectedNavigation.Description}" Classes="caption" /></StackPanel><StackPanel Grid.Column="1" Classes="inline" VerticalAlignment="Center"><Button Classes="quiet icon" Command="{Binding RefreshCommand}" IsEnabled="{Binding !Busy}" ToolTip.Tip="刷新书架 F5" AutomationProperties.Name="刷新书架"><c:AppIcon Kind="Sync" /></Button><Button Classes="quiet icon" Command="{Binding CancelCommand}" IsVisible="{Binding Busy}" ToolTip.Tip="取消 Esc" AutomationProperties.Name="取消操作"><c:AppIcon Kind="Close" /></Button></StackPanel></Grid>
+        <TransitioningContentControl Grid.Row="1" x:Name="PageHost" Content="{Binding SelectedNavigation.Page}" />
+      </Grid>
+    </Grid>
+    <Border Grid.Row="2" BorderBrush="{DynamicResource EdgeBrush}" BorderThickness="0,1,0,0" Background="{DynamicResource SurfaceBrush}" Padding="16,8"><Grid RowDefinitions="Auto,Auto"><ProgressBar IsIndeterminate="True" IsVisible="{Binding Busy}" Height="2" /><TextBlock Grid.Row="1" Text="{Binding Status}" Classes="caption wrap" AutomationProperties.Name="操作状态" AutomationProperties.LiveSetting="Polite" /></Grid></Border>
+    <Border Grid.Row="1" Background="{DynamicResource OverlayBrush}" IsVisible="{Binding QuickEditorOpen}"><Border Classes="panel" CornerRadius="16,0,0,16" Width="480" HorizontalAlignment="Right" Margin="0,8,0,8"><ContentControl Content="{Binding QuickEditor}"><ContentControl.ContentTemplate><DataTemplate x:DataType="vm:QuickPlayEditorViewModel"><views:QuickPlayEditorView /></DataTemplate></ContentControl.ContentTemplate></ContentControl></Border></Border>
+  </Grid>
+</Window>

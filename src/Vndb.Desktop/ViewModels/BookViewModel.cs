@@ -1,0 +1,59 @@
+using Vndb.Contracts;
+using CommunityToolkit.Mvvm.ComponentModel;
+using Vndb.Local;
+using Vndb.Core;
+
+namespace Vndb.Desktop.ViewModels;
+
+public sealed partial class BookViewModel(LibraryItemView? item, MetadataSnapshot? metadata, IReadOnlyList<PersonalPlayView>? plays = null, bool associationNeedsReview = false) : ObservableObject
+{
+    private IReadOnlyList<PersonalPlayView> _plays = plays?.Where(p => p.DeletedAt is null).ToArray() ?? [];
+    private bool _needsPlayReview = associationNeedsReview || plays is null && item?.PlayCount > 0;
+    [ObservableProperty] private bool _selected;
+    public bool IsLocal { get; set; }
+    public bool HasInstallation { get; private set; }
+    public IReadOnlyList<string> PackagePaths { get; private set; } = [];
+    public IReadOnlyList<string> PackageRecords { get; private set; } = [];
+    public string PackageLocations => string.Join('\n', PackageRecords.Select(p => "安装包相对位置（仅本机）：" + p));
+    public void SetOwnership(bool installed, IReadOnlyList<string> packages, IReadOnlyList<string>? records = null)
+    {
+        HasInstallation = installed; PackagePaths = packages; PackageRecords = records ?? packages; IsLocal = installed || packages.Count > 0;
+        foreach (var name in new[] { nameof(HasInstallation), nameof(PackagePaths), nameof(PackageRecords), nameof(PackageLocations), nameof(IsLocal), nameof(LocalLabel) }) OnPropertyChanged(name);
+    }
+    public DateTimeOffset? LastOpenedAt { get; set; }
+    public DateTimeOffset? AddedAt => Item?.Item.CreatedAt;
+    public string? Released => Metadata?.Novel?.Released;
+    public string LastOpenedLabel => LastOpenedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "尚未从本客户端打开";
+    public IReadOnlyList<string> Companies => Metadata?.Developers.Count > 0 ? Metadata.Developers.Select(p => p.Original ?? p.Name).ToArray() : [Company];
+    public string ShelfState => NeedsPlayReview ? "关联待核对" : Plays.Count > 0 ? Status(Plays.OrderByDescending(p => p.UpdatedAt).First().Details.Status) : "未记录";
+    public string CollectionLabel => Item is null ? "公共资料 · 未加入书架" : "个人书架";
+    public string LocalLabel => HasInstallation ? PackagePaths.Count > 0 ? "▣ 已安装 · 有安装包" : "▣ 已安装" : PackagePaths.Count > 0 ? "▣ 本地已有安装包 · 未登记安装" : PackageRecords.Count > 0 ? "安装包记录：缺失／待核对" : IsLocal ? "本机有副本" : "";
+    public LibraryItemView? Item { get; } = item;
+    public MetadataSnapshot? Metadata { get; } = metadata;
+    public IReadOnlyList<PersonalPlayView> Plays => _plays;
+    public bool NeedsPlayReview => _needsPlayReview || Plays.Any(p => !PersonalRules.States.Contains(p.Details.Status));
+    public PersonalProgress Progress => PersonalProgress.FromStatuses(Plays.Select(p => p.Details.Status), NeedsPlayReview);
+    public bool IsUnplayed => Progress.State == "unplayed";
+    public bool IsUnrecorded => Progress.State == "unrecorded";
+    public string PlayAssociationNotice => NeedsPlayReview ? "关联待核对：请联网刷新或读取此条目的记录；未将不明记录归入本作品。" : "";
+    public void ApplyPlays(IReadOnlyList<PersonalPlayView> values, bool needsReview = false)
+    {
+        _plays = values.Where(p => p.DeletedAt is null).ToArray(); _needsPlayReview = needsReview;
+        foreach (var name in new[] { nameof(Plays), nameof(HasPlayed), nameof(IsUnplayed), nameof(IsUnrecorded), nameof(Progress), nameof(NeedsPlayReview), nameof(ShelfState), nameof(PlaySummary), nameof(PlayAssociationNotice) }) OnPropertyChanged(name);
+    }
+    public string Id => Item?.Item.Id ?? Metadata?.VndbId ?? "";
+    public string Title => Item?.Item.Details.TitleOverride ?? Metadata?.Novel?.Titles.FirstOrDefault(t => t.Lang == "ja" && t.Main)?.Title
+        ?? Metadata?.Novel?.Titles.FirstOrDefault(t => t.Lang == "ja")?.Title ?? Metadata?.Novel?.AltTitle ?? Metadata?.Title ?? Item?.Item.Details.Title ?? "未命名";
+    public string Company => Metadata?.Developers.Count > 0
+        ? string.Join(" / ", Metadata.Developers.Select(p => p.Original ?? p.Name)) : Item?.Item.Details.CompanyHint ?? "会社待补全";
+    public string GroupCompany => Item?.Item.Details.CompanyOverride ?? Metadata?.Developers.FirstOrDefault()?.Original
+        ?? Metadata?.Developers.FirstOrDefault()?.Name ?? Item?.Item.Details.CompanyHint ?? "";
+    public bool HasPlayed => Plays.Any(p => PersonalRules.IsPlayed(p.Details.Status));
+    public string Subtitle => string.Join(" · ", new[] { Metadata?.VndbId, Metadata?.Novel?.Released,
+        Item is not null && LocalInstallationRegistration.IsPending(Item.Item.Id) ? "本机登记待同步" : null }.Where(s => !string.IsNullOrEmpty(s)));
+    public string PlaySummary => (Plays.Count == 0 ? NeedsPlayReview ? "关联待核对" : "未记录游玩" :
+        string.Join(" · ", Plays.Select(p => Status(p.Details.Status)).Distinct()) + " / " + Plays.Count + " 条记录") + (NeedsPlayReview && Plays.Count > 0 ? " · 部分关联待核对" : "");
+    public string Description => Metadata?.Novel?.Description ?? "暂无简介；可通过查询补全资料。";
+    public IReadOnlyList<DetailField> BookNotes => new[] { new DetailField("书架备注一", Item?.Item.Details.Notes ?? ""), new("书架备注二", Item?.Item.Details.ExtraNotes ?? "") }.Where(f => f.Value.Length > 0).ToArray();
+    public static string Status(string value) => value switch { "not_started" => "未游玩", "playing" => "游玩中", "played" => "已游玩", "completed" => "本次完成", "on_hold" => "搁置", "dropped" => "放弃", _ => "关联待核对" };
+}

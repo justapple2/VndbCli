@@ -1,0 +1,63 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:Vndb.Desktop.ViewModels"
+             xmlns:local="using:Vndb.Local" x:Class="Vndb.Desktop.Views.SettingsView" x:DataType="vm:MainViewModel">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled"><StackPanel Classes="settings-page">
+    <TextBlock Text="连接与本机偏好" Classes="section-title" />
+    <TextBlock Text="修改连接、全局LE或目录默认值后，点击“保存并应用”。游戏位置与启动配置仅保存在本机JSON。" Classes="caption wrap" />
+    <Border Classes="panel"><StackPanel Classes="form">
+      <TextBlock Text="Web连接" Classes="section-title" />
+      <TextBlock Text="Web根地址（留空为离线客户端）" Classes="wrap" /><TextBox Text="{Binding ServerUrl}" PlaceholderText="http://nas.local:5187/" AutomationProperties.Name="Web地址" />
+      <TextBlock Text="管理密钥（Web写入时使用，公开查询不需要）" Classes="wrap" /><TextBox Text="{Binding ManagementKey}" PasswordChar="●" AutomationProperties.Name="管理密钥" />
+      <CheckBox IsChecked="{Binding RememberKey}"><TextBlock Text="Windows当前用户加密保存密钥（空值表示移除）" Classes="wrap" /></CheckBox>
+      <Button Classes="quiet form-action" Content="移除已保存密钥" Command="{Binding ForgetKeyCommand}" />
+    </StackPanel></Border>
+    <Border Classes="panel"><StackPanel Classes="form">
+      <TextBlock Text="全局Locale Emulator" Classes="section-title" />
+      <TextBlock Text="工具路径（LEProc.exe或所在目录）" Classes="wrap" />
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"><TextBox Text="{Binding LocaleEmulatorPath}" AutomationProperties.Name="默认转区工具路径" /><Button Grid.Column="1" Content="选择LE" Command="{Binding ChooseLocaleToolCommand}" /></Grid>
+      <Button Classes="form-action" Content="读取全局语言配置" Command="{Binding LoadLocaleProfilesCommand}" />
+      <ComboBox ItemsSource="{Binding LocaleProfiles}" SelectedItem="{Binding SelectedLocaleProfile}" ItemTemplate="{StaticResource LocaleProfileTemplate}" AutomationProperties.Name="默认转区语言" />
+      <TextBlock Text="保存后，在书架或本机启动页选择“LE默认配置”。不会更改系统区域或自动提权；清空工具路径可停用。" Classes="caption wrap" />
+      <Expander Classes="advanced" Header="手动语言配置ID"><StackPanel Classes="form"><TextBlock Text="保留完整GUID手动输入，用于无法自动列出配置时。" Classes="caption wrap" /><TextBox Text="{Binding LocaleProfileId}" AutomationProperties.Name="默认转区GUID" /></StackPanel></Expander>
+    </StackPanel></Border>
+    <Border Classes="panel"><StackPanel Classes="form">
+      <TextBlock Text="目录整理默认值" Classes="section-title" />
+      <TextBlock Text="明确扫描源范围" /><Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"><TextBox Text="{Binding Organization.SourceScope}" AutomationProperties.Name="扫描源范围" /><Button Grid.Column="1" Content="选择源" Command="{Binding ChooseSourceCommand}" /></Grid>
+      <TextBlock Text="归档目标根目录（已存在且同卷）" Classes="wrap" /><Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"><TextBox Text="{Binding Organization.TargetRoot}" AutomationProperties.Name="归档目标根" /><Button Grid.Column="1" Content="选择目标" Command="{Binding ChooseTargetCommand}" /></Grid>
+      <TextBlock Text="按会社／游戏日文原名分组，完整保留特典。保存设置不会扫描或移动文件，实际整理仍需逐次预览和批准。" Classes="caption wrap" />
+      <Expander Classes="advanced" Header="查询JSON存放位置"><StackPanel Classes="form"><TextBlock Text="留空使用文档数据根；VN_LIBRARY_CACHE环境变量优先。修改后同样需保存并应用。" Classes="caption wrap" /><TextBox Text="{Binding QueryRootOverride}" AutomationProperties.Name="查询JSON根目录" /></StackPanel></Expander>
+    </StackPanel></Border>
+    <WrapPanel Classes="filters"><Button Classes="primary" Content="保存并应用" Command="{Binding SaveSettingsCommand}" /><TextBlock Text="应用连接、全局LE与目录默认值" Classes="caption" VerticalAlignment="Center" /></WrapPanel>
+    <Border Classes="panel"><StackPanel Classes="form">
+      <TextBlock Text="界面外观" Classes="section-title" /><TextBlock Text="右上角日／月图标切换本应用明暗主题。此组偏好单独保存。" Classes="caption wrap" />
+      <CheckBox IsChecked="{Binding ReducedMotion}"><TextBlock Text="减少动画（关闭书架悬浮与页面淡入）" Classes="wrap" /></CheckBox>
+      <Button Classes="form-action" Content="保存外观偏好" Command="{Binding SaveAppearanceCommand}" />
+    </StackPanel></Border>
+    <TextBlock Text="高级维护" Classes="section-title" />
+    <Expander Classes="advanced" Header="本机数据与查询作用域"><StackPanel Classes="form">
+      <TextBlock Text="本机数据根（系统文档目录，与程序位置无关）" Classes="wrap" /><SelectableTextBlock Text="{Binding DataRootLocation}" Classes="wrap" />
+      <TextBlock Text="当前服务的查询快照／待同步目录" Classes="wrap" /><SelectableTextBlock Text="{Binding StateLocation}" Classes="wrap" />
+      <Button Classes="form-action" Content="导出本次查询JSON" Command="{Binding Discovery.ExportCommand}" />
+      <TextBlock Text="启动、组件、目录与恢复证据只在本机保存；Web接收作品信息和存在布尔值。更换服务会使用独立快照。" Classes="caption wrap" />
+    </StackPanel></Expander>
+    <Expander Classes="advanced" Header="查询JSON作用域／旧资料迁移"><StackPanel Classes="form">
+      <TextBlock Text="{Binding QueryData.Summary}" Classes="caption wrap" AutomationProperties.LiveSetting="Polite" />
+      <WrapPanel Classes="filters"><Button Content="读取查询诊断" Command="{Binding QueryData.RefreshCommand}" /><Button Content="预览旧查询资料" Command="{Binding QueryData.PreviewCommand}" /></WrapPanel>
+      <CheckBox IsChecked="{Binding QueryData.Approved}"><TextBlock Text="已核对来源证明，确认按原字节复制并保留原件" Classes="wrap" /></CheckBox>
+      <Button Classes="form-action" Content="确认查询资料迁移" Command="{Binding QueryData.ApplyCommand}" AutomationProperties.Name="确认查询资料迁移" />
+    </StackPanel></Expander>
+    <Expander Classes="advanced" Header="导入限额／最近逐项回执"><StackPanel Classes="form">
+      <TextBlock Text="{Binding Imports.Summary}" Classes="caption wrap" AutomationProperties.LiveSetting="Polite" />
+      <Button Classes="form-action" Content="读取导入限额与回执" Command="{Binding Imports.RefreshCommand}" AutomationProperties.Name="读取导入限额与回执" />
+      <ItemsControl ItemsSource="{Binding Imports.DisplayResults}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:ImportFeedbackDisplay"><Border Classes="panel"><StackPanel Classes="form"><TextBlock Text="{Binding Kind}" Classes="caption" /><TextBlock Text="{Binding State}" Classes="strong wrap" /><TextBlock Text="{Binding Key}" Classes="caption wrap" /><TextBlock Text="{Binding Message}" Classes="wrap" /><Expander Classes="advanced" Header="原始状态与键"><SelectableTextBlock Text="{Binding Evidence}" Classes="technical wrap" /></Expander></StackPanel></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+    </StackPanel></Expander>
+    <Expander Classes="advanced" Header="本地存在标记／冲突恢复"><StackPanel Classes="form">
+      <TextBlock Text="{Binding Presence.StateLabel}" Classes="wrap" AutomationProperties.LiveSetting="Polite" />
+      <WrapPanel Classes="filters"><Button Content="读取存在标记状态" Command="{Binding Presence.RefreshCommand}" /><Button Content="按原批次重试" Command="{Binding Presence.RetryCommand}" /><Button Content="预览重新核对" Command="{Binding Presence.PreviewCommand}" /></WrapPanel>
+      <TextBlock Text="{Binding Presence.PreviewLabel}" Classes="caption wrap" />
+      <CheckBox IsChecked="{Binding Presence.Approved}"><TextBlock Text="已核对，确认封存拒绝原件并保存替代意图" Classes="wrap" /></CheckBox>
+      <Button Classes="form-action" Content="确认重新核对" Command="{Binding Presence.ConfirmCommand}" AutomationProperties.Name="确认存在标记重新核对" />
+      <TextBlock Text="不明结果只按原ID重试。需要重新观察安装时，再明确执行下方核对；不会在打开页面时扫描。" Classes="caption wrap" />
+      <WrapPanel Classes="filters"><Button Content="重新核对本机安装" Command="{Binding RecheckLocalCommand}" /><Button Content="同步资料与存在标记" Command="{Binding SyncCommand}" /></WrapPanel>
+    </StackPanel></Expander>
+  </StackPanel></ScrollViewer>
+</UserControl>

@@ -1,0 +1,32 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:Vndb.Desktop.ViewModels"
+             x:Class="Vndb.Desktop.Views.RegistryRepairView" x:DataType="vm:MainViewModel">
+  <StackPanel Classes="form">
+    <TextBlock Text="仅处理厂商Software键中的确切目录字符串。先读取与预览，再备份并应用；请先退出相关游戏。不会执行REG脚本、上传路径或自动提权。" Classes="caption wrap" />
+    <TextBlock Text="1 · 读取已有注册信息" Classes="strong" />
+    <TextBlock Text="整理前的旧目录" /><TextBox Text="{Binding RegistrySource}" AutomationProperties.Name="注册表旧目录" />
+    <TextBlock Text="当前完整游戏目录" /><TextBox Text="{Binding RegistryTarget}" AutomationProperties.Name="注册表当前目录" />
+    <TextBlock Text="会社／游戏关键词" /><TextBox Text="{Binding RegistryTerm}" AutomationProperties.Name="注册表查找关键词" />
+    <WrapPanel Classes="filters"><Button Content="查找已有注册信息" Command="{Binding FindRegistryCommand}" /><Button Content="读取REG文件" Command="{Binding ReadRegistryFileCommand}" /></WrapPanel>
+    <Expander Classes="advanced" Header="REG文件位数与文本编码"><StackPanel Classes="form">
+      <ComboBox ItemsSource="{Binding RegistryViews}" SelectedItem="{Binding RegistryView}" AutomationProperties.Name="REG目标位数" />
+      <ComboBox ItemsSource="{Binding RegistryEncodings}" SelectedItem="{Binding RegistryEncoding}" AutomationProperties.Name="REG文本编码" />
+      <TextBlock Text="仅影响下一次REG文件读取；修改后重新读取。系统查找会分别列出32／64位结果，旧ANSI文件可明确选择编码。" Classes="caption wrap" />
+    </StackPanel></Expander>
+    <ScrollViewer MaxHeight="200"><ItemsControl ItemsSource="{Binding RegistryCandidates}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:RegistryCandidate"><CheckBox IsChecked="{Binding Selected}" HorizontalContentAlignment="Stretch"><StackPanel Classes="compact"><TextBlock Text="{Binding Label}" Classes="wrap" /><TextBlock Text="{Binding Value}" Classes="caption wrap" /></StackPanel></CheckBox></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
+    <TextBlock Text="2 · 选择路径并核对预览" Classes="strong" />
+    <Button Classes="form-action" Content="预览选中路径的修复" Command="{Binding PreviewRegistryCommand}" />
+    <Border Classes="workflow-note"><TextBlock Text="{Binding RegistryStep}" Classes="caption wrap" AutomationProperties.Name="注册信息预览状态" AutomationProperties.LiveSetting="Polite" /></Border>
+    <ScrollViewer MaxHeight="220"><SelectableTextBlock Text="{Binding RegistryPreview}" Classes="wrap" /></ScrollViewer>
+    <TextBlock Text="3 · 明确确认" Classes="strong" />
+    <CheckBox IsChecked="{Binding RegistryApproved}" IsEnabled="{Binding HasRegistryPreview}"><TextBlock Text="已核对当前预览，并确认相关游戏已退出" Classes="wrap" /></CheckBox>
+    <Button Classes="form-action" Content="备份并应用修复预览" Command="{Binding ApplyRegistryCommand}" />
+    <TextBlock Text="只修改本次已预览的路径值；权限不足会保留恢复记录，不请求提权。" Classes="caption wrap" />
+    <Expander Classes="advanced" Header="恢复之前备份的原值"><StackPanel Classes="form">
+      <Button Classes="form-action" Content="读取本机恢复记录" Command="{Binding RefreshRegistryRunsCommand}" />
+      <ComboBox ItemsSource="{Binding RegistryRuns}" SelectedItem="{Binding SelectedRegistryRun}" AutomationProperties.Name="注册表恢复记录" />
+      <Button Classes="form-action" Content="预览恢复原值" Command="{Binding PreviewRegistryRestoreCommand}" />
+      <TextBlock Text="恢复预览显示在上方核对区。核对后勾选同一确认框，再明确恢复；不会同时应用另一份修复预览。" Classes="caption wrap" />
+      <Button Classes="form-action" Content="确认恢复原值" Command="{Binding RestoreRegistryCommand}" />
+    </StackPanel></Expander>
+  </StackPanel>
+</UserControl>

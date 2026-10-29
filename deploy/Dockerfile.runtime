@@ -1,0 +1,15 @@
+# Build context: the linux-x64 folder produced by scripts/Publish-Runtime.ps1.
+# Keep SDK/Roslyn compilation off memory-constrained NAS hosts.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble
+WORKDIR /app
+COPY --chown=1654:1654 --chmod=0555 web/ ./
+COPY --chown=1654:1654 --chmod=0555 admin/ ./admin/
+COPY --chown=1654:1654 --chmod=0555 cli/ ./cli/
+COPY --chown=1654:1654 --chmod=0444 LICENSE NOTICE THIRD-PARTY-NOTICES.md ./
+COPY --chown=1654:1654 --chmod=0555 licenses/ ./licenses/
+LABEL org.opencontainers.image.version="0.5.0"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+ENV ASPNETCORE_HTTP_PORTS=8080 Library__DataDirectory=/data DOTNET_NOLOGO=1
+EXPOSE 8080
+USER 1654
+ENTRYPOINT ["dotnet", "/app/Vndb.Web.dll"]

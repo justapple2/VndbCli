@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>vndb-admin</AssemblyName>
+    <RootNamespace>Vndb.Admin</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Vndb.Core/Vndb.Core.csproj" />
+    <PackageReference Include="System.CommandLine" Version="2.0.13" />
+    <ProjectReference Include="../Vndb.Library/Vndb.Library.csproj" />
+  </ItemGroup>
+</Project>

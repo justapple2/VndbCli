@@ -1,0 +1,99 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:Vndb.Desktop.ViewModels" xmlns:c="using:Vndb.Desktop.Controls" xmlns:views="using:Vndb.Desktop.Views"
+             x:Class="Vndb.Desktop.Views.ShelfView" x:DataType="vm:MainViewModel">
+  <UserControl.Resources>
+    <DataTemplate x:Key="BookCardTemplate" x:DataType="vm:BookViewModel">
+      <Grid ContextRequested="OnBookContextRequested" DoubleTapped="OnBookDoubleTapped">
+        <Button Classes="card" Classes.chosen="{Binding Selected}" Click="OnCardClick" AutomationProperties.Name="{Binding Title}">
+          <Grid RowDefinitions="216,Auto,Auto,Auto" RowSpacing="6">
+            <Grid><c:CoverView Metadata="{Binding Metadata}" Background="{DynamicResource CoverBrush}" /><Border Classes="badge" IsVisible="{Binding IsLocal}" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="6"><TextBlock Text="{Binding LocalLabel}" /></Border></Grid>
+            <TextBlock Grid.Row="1" Text="{Binding Title}" Classes="book-title" ToolTip.Tip="{Binding Title}" />
+            <TextBlock Grid.Row="2" Text="{Binding Company}" Classes="caption ellipsis" ToolTip.Tip="{Binding Company}" />
+            <TextBlock Grid.Row="3" Text="{Binding PlaySummary}" Classes="caption ellipsis" ToolTip.Tip="{Binding PlayAssociationNotice}" />
+          </Grid>
+        </Button>
+        <Button Classes="book-more icon" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="14" Click="OnMoreClick" AutomationProperties.Name="作品更多操作" ToolTip.Tip="更多操作（也可右键或按菜单键）"><c:AppIcon Kind="More" /></Button>
+      </Grid>
+    </DataTemplate>
+    <DataTemplate x:Key="BookListTemplate" x:DataType="vm:BookViewModel">
+      <Grid Classes="book-row" ColumnDefinitions="72,*,36" ContextRequested="OnBookContextRequested" DoubleTapped="OnBookDoubleTapped">
+        <c:CoverView Metadata="{Binding Metadata}" Background="{DynamicResource CoverBrush}" />
+        <StackPanel Grid.Column="1" Classes="compact" VerticalAlignment="Center"><TextBlock Text="{Binding Title}" Classes="strong ellipsis" ToolTip.Tip="{Binding Title}" /><TextBlock Text="{Binding Company}" Classes="caption ellipsis" ToolTip.Tip="{Binding Company}" /><TextBlock Text="{Binding PlaySummary}" Classes="caption" ToolTip.Tip="{Binding PlayAssociationNotice}" /><TextBlock Text="{Binding LastOpenedLabel}" Classes="caption" /></StackPanel>
+        <Button Grid.Column="2" Classes="book-more icon" VerticalAlignment="Top" Click="OnMoreClick" AutomationProperties.Name="作品更多操作" ToolTip.Tip="更多操作"><c:AppIcon Kind="More" /></Button>
+      </Grid>
+    </DataTemplate>
+  </UserControl.Resources>
+  <Grid RowDefinitions="Auto,Auto,*" RowSpacing="8">
+    <Grid x:Name="ShelfToolbar" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+      <StackPanel Classes="compact"><TextBlock Text="{Binding Shelf.PageLabel}" Classes="strong" /><TextBlock Text="{Binding Shelf.Source}" Classes="caption wrap" /></StackPanel>
+      <StackPanel Grid.Column="1" Classes="inline">
+        <Button Classes="quiet icon" Command="{Binding Shelf.OpenDetailsCommand}" AutomationProperties.Name="查看所选作品详情" ToolTip.Tip="查看详情（Enter／双击）"><c:AppIcon Kind="Book" /></Button>
+        <Button x:Name="ShelfViewToggle" Classes="icon" Command="{Binding Shelf.ToggleViewCommand}" ToolTip.Tip="切换卡片／列表" AutomationProperties.Name="切换卡片列表"><c:AppIcon Kind="Grid" /></Button>
+        <Button Classes="icon" Command="{Binding Shelf.PreviousCommand}" ToolTip.Tip="上一页" AutomationProperties.Name="上一页"><c:AppIcon Kind="Left" /></Button>
+        <Button Classes="icon" Command="{Binding Shelf.NextCommand}" ToolTip.Tip="下一页" AutomationProperties.Name="下一页"><c:AppIcon Kind="Right" /></Button>
+      </StackPanel>
+    </Grid>
+    <StackPanel x:Name="ShelfFilters" Grid.Row="1" Classes="compact">
+      <Expander Classes="shelf-filters" Header="{Binding Shelf.FilterHeading}" IsExpanded="{Binding Shelf.FiltersExpanded}" HorizontalContentAlignment="Stretch">
+        <WrapPanel Classes="filters">
+          <TextBox x:Name="ShelfFilter" Classes="shelf-filter" Text="{Binding Shelf.Filter}" PlaceholderText="{Binding Shelf.FilterPlaceholder}" AutomationProperties.Name="筛选当前书架结果" />
+          <ComboBox Classes="company-filter" ItemsSource="{Binding Shelf.CompanyFilters}" SelectedItem="{Binding Shelf.CompanyFilter}" AutomationProperties.Name="会社筛选" />
+          <ComboBox Classes="short-filter" ItemsSource="{Binding Shelf.ShelfStates}" SelectedItem="{Binding Shelf.ShelfState}" AutomationProperties.Name="游玩状态筛选" />
+          <ComboBox Classes="short-filter" ItemsSource="{Binding Shelf.ShelfSorts}" SelectedItem="{Binding Shelf.ShelfSort}" AutomationProperties.Name="书架排序" />
+          <CheckBox Content="降序" IsChecked="{Binding Shelf.SortDescending}" /><CheckBox Content="本机有副本" IsChecked="{Binding Shelf.LocalOnly}" />
+          <Button Classes="quiet icon" Command="{Binding Shelf.ResetFiltersCommand}" ToolTip.Tip="清除当前视图筛选" AutomationProperties.Name="重置筛选"><c:AppIcon Kind="Filter" /></Button>
+          <Button Classes="quiet icon" Command="{Binding Shelf.SavePreferencesCommand}" IsVisible="{Binding Shelf.IsHome}" ToolTip.Tip="记住书架偏好，仅保存于本机" AutomationProperties.Name="记住书架偏好"><c:AppIcon Kind="Save" /></Button>
+        </WrapPanel>
+      </Expander>
+      <TextBlock Text="{Binding Shelf.FilterSummary}" IsVisible="{Binding Shelf.HasFilters}" Classes="caption wrap" AutomationProperties.Name="生效的书架筛选" />
+    </StackPanel>
+    <Grid Grid.Row="2" x:Name="ContentArea">
+      <Grid ColumnDefinitions="*,0" ColumnSpacing="0" x:Name="ShelfColumns">
+        <Grid x:Name="BookArea">
+          <ListBox Classes="card-rows" ItemsSource="{Binding Shelf.Rows}" IsVisible="{Binding !Shelf.ListMode}" x:Name="CardRows" Focusable="False" AutomationProperties.Name="虚拟化卡片书架">
+            <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
+            <ListBox.ItemTemplate><DataTemplate x:DataType="vm:BookRow"><ItemsControl ItemsSource="{Binding Books}" ItemTemplate="{StaticResource BookCardTemplate}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="{Binding Columns}" /></ItemsPanelTemplate></ItemsControl.ItemsPanel></ItemsControl></DataTemplate></ListBox.ItemTemplate>
+          </ListBox>
+          <ListBox Classes="book-list" ItemsSource="{Binding Shelf.Books}" SelectedItem="{Binding Shelf.SelectedBook}" IsVisible="{Binding Shelf.ListMode}" ItemTemplate="{StaticResource BookListTemplate}" x:Name="BookList" AutomationProperties.Name="封面列表书架"><ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate></ListBox.ItemsPanel></ListBox>
+          <TextBlock Text="没有符合筛选的作品。可清除筛选，或进入查询作品。" Classes="caption wrap" IsVisible="{Binding Shelf.ShelfEmpty}" Margin="12" IsHitTestVisible="False" />
+        </Grid>
+      </Grid>
+    </Grid>
+      <Border Grid.RowSpan="3" x:Name="DetailsBackdrop" Background="{DynamicResource OverlayBrush}" IsVisible="False" PointerPressed="OnBackdropPressed" />
+      <Border Grid.Row="2" x:Name="DetailPanel" Classes="panel shelf-detail" IsVisible="False" HorizontalAlignment="Right" Width="{StaticResource ShelfDetailWidth}" KeyboardNavigation.TabNavigation="Cycle">
+        <Grid RowDefinitions="Auto,*" RowSpacing="12">
+          <Grid ColumnDefinitions="*,Auto"><TextBlock Text="作品详情" Classes="section-title" /><Button Grid.Column="1" x:Name="CloseDetails" Classes="quiet icon" Command="{Binding Shelf.CloseDetailsCommand}" AutomationProperties.Name="关闭作品详情" ToolTip.Tip="关闭详情 Esc"><c:AppIcon Kind="Close" /></Button></Grid>
+          <ScrollViewer Grid.Row="1"><StackPanel Classes="form">
+            <c:CoverView x:Name="DetailsCover" Metadata="{Binding SelectedMetadata}" Height="{StaticResource ShelfDetailCoverHeight}" Background="{DynamicResource CoverBrush}" />
+            <ContentControl Content="{Binding BookDetails.Book}" ContentTemplate="{StaticResource BookDetailHeadingTemplate}" />
+            <ItemsControl ItemsSource="{Binding BookDetails.Metadata}" ItemTemplate="{StaticResource DetailFieldTemplate}" />
+            <ItemsControl ItemsSource="{Binding BookDetails.Releases}" ItemTemplate="{StaticResource DetailFieldTemplate}" />
+            <ContentControl Content="{Binding BookDetails.Book}" ContentTemplate="{StaticResource BookDescriptionTemplate}" />
+            <TextBlock Text="游玩经历" Classes="strong" />
+            <ContentControl Content="{Binding BookDetails.Book}" ContentTemplate="{StaticResource BookPlaySummaryTemplate}" />
+            <Button Classes="quiet" Command="{Binding DetailCommand}" Content="读取此条目完整记录" />
+            <ItemsControl ItemsSource="{Binding BookDetails.Plays}">
+              <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:PlayDetailRow">
+                <Border Classes="detail-record"><StackPanel Classes="compact">
+                  <TextBlock Text="{Binding Heading}" Classes="strong wrap" /><TextBlock Text="{Binding Identity}" Classes="caption wrap" />
+                  <TextBlock Text="{Binding Time}" Classes="caption wrap" /><TextBlock Text="{Binding Score}" Classes="caption" />
+                  <SelectableTextBlock Text="{Binding Review}" Classes="wrap" />
+                  <ItemsControl ItemsSource="{Binding Notes}" ItemTemplate="{StaticResource DetailFieldTemplate}" />
+                  <Button Content="编辑这次记录" Command="{Binding $parent[views:ShelfView].((vm:MainViewModel)DataContext).EditPlayRecordCommand}" CommandParameter="{Binding}" />
+                </StackPanel></Border>
+              </DataTemplate></ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Command="{Binding EditBookPlayCommand}" CommandParameter="{Binding SelectedBook}"><StackPanel Classes="inline"><c:AppIcon Kind="Clock" /><TextBlock Text="选择／新建游玩记录" /></StackPanel></Button>
+            <TextBlock Text="仅本机 · 安装与启动" Classes="strong" />
+            <TextBlock Text="{Binding BookDetails.LocalStatus}" Classes="caption wrap" AutomationProperties.Name="本机启动就绪说明" />
+            <ComboBox ItemsSource="{Binding LaunchMethods}" SelectedItem="{Binding LaunchMode}" IsVisible="{Binding BookDetails.LaunchConfigured}" AutomationProperties.Name="书架启动方式" />
+            <Button Classes="primary" Command="{Binding QuickLaunchCommand}" Content="按配置启动" IsVisible="{Binding BookDetails.LaunchConfigured}" />
+            <Button Content="配置／选择启动入口" Command="{Binding ConfigureBookCommand}" CommandParameter="{Binding SelectedBook}" IsVisible="{Binding BookDetails.HasInstallation}" />
+            <Button Content="登记／重新核对本机安装" Command="{Binding RegisterBookCommand}" CommandParameter="{Binding SelectedBook}" />
+            <Button Content="登记本地安装包" Command="{Binding RegisterPackageBookCommand}" CommandParameter="{Binding SelectedBook}" />
+            <Button Content="检查／修复注册路径…" Command="{Binding RegistryBookCommand}" CommandParameter="{Binding SelectedBook}" IsVisible="{Binding BookDetails.HasInstallation}" />
+            <Expander Header="本机安装与组件" HorizontalContentAlignment="Stretch"><StackPanel Classes="compact"><ComboBox ItemsSource="{Binding Installations}" SelectedItem="{Binding SelectedInstallation}" ItemTemplate="{StaticResource InstallationTemplate}" AutomationProperties.Name="完整安装" /><ItemsControl ItemsSource="{Binding SelectedComponents}" ItemTemplate="{StaticResource ComponentTemplate}" /></StackPanel></Expander>
+          </StackPanel></ScrollViewer>
+        </Grid>
+      </Border>
+  </Grid>
+</UserControl>

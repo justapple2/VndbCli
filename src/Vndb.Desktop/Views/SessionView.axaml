@@ -1,0 +1,51 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Vndb.Desktop.ViewModels" xmlns:local="using:Vndb.Local" x:Class="Vndb.Desktop.Views.SessionView" x:DataType="vm:MainViewModel">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled"><StackPanel Classes="settings-page">
+    <Border Classes="workflow-note"><StackPanel Classes="compact"><TextBlock Text="自动计时按需使用" Classes="strong" /><TextBlock Text="可以只启动游戏，也可以明确选定这次游玩后计时。不会自动推算未知时长或判定通关。" Classes="caption wrap" /></StackPanel></Border>
+    <Border Classes="panel"><StackPanel Classes="form">
+      <TextBlock Text="启动配置" Classes="section-title" />
+      <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" ItemTemplate="{StaticResource LaunchProfileTemplate}" AutomationProperties.Name="会话启动配置" />
+      <ComboBox ItemsSource="{Binding LaunchMethods}" SelectedItem="{Binding LaunchMode}" AutomationProperties.Name="会话启动方式" />
+      <Button Classes="form-action" Content="直接游玩，不启用计时" Command="{Binding LaunchCommand}" IsEnabled="{Binding HasSavedLaunch}" AutomationProperties.Name="不计时启动游戏" />
+      <TextBlock Text="仍按所选的直接／LE方式启动；包装器参数和实际进程配置在本机启动页保存。" Classes="caption wrap" />
+    </StackPanel></Border>
+    <Border Classes="panel"><StackPanel Classes="form">
+      <TextBlock Text="1 · 明确这次游玩" Classes="section-title" />
+      <ContentControl Content="{Binding SelectedBook}" ContentTemplate="{StaticResource BookDetailHeadingTemplate}" />
+      <TextBlock Text="本次游玩属于书架所选作品，启动配置须与目标匹配。重玩请另建经历，避免写到上一次。" Classes="caption wrap" />
+      <WrapPanel Classes="filters"><Button Content="读取作品游玩记录" Command="{Binding LoadSessionPlaysCommand}" /><Button Content="新建本次游玩／重玩" Command="{Binding NewPlayTargetCommand}" /></WrapPanel>
+      <ComboBox ItemsSource="{Binding SessionPlays}" SelectedItem="{Binding SelectedPlay}" ItemTemplate="{StaticResource SessionPlayTemplate}" AutomationProperties.Name="选择已有游玩经历" />
+      <Button Classes="form-action" Content="使用选中的已有游玩" Command="{Binding UseExistingPlayCommand}" />
+      <TextBlock Text="本机已建立的游玩目标（含离线记录）" Classes="wrap" />
+      <ComboBox ItemsSource="{Binding PlayTargets}" SelectedItem="{Binding SelectedTarget}" ItemTemplate="{StaticResource SessionTargetTemplate}" AutomationProperties.Name="本次游玩目标" />
+    </StackPanel></Border>
+    <Border Classes="panel"><StackPanel Classes="form">
+      <TextBlock Text="2 · 启动与计时" Classes="section-title" />
+      <TextBlock Text="{Binding SessionStatus}" Classes="wrap" AutomationProperties.Name="本机计时状态" AutomationProperties.LiveSetting="Polite" />
+      <WrapPanel Classes="filters"><Button Classes="primary" Content="启动所选配置并计时" Command="{Binding StartTrackedCommand}" IsEnabled="{Binding CanStartTracked}" /><Button Content="暂停计时" Command="{Binding PauseSessionCommand}" /><Button Content="继续计时" Command="{Binding ResumeSessionCommand}" /><Button Content="结束计时（保留游戏运行）" Command="{Binding StopSessionCommand}" /></WrapPanel>
+      <CheckBox IsChecked="{Binding KeepTimingOnClose}"><TextBlock Text="关闭窗口时最小化并继续计时（退出前请结束会话）" Classes="wrap" /></CheckBox>
+      <TextBlock Text="只有确认身份的游戏进程会累计时间；使用包装器时，可在下方高级工具明确实际游戏进程。" Classes="caption wrap" />
+    </StackPanel></Border>
+    <Border Classes="panel"><StackPanel Classes="form">
+      <TextBlock Text="3 · 留下本次感想（可跳过）" Classes="section-title" />
+      <ComboBox ItemsSource="{Binding PlayStatuses}" SelectedItem="{Binding QuickStatus}" ItemTemplate="{StaticResource StateChoiceTemplate}" AutomationProperties.Name="本次游玩状态" />
+      <TextBox Text="{Binding QuickReview}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="100" AutomationProperties.Name="本次感想" />
+      <Button Classes="form-action" Content="保存感想／状态并待同步" Command="{Binding SaveQuickReviewCommand}" />
+      <TextBlock Text="写入本机JSON后再同步；手工基数、自动会话和调整分别保留。" Classes="caption wrap" />
+    </StackPanel></Border>
+    <Expander Classes="advanced" Header="高级：包装器与实际进程"><StackPanel Classes="form">
+      <TextBlock Text="留空按已保存启动EXE计时。包装器只用于启动及亲缘确认；明确选择实际游戏EXE后，只跟踪确切路径、PID和创建标记。" Classes="caption wrap" />
+      <TextBox Text="{Binding ActualExecutable}" PlaceholderText="实际游戏完整EXE路径（可选）" AutomationProperties.Name="实际游戏路径" />
+      <WrapPanel Classes="filters"><Button Content="选择实际EXE" Command="{Binding ChooseActualExecutableCommand}" /><Button Content="保存实际进程配置" Command="{Binding SaveTrackingCommand}" /><Button Content="列出此路径的已运行进程" Command="{Binding RefreshProcessesCommand}" /></WrapPanel>
+      <ComboBox ItemsSource="{Binding RunningProcesses}" SelectedItem="{Binding SelectedProcess}" AutomationProperties.Name="明确选择已运行游戏进程"><ComboBox.ItemTemplate><DataTemplate x:DataType="local:ProcessObservation"><StackPanel Classes="compact"><TextBlock Text="{Binding ., Converter={StaticResource LocalChoiceLabel}}" Classes="strong wrap" /><TextBlock Text="{Binding Identity.Executable}" Classes="caption wrap" /></StackPanel></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+      <Button Classes="form-action" Content="跟踪选中的确切进程" Command="{Binding AttachProcessCommand}" />
+      <TextBlock Text="修改实际程序后须重新读取并选择进程；不会因为打开本页而扫描进程或启动程序。" Classes="caption wrap" />
+    </StackPanel></Expander>
+    <Expander Classes="advanced" Header="高级：同步、导出与冲突"><StackPanel Classes="form">
+      <TextBlock Text="{Binding ActivityStatus}" Classes="caption wrap" AutomationProperties.LiveSetting="Polite" />
+      <WrapPanel Classes="filters"><Button Content="同步并读取双方冲突" Command="{Binding SyncActivityCommand}" /><Button Content="导出完整活动JSON" Command="{Binding ExportActivityCommand}" /></WrapPanel>
+      <TextBlock Text="冲突在Web会话页核对双方版本后明确选择；未确认结果沿原操作重试。" Classes="caption wrap" />
+      <TextBox Text="{Binding ConflictDetails}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="250" Classes="technical" AutomationProperties.Name="感想冲突双方版本" />
+    </StackPanel></Expander>
+  </StackPanel></ScrollViewer>
+</UserControl>

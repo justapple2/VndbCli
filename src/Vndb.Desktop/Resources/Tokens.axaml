@@ -1,0 +1,58 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="using:System">
+  <Thickness x:Key="PagePadding">24,20,24,16</Thickness>
+  <Thickness x:Key="PanelPadding">20</Thickness>
+  <CornerRadius x:Key="PanelRadius">16</CornerRadius>
+  <Color x:Key="AccentSeed">#7160D2</Color>
+  <sys:Double x:Key="FontCaption">12</sys:Double>
+  <sys:Double x:Key="FontBody">14</sys:Double>
+  <sys:Double x:Key="FontSection">17</sys:Double>
+  <sys:Double x:Key="FontHeading">26</sys:Double>
+  <sys:Double x:Key="ShelfDetailWidth">304</sys:Double>
+  <sys:Double x:Key="ShelfDrawerWidth">360</sys:Double>
+  <sys:Double x:Key="ShelfWideThreshold">1040</sys:Double>
+  <sys:Double x:Key="ShelfCardMinimumWidth">205</sys:Double>
+  <sys:Double x:Key="ShelfDetailCoverHeight">168</sys:Double>
+  <sys:Double x:Key="ShelfDrawerCoverHeight">96</sys:Double>
+  <sys:Double x:Key="FormWideThreshold">900</sys:Double>
+  <sys:Double x:Key="FormMaximumWidth">980</sys:Double>
+  <ResourceDictionary.ThemeDictionaries>
+    <ResourceDictionary x:Key="Light">
+      <SolidColorBrush x:Key="CanvasBrush" Color="#F4F5F9" />
+      <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="SidebarBrush" Color="#EEF0F6" />
+      <SolidColorBrush x:Key="TextBrush" Color="#25283A" />
+      <SolidColorBrush x:Key="MutedBrush" Color="#626B80" />
+      <SolidColorBrush x:Key="EdgeBrush" Color="#DEE2EC" />
+      <SolidColorBrush x:Key="InputEdgeBrush" Color="#7E899E" />
+      <SolidColorBrush x:Key="CoverBrush" Color="#E7EAF2" />
+      <SolidColorBrush x:Key="AccentBrush" Color="#6551CD" />
+      <SolidColorBrush x:Key="AccentSoftBrush" Color="#E7E1FA" />
+      <SolidColorBrush x:Key="PrimaryBrush" Color="#6551CD" />
+      <SolidColorBrush x:Key="PrimaryHoverBrush" Color="#5743B9" />
+      <SolidColorBrush x:Key="SuccessBrush" Color="#216B52" />
+      <SolidColorBrush x:Key="SuccessSoftBrush" Color="#E0F0E9" />
+      <SolidColorBrush x:Key="DangerBrush" Color="#B92F43" />
+      <SolidColorBrush x:Key="DangerFillBrush" Color="#B92F43" />
+      <SolidColorBrush x:Key="OverlayBrush" Color="#600E1221" />
+    </ResourceDictionary>
+    <ResourceDictionary x:Key="Dark">
+      <SolidColorBrush x:Key="CanvasBrush" Color="#12141D" />
+      <SolidColorBrush x:Key="SurfaceBrush" Color="#1C1F2C" />
+      <SolidColorBrush x:Key="SidebarBrush" Color="#171A25" />
+      <SolidColorBrush x:Key="TextBrush" Color="#ECECF4" />
+      <SolidColorBrush x:Key="MutedBrush" Color="#ADB3C9" />
+      <SolidColorBrush x:Key="EdgeBrush" Color="#303547" />
+      <SolidColorBrush x:Key="InputEdgeBrush" Color="#7C87A3" />
+      <SolidColorBrush x:Key="CoverBrush" Color="#292F43" />
+      <SolidColorBrush x:Key="AccentBrush" Color="#B9AAFF" />
+      <SolidColorBrush x:Key="AccentSoftBrush" Color="#322C4D" />
+      <SolidColorBrush x:Key="PrimaryBrush" Color="#7160C9" />
+      <SolidColorBrush x:Key="PrimaryHoverBrush" Color="#6553C4" />
+      <SolidColorBrush x:Key="SuccessBrush" Color="#ABE0C4" />
+      <SolidColorBrush x:Key="SuccessSoftBrush" Color="#243D33" />
+      <SolidColorBrush x:Key="DangerBrush" Color="#FF9AAB" />
+      <SolidColorBrush x:Key="DangerFillBrush" Color="#B92F43" />
+      <SolidColorBrush x:Key="OverlayBrush" Color="#A0080A10" />
+    </ResourceDictionary>
+  </ResourceDictionary.ThemeDictionaries>
+</ResourceDictionary>

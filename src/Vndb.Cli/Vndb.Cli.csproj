@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>vndb</AssemblyName>
+    <RootNamespace>Vndb.Cli</RootNamespace>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>vndb</ToolCommandName>
+    <PackageId>VndbCli</PackageId>
+    <Description>VNDB queries with Web fallback, reviewed local organization and recovery.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Vndb.Core/Vndb.Core.csproj" />
+    <ProjectReference Include="../Vndb.Client/Vndb.Client.csproj" />
+    <ProjectReference Include="../Vndb.Local/Vndb.Local.csproj" />
+    <PackageReference Include="System.CommandLine" Version="2.0.13" />
+  </ItemGroup>
+</Project>

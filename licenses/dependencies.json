@@ -1,0 +1,1092 @@
+{
+  "format": "vndb-local-third-party-v1",
+  "application_version": "0.5.0",
+  "packages": [
+    {
+      "id": "Avalonia",
+      "version": "12.1.4",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+      "authors": "Avalonia Team",
+      "upstream": "https://github.com/AvaloniaUI/Avalonia/",
+      "notices": [
+        "licenses/Avalonia-MIT.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.Angle.Windows.Natives",
+      "version": "2.1.27548.20260419",
+      "license": "BSD-3-Clause",
+      "scope": "runtime",
+      "copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+      "authors": "Avalonia Team",
+      "upstream": "https://github.com/AvaloniaUI/angle/",
+      "notices": [
+        "licenses/Avalonia.Angle.Windows.Natives-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.BuildServices",
+      "version": "11.3.2",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "Copyright 2023-2025 © The AvaloniaUI Project",
+      "authors": "Avalonia Team",
+      "upstream": "https://github.com/AvaloniaUI/Avalonia.BuildServices",
+      "notices": [
+        "licenses/Avalonia-MIT.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.Desktop",
+      "version": "12.1.4",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+      "authors": "Avalonia Team",
+      "upstream": "https://github.com/AvaloniaUI/Avalonia/",
+      "notices": [
+        "licenses/Avalonia-MIT.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.Fonts.Inter",
+      "version": "12.1.4",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+      "authors": "Avalonia Team",
+      "upstream": "https://github.com/AvaloniaUI/Avalonia/",
+      "notices": [
+        "licenses/Avalonia-MIT.txt",
+        "licenses/Inter-OFL-1.1.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.FreeDesktop",
+      "version": "12.1.4",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+      "authors": "Avalonia Team",
+      "upstream": "https://github.com/AvaloniaUI/Avalonia/",
+      "notices": [
+        "licenses/Avalonia-MIT.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.FreeDesktop.AtSpi",
+      "version": "12.1.4",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+      "authors": "Avalonia Team",
+      "upstream": "https://github.com/AvaloniaUI/Avalonia/",
+      "notices": [
+        "licenses/Avalonia-MIT.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.HarfBuzz",
+      "version": "12.1.4",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+      "authors": "Avalonia Team",
+      "upstream": "https://github.com/AvaloniaUI/Avalonia/",
+      "notices": [
+        "licenses/Avalonia-MIT.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.Headless",
+      "version": "12.1.4",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+      "authors": "Avalonia Team",
+      "upstream": "https://github.com/AvaloniaUI/Avalonia/",
+      "notices": [
+        "licenses/Avalonia-MIT.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.Native",
+      "version": "12.1.4",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+      "authors": "Avalonia Team",
+      "upstream": "https://github.com/AvaloniaUI/Avalonia/",
+      "notices": [
+        "licenses/Avalonia-MIT.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.Remote.Protocol",
+      "version": "12.1.4",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+      "authors": "Avalonia Team",
+      "upstream": "https://github.com/AvaloniaUI/Avalonia/",
+      "notices": [
+        "licenses/Avalonia-MIT.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.Skia",
+      "version": "12.1.4",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+      "authors": "Avalonia Team",
+      "upstream": "https://github.com/AvaloniaUI/Avalonia/",
+      "notices": [
+        "licenses/Avalonia-MIT.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.Themes.Fluent",
+      "version": "12.1.4",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+      "authors": "Avalonia Team",
+      "upstream": "https://github.com/AvaloniaUI/Avalonia/",
+      "notices": [
+        "licenses/Avalonia-MIT.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.Win32",
+      "version": "12.1.4",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+      "authors": "Avalonia Team",
+      "upstream": "https://github.com/AvaloniaUI/Avalonia/",
+      "notices": [
+        "licenses/Avalonia-MIT.txt"
+      ]
+    },
+    {
+      "id": "Avalonia.X11",
+      "version": "12.1.4",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "Copyright 2013-2026 © The AvaloniaUI Project",
+      "authors": "Avalonia Team",
+      "upstream": "https://github.com/AvaloniaUI/Avalonia/",
+      "notices": [
+        "licenses/Avalonia-MIT.txt"
+      ]
+    },
+    {
+      "id": "CommunityToolkit.Mvvm",
+      "version": "8.4.2",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "(c) .NET Foundation and Contributors. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/CommunityToolkit/dotnet",
+      "notices": [
+        "licenses/CommunityToolkit.Mvvm-License.md",
+        "licenses/CommunityToolkit.Mvvm-ThirdPartyNotices.txt"
+      ]
+    },
+    {
+      "id": "HarfBuzzSharp",
+      "version": "8.3.1.3",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://go.microsoft.com/fwlink/?linkid=868515",
+      "notices": [
+        "licenses/HarfBuzzSharp-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "HarfBuzzSharp.NativeAssets.Linux",
+      "version": "8.3.1.3",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://go.microsoft.com/fwlink/?linkid=868515",
+      "notices": [
+        "licenses/HarfBuzzSharp-LICENSE.txt",
+        "licenses/HarfBuzzSharp.NativeAssets.Linux-THIRD-PARTY-NOTICES.txt"
+      ]
+    },
+    {
+      "id": "HarfBuzzSharp.NativeAssets.macOS",
+      "version": "8.3.1.3",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://go.microsoft.com/fwlink/?linkid=868515",
+      "notices": [
+        "licenses/HarfBuzzSharp-LICENSE.txt",
+        "licenses/HarfBuzzSharp.NativeAssets.Linux-THIRD-PARTY-NOTICES.txt"
+      ]
+    },
+    {
+      "id": "HarfBuzzSharp.NativeAssets.WebAssembly",
+      "version": "8.3.1.3",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://go.microsoft.com/fwlink/?linkid=868515",
+      "notices": [
+        "licenses/HarfBuzzSharp-LICENSE.txt",
+        "licenses/HarfBuzzSharp.NativeAssets.Linux-THIRD-PARTY-NOTICES.txt"
+      ]
+    },
+    {
+      "id": "HarfBuzzSharp.NativeAssets.Win32",
+      "version": "8.3.1.3",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://go.microsoft.com/fwlink/?linkid=868515",
+      "notices": [
+        "licenses/HarfBuzzSharp-LICENSE.txt",
+        "licenses/HarfBuzzSharp.NativeAssets.Linux-THIRD-PARTY-NOTICES.txt"
+      ]
+    },
+    {
+      "id": "MicroCom.Runtime",
+      "version": "0.11.6",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "Copyright 2021 © Nikita Tsukanov",
+      "authors": "MicroCom.Runtime",
+      "upstream": "https://github.com/kekekeks/MicroCom",
+      "notices": [
+        "licenses/MicroCom-MIT.txt"
+      ]
+    },
+    {
+      "id": "Microsoft.ApplicationInsights",
+      "version": "2.23.0",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/Microsoft/ApplicationInsights-dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.AspNetCore.Mvc.Testing",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.AspNetCore.Mvc.Testing-THIRD-PARTY-NOTICES.TXT",
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.AspNetCore.OpenApi",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.AspNetCore.Mvc.Testing-THIRD-PARTY-NOTICES.TXT",
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.AspNetCore.TestHost",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.AspNetCore.Mvc.Testing-THIRD-PARTY-NOTICES.TXT",
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Bcl.AsyncInterfaces",
+      "version": "6.0.0",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/runtime",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Bcl.AsyncInterfaces-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Data.Sqlite",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Data.Sqlite.Core",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Configuration",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Configuration.Abstractions",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Configuration.Binder",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Configuration.CommandLine",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Configuration.EnvironmentVariables",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Configuration.FileExtensions",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Configuration.Json",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Configuration.UserSecrets",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.DependencyInjection",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.DependencyInjection.Abstractions",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.DependencyModel",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Diagnostics",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Diagnostics.Abstractions",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.FileProviders.Abstractions",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.FileProviders.Physical",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.FileSystemGlobbing",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Hosting",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Hosting.Abstractions",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Logging",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Logging.Abstractions",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Logging.Configuration",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Logging.Console",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Logging.Debug",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Logging.EventLog",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Logging.EventSource",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Options",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Options.ConfigurationExtensions",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Extensions.Primitives",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.OpenApi",
+      "version": "2.12.2",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/Microsoft/OpenAPI.NET",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Testing.Extensions.Telemetry",
+      "version": "2.5.1",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/microsoft/testfx",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Testing.Extensions.TrxReport.Abstractions",
+      "version": "2.5.1",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/microsoft/testfx",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Testing.Platform",
+      "version": "2.5.1",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/microsoft/testfx",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Testing.Platform.MSBuild",
+      "version": "2.5.1",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/microsoft/testfx",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT"
+      ]
+    },
+    {
+      "id": "Microsoft.Win32.Registry",
+      "version": "5.0.0",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "git://github.com/dotnet/runtime",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Win32.Registry-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "SkiaSharp",
+      "version": "3.119.4",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://go.microsoft.com/fwlink/?linkid=868515",
+      "notices": [
+        "licenses/HarfBuzzSharp-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "SkiaSharp.NativeAssets.Linux",
+      "version": "3.119.4",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://go.microsoft.com/fwlink/?linkid=868515",
+      "notices": [
+        "licenses/HarfBuzzSharp-LICENSE.txt",
+        "licenses/HarfBuzzSharp.NativeAssets.Linux-THIRD-PARTY-NOTICES.txt"
+      ]
+    },
+    {
+      "id": "SkiaSharp.NativeAssets.macOS",
+      "version": "3.119.4",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://go.microsoft.com/fwlink/?linkid=868515",
+      "notices": [
+        "licenses/HarfBuzzSharp-LICENSE.txt",
+        "licenses/HarfBuzzSharp.NativeAssets.Linux-THIRD-PARTY-NOTICES.txt"
+      ]
+    },
+    {
+      "id": "SkiaSharp.NativeAssets.WebAssembly",
+      "version": "3.119.4",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://go.microsoft.com/fwlink/?linkid=868515",
+      "notices": [
+        "licenses/HarfBuzzSharp-LICENSE.txt",
+        "licenses/HarfBuzzSharp.NativeAssets.Linux-THIRD-PARTY-NOTICES.txt"
+      ]
+    },
+    {
+      "id": "SkiaSharp.NativeAssets.Win32",
+      "version": "3.119.4",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://go.microsoft.com/fwlink/?linkid=868515",
+      "notices": [
+        "licenses/HarfBuzzSharp-LICENSE.txt",
+        "licenses/HarfBuzzSharp.NativeAssets.Linux-THIRD-PARTY-NOTICES.txt"
+      ]
+    },
+    {
+      "id": "SQLitePCLRaw.bundle_e_sqlite3",
+      "version": "2.1.13",
+      "license": "Apache-2.0",
+      "scope": "runtime",
+      "copyright": "Copyright 2014-2024 SourceGear, LLC",
+      "authors": "Eric Sink",
+      "upstream": "https://github.com/ericsink/SQLitePCL.raw",
+      "notices": [
+        "LICENSE"
+      ]
+    },
+    {
+      "id": "SQLitePCLRaw.core",
+      "version": "2.1.13",
+      "license": "Apache-2.0",
+      "scope": "runtime",
+      "copyright": "Copyright 2014-2024 SourceGear, LLC",
+      "authors": "Eric Sink",
+      "upstream": "https://github.com/ericsink/SQLitePCL.raw",
+      "notices": [
+        "LICENSE"
+      ]
+    },
+    {
+      "id": "SQLitePCLRaw.lib.e_sqlite3",
+      "version": "2.1.13",
+      "license": "Apache-2.0",
+      "scope": "runtime",
+      "copyright": "Copyright 2014-2024 SourceGear, LLC",
+      "authors": "Eric Sink",
+      "upstream": "https://github.com/ericsink/SQLitePCL.raw",
+      "notices": [
+        "LICENSE"
+      ]
+    },
+    {
+      "id": "SQLitePCLRaw.provider.e_sqlite3",
+      "version": "2.1.13",
+      "license": "Apache-2.0",
+      "scope": "runtime",
+      "copyright": "Copyright 2014-2024 SourceGear, LLC",
+      "authors": "Eric Sink",
+      "upstream": "https://github.com/ericsink/SQLitePCL.raw",
+      "notices": [
+        "LICENSE"
+      ]
+    },
+    {
+      "id": "System.CommandLine",
+      "version": "2.0.13",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT"
+      ]
+    },
+    {
+      "id": "System.Diagnostics.EventLog",
+      "version": "10.0.13",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "System.Security.AccessControl",
+      "version": "6.0.1",
+      "license": "MIT",
+      "scope": "test/build",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/runtime",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/System.Security.AccessControl-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "System.Security.Cryptography.ProtectedData",
+      "version": "10.0.0",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "© Microsoft Corporation. All rights reserved.",
+      "authors": "Microsoft",
+      "upstream": "https://github.com/dotnet/dotnet",
+      "notices": [
+        "licenses/Microsoft.Bcl.AsyncInterfaces-LICENSE.TXT",
+        "licenses/Microsoft.Extensions.Configuration-THIRD-PARTY-NOTICES.TXT"
+      ]
+    },
+    {
+      "id": "Tmds.DBus.Protocol",
+      "version": "0.94.1",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "Tom Deseyn",
+      "authors": "Tom Deseyn",
+      "upstream": "https://github.com/tmds/Tmds.DBus.git",
+      "notices": [
+        "licenses/Tmds-DBus-MIT.txt"
+      ]
+    },
+    {
+      "id": "xunit.analyzers",
+      "version": "2.2.0",
+      "license": "Apache-2.0",
+      "scope": "test/build",
+      "copyright": "Copyright (C) .NET Foundation",
+      "authors": "jnewkirk,bradwilson,marcind",
+      "upstream": "https://github.com/xunit/xunit.analyzers",
+      "notices": [
+        "LICENSE",
+        "licenses/xunit-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "xunit.v3.assert",
+      "version": "4.0.2",
+      "license": "Apache-2.0",
+      "scope": "test/build",
+      "copyright": "Copyright (C) .NET Foundation",
+      "authors": "jnewkirk,bradwilson",
+      "upstream": "https://github.com/xunit/xunit",
+      "notices": [
+        "LICENSE",
+        "licenses/xunit-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "xunit.v3.common",
+      "version": "4.0.2",
+      "license": "Apache-2.0",
+      "scope": "test/build",
+      "copyright": "Copyright (C) .NET Foundation",
+      "authors": "jnewkirk,bradwilson",
+      "upstream": "https://github.com/xunit/xunit",
+      "notices": [
+        "LICENSE",
+        "licenses/xunit-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "xunit.v3.core.mtp-v2",
+      "version": "4.0.2",
+      "license": "Apache-2.0",
+      "scope": "test/build",
+      "copyright": "Copyright (C) .NET Foundation",
+      "authors": "jnewkirk,bradwilson",
+      "upstream": "https://github.com/xunit/xunit",
+      "notices": [
+        "LICENSE",
+        "licenses/xunit-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "xunit.v3.extensibility.core",
+      "version": "4.0.2",
+      "license": "Apache-2.0",
+      "scope": "test/build",
+      "copyright": "Copyright (C) .NET Foundation",
+      "authors": "jnewkirk,bradwilson",
+      "upstream": "https://github.com/xunit/xunit",
+      "notices": [
+        "LICENSE",
+        "licenses/xunit-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "xunit.v3.mtp-v2",
+      "version": "4.0.2",
+      "license": "Apache-2.0",
+      "scope": "test/build",
+      "copyright": "Copyright (C) .NET Foundation",
+      "authors": "jnewkirk,bradwilson",
+      "upstream": "https://github.com/xunit/xunit",
+      "notices": [
+        "LICENSE",
+        "licenses/xunit-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "xunit.v3.runner.common",
+      "version": "4.0.2",
+      "license": "Apache-2.0",
+      "scope": "test/build",
+      "copyright": "Copyright (C) .NET Foundation",
+      "authors": "jnewkirk,bradwilson",
+      "upstream": "https://github.com/xunit/xunit",
+      "notices": [
+        "LICENSE",
+        "licenses/xunit-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "xunit.v3.runner.inproc.console",
+      "version": "4.0.2",
+      "license": "Apache-2.0",
+      "scope": "test/build",
+      "copyright": "Copyright (C) .NET Foundation",
+      "authors": "jnewkirk,bradwilson",
+      "upstream": "https://github.com/xunit/xunit",
+      "notices": [
+        "LICENSE",
+        "licenses/xunit-LICENSE.txt"
+      ]
+    },
+    {
+      "id": "ZstdSharp.Port",
+      "version": "0.8.8",
+      "license": "MIT",
+      "scope": "runtime",
+      "copyright": "Copyright Oleg Stepanischev 2026",
+      "authors": "Oleg Stepanischev",
+      "upstream": "https://github.com/oleg-st/ZstdSharp.git",
+      "notices": [
+        "licenses/ZstdSharp-MIT.txt"
+      ]
+    }
+  ]
+}

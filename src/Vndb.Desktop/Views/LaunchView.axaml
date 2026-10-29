@@ -1,0 +1,54 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:Vndb.Desktop.ViewModels"
+             xmlns:local="using:Vndb.Local" xmlns:views="using:Vndb.Desktop.Views" x:Class="Vndb.Desktop.Views.LaunchView" x:DataType="vm:MainViewModel">
+  <ScrollViewer x:Name="PageScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled">
+    <Grid x:Name="LayoutGrid" ColumnDefinitions="2*,3*" ColumnSpacing="16" RowSpacing="16">
+      <Border x:Name="ProfilesPane" Classes="panel">
+        <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="12">
+          <TextBlock Text="已保存的启动配置" Classes="section-title" />
+          <StackPanel Grid.Row="1" Classes="compact"><TextBox Text="{Binding LaunchFilter}" PlaceholderText="筛选启动名称" AutomationProperties.Name="筛选启动配置" /><CheckBox IsChecked="{Binding ProfilesForSelectedBook}"><TextBlock Text="只看当前作品／安装" Classes="wrap" /></CheckBox></StackPanel>
+          <ListBox Grid.Row="2" ItemsSource="{Binding FilteredProfiles}" SelectedItem="{Binding SelectedProfile}" AutomationProperties.Name="本机启动配置列表" ItemTemplate="{StaticResource LaunchProfileTemplate}" />
+          <StackPanel Grid.Row="3" Classes="form">
+            <ComboBox ItemsSource="{Binding LaunchMethods}" SelectedItem="{Binding LaunchMode}" AutomationProperties.Name="本机启动方式" />
+            <Button Content="启动所选已保存配置" Classes="primary" Command="{Binding LaunchCommand}" IsEnabled="{Binding HasSavedLaunch}" AutomationProperties.Name="显式启动本机游戏" />
+            <TextBlock Text="基本启动不依赖Web，也不要求开启计时。LE使用设置页已保存的全局配置。" Classes="caption wrap" />
+          </StackPanel>
+        </Grid>
+      </Border>
+      <ScrollViewer x:Name="EditorScroll" Grid.Column="1" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Classes="form">
+          <Border Classes="panel"><StackPanel Classes="form">
+            <TextBlock Text="配置启动入口" Classes="section-title" />
+            <Border Classes="workflow-note"><TextBlock Text="{Binding LaunchDraftNotice}" Classes="caption wrap" AutomationProperties.Name="启动草稿状态" AutomationProperties.LiveSetting="Polite" /></Border>
+            <TextBlock Text="名称" /><TextBox Text="{Binding LaunchTitle}" AutomationProperties.Name="启动名称" />
+            <TextBlock Text="启动程序（游戏或包装工具EXE）" Classes="wrap" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"><TextBox Text="{Binding Executable}" AutomationProperties.Name="启动程序路径" /><Button Grid.Column="1" Content="选择EXE" Command="{Binding ChooseExecutableCommand}" /></Grid>
+            <TextBlock Text="启动参数" /><TextBox Text="{Binding ArgumentsText}" PlaceholderText="SiglusEngine.exe" AutomationProperties.Name="自定义启动参数" />
+            <TextBlock Text="每个带空格的参数用双引号包围。包装器选作启动程序，实际游戏名可写在参数中。" Classes="caption wrap" />
+            <TextBlock Text="工作目录" /><TextBox Text="{Binding WorkingDirectory}" AutomationProperties.Name="工作目录" />
+            <TextBlock Text="完整安装（可选）" /><ComboBox ItemsSource="{Binding LaunchInstallations}" SelectedItem="{Binding SelectedLaunchInstallation}" ItemTemplate="{StaticResource InstallationTemplate}" AutomationProperties.Name="启动关联安装" />
+            <TextBlock Text="关联的作品／特典组件" /><ComboBox ItemsSource="{Binding LaunchComponents}" SelectedItem="{Binding SelectedLaunchComponent}" ItemTemplate="{StaticResource LaunchComponentTemplate}" AutomationProperties.Name="启动关联组件" />
+            <TextBlock Text="独立离线配置可以不关联安装。修改已有组件关联时，须明确选择所属完整安装。" Classes="caption wrap" />
+            <WrapPanel Classes="filters"><Button Classes="primary" Content="保存本机配置" Command="{Binding SaveLaunchCommand}" /><Button Content="新增独立配置" Command="{Binding NewLaunchCommand}" ToolTip.Tip="清空编辑草稿和安装选择；已保存配置保留。" /></WrapPanel>
+          </StackPanel></Border>
+          <Border Classes="panel"><StackPanel Classes="form">
+            <TextBlock Text="核对已保存命令" Classes="section-title" />
+            <TextBlock Text="预览不运行程序，使用左侧选中的已保存配置和当前启动方式。" Classes="caption wrap" />
+            <Button Classes="form-action" Content="预览已保存命令（不启动）" Command="{Binding PreviewLaunchCommand}" IsEnabled="{Binding HasSavedLaunch}" />
+            <SelectableTextBlock Text="{Binding LaunchPreview}" Classes="wrap" AutomationProperties.Name="已保存启动命令预览" />
+          </StackPanel></Border>
+          <Expander Classes="advanced" Header="高级：参数、组件ID与候选程序">
+            <StackPanel Classes="form">
+              <TextBlock Text="参数JSON数组（与上方参数双向转换）" Classes="wrap" /><TextBox Text="{Binding ArgumentsJson}" Classes="technical" AutomationProperties.Name="启动参数JSON数组" />
+              <TextBlock Text="组件ID（保留完整手动输入）" /><TextBox Text="{Binding ComponentId}" AutomationProperties.Name="组件ID" />
+              <Button Classes="form-action" Content="发现此目录的候选EXE（需手动选择）" Command="{Binding DiscoverExecutablesCommand}" />
+              <ComboBox ItemsSource="{Binding ExecutableCandidates}" SelectedItem="{Binding SelectedExecutableCandidate}" AutomationProperties.Name="候选游戏程序"><ComboBox.ItemTemplate><DataTemplate x:DataType="local:ExecutableCandidate"><StackPanel Classes="compact"><TextBlock Text="{Binding Path}" Classes="wrap" /><TextBlock Text="{Binding Description}" Classes="caption wrap" /></StackPanel></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+              <TextBlock Text="只有点击发现才读取指定目录。选择或导入资料不会创建启动配置，快捷方式也不会被自动解析执行。" Classes="caption wrap" />
+            </StackPanel>
+          </Expander>
+          <Expander Classes="advanced" Header="迁移后的注册信息检查／路径修复" IsExpanded="{Binding RegistryExpanded}"><views:RegistryRepairView /></Expander>
+          <TextBlock Text="启动失败且怀疑目录迁移时，可展开上方检查注册路径：输入旧目录 → 读取已有值 → 预览 → 备份并确认。仅处理厂商路径字符串；不自动导入REG、不提权。" Classes="caption wrap" />
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
+  </ScrollViewer>
+</UserControl>

@@ -1,0 +1,11 @@
+**/bin
+**/obj
+.git
+.vs
+artifacts
+tmp
+tests
+docs
+scripts
+*.binlog
+.env*

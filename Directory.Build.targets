@@ -1,0 +1,14 @@
+<Project>
+  <!-- Emit SDK-resolved publish members outside the publish tree, including the single-file bundle. -->
+  <Target Name="VnRecordPublishFiles" AfterTargets="Publish"
+          Condition="'$(VnPublishFiles)' != '' and '$(MSBuildProjectName)' == '$(VnPublishProject)'">
+    <ItemGroup>
+      <_VnPublishFile Include="@(ResolvedFileToPublish->'%(RelativePath)')" />
+      <_VnPublishFile Include="$(PublishedSingleFileName)" Condition="'$(PublishSingleFile)' == 'true'" />
+      <_VnPublishFile Include="@(_PublishStaticWebAssetsTargetPath->'%(TargetPath)')" />
+      <_VnPublishFile Include="$(TargetName).staticwebassets.endpoints.json" Condition="Exists('$(StaticWebAssetEndpointsPublishManifestPath)')" />
+    </ItemGroup>
+    <Error Condition="Exists('$(VnPublishFiles)')" Text="Publish inventory already exists; use a new generation." />
+    <WriteLinesToFile File="$(VnPublishFiles)" Lines="@(_VnPublishFile)" Overwrite="false" Encoding="UTF-8" />
+  </Target>
+</Project>

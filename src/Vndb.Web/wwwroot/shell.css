@@ -1,0 +1,62 @@
+/* Shared page shell. Page-specific forms keep their existing consumers and routes. */
+[hidden] { display: none !important; }
+body { font-size: var(--font-body); }
+button, input, select, textarea { font: inherit; }
+input, select, textarea { max-width: 100%; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.sidebar { width: 236px; padding: 24px 16px; overflow-y: auto; gap: 16px; }
+.sidebar .brand { margin: 0 8px 8px; font-size: 20px; gap: 10px; }
+.brand svg, .nav-item svg, .navigation-toggle svg { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.site-nav { display: grid; gap: 4px; }
+.nav-item { text-decoration: none; font-size: 14px; padding: 10px 12px; margin: 0; border-radius: 8px; }
+.nav-item.selected, .nav-item[aria-current] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.nav-item:hover { background: var(--accent-soft); }
+.site-tools { margin-top: 8px; }
+.site-tools summary { padding: 10px 12px; color: var(--muted); cursor: pointer; }
+.site-tools .nav-item { font-size: 13px; }
+.sidebar .company-label { margin: 8px 10px 0; }
+.side-label, .side-bottom, .side-bottom small, .side-bottom .plain, .counter { font-size: var(--font-caption); }
+.side-bottom { margin-top: auto; padding: 16px 8px 0; }
+.workspace { margin-left: 236px; min-width: 0; }
+.topbar { min-height: 64px; height: auto; padding: 16px 32px; gap: 12px; font-size: 13px; }
+.crumb { overflow-wrap: anywhere; }
+.workspace main { padding: 28px 32px; width: 100%; min-width: 0; }
+.workspace .manager { max-width: 1400px; margin: 0 auto; }
+.page-heading { flex-wrap: wrap; }
+.page-heading p, .plain, .small, .form-help, .eyebrow, .view-note, .pagination > span, .settings-dialog .small { font-size: var(--font-caption); }
+.page-heading p { line-height: 1.8; }
+.primary { background: var(--accent); color: white; font-size: 14px; border-radius: 8px; }
+.primary:hover { background: var(--accent-hover); }
+.secondary { background: var(--light); border-radius: 8px; font-size: 13px; }
+.secondary:hover { background: var(--accent-soft); }
+.manager-tabs { overflow-x: auto; flex-wrap: nowrap; }
+.manager-tabs button { white-space: nowrap; }
+.manager-tabs .active { color: var(--accent); border-color: var(--accent); }
+.manager-block, .manager-card { background: var(--light); border-color: var(--line); }
+.manager-block pre, #time { overflow: auto; max-width: 100%; }
+.notice { font-size: 14px; }
+.notice.error { color: var(--danger); background: var(--danger-soft); }
+.local-presence { background: var(--success-soft); color: var(--success); font-size: var(--font-caption); }
+.navigation-toggle { display: none; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; white-space: nowrap; }
+.mobile-navigation { padding: 20px; width: min(360px, calc(100vw - 24px)); max-height: 90dvh; overflow: auto; }
+.mobile-navigation > button { margin-bottom: 16px; }
+@media (max-width: 900px) {
+  .sidebar { display: none; }
+  .workspace { margin-left: 0; }
+  .navigation-toggle { display: inline-flex; }
+  .workspace main { padding: 24px 20px; }
+  .topbar { padding: 12px 20px; }
+  .toast { left: 50%; }
+}
+@media (max-width: 500px) {
+  .workspace main { padding: 20px 14px; }
+  .topbar { padding: 10px 14px; flex-wrap: wrap; }
+  h1 { font-size: 28px; }
+  .page-heading > .primary { font-size: 14px; width: auto; height: auto; margin: 0; padding: 10px 14px; }
+  .statistics { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .statistics div { border: 0; padding: 0; }
+  .statistics span { font-size: var(--font-caption); }
+  .search-row { flex-wrap: wrap; }
+  .tabs { gap: 12px; flex-wrap: wrap; }
+  .manager-toolbar > label { min-width: 0; }
+}

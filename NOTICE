@@ -1,0 +1,17 @@
+VNDB Local 0.5
+Copyright (c) 2026 VNDB Local contributors.
+
+Original project code is licensed under the Apache License, Version 2.0.
+Third-party components retain their own licenses and copyright notices.
+See THIRD-PARTY-NOTICES.md and licenses/dependencies.json for the complete
+dependency list and the accompanying original license and notice texts.
+
+SQLitePCL.raw: Copyright 2014-2024 SourceGear, LLC (Apache-2.0).
+xUnit.net: Copyright (c) .NET Foundation and Contributors (Apache-2.0).
+Fluent UI System Icons: Copyright (c) 2020 Microsoft Corporation (MIT).
+Inter: Copyright (c) 2016 The Inter Project Authors (SIL OFL 1.1).
+Portions of the rendering stack use the FreeType Project (www.freetype.org).
+
+VNDB data, game images, games, and user records are separate from this
+software license. VNDB data remains subject to its original data license;
+images remain subject to the rights of their respective owners.

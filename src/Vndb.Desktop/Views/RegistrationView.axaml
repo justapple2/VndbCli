@@ -1,0 +1,46 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Vndb.Desktop.ViewModels" xmlns:c="using:Vndb.Desktop.Controls"
+             x:Class="Vndb.Desktop.Views.RegistrationView" x:DataType="vm:RegistrationFeatureViewModel">
+  <ScrollViewer x:Name="PageScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled">
+  <Grid x:Name="LayoutGrid" ColumnDefinitions="*,*" ColumnSpacing="16" RowSpacing="12">
+    <ScrollViewer x:Name="FormPane">
+      <StackPanel Classes="form">
+        <Border Classes="panel"><StackPanel Classes="form">
+          <StackPanel Classes="inline"><c:AppIcon Kind="Folder" /><TextBlock Text="1 · 选择完整安装" Classes="section-title" /></StackPanel>
+          <TextBlock Text="选择游戏或合集的最外层目录，特典与章节保留在里面。" Classes="caption wrap" />
+          <TextBlock Text="完整目录 *" /><Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"><TextBox Text="{Binding RootPath}" AutomationProperties.Name="登记完整目录" AutomationProperties.IsRequiredForForm="True" /><Button Grid.Column="1" Classes="icon" Command="{Binding ChooseRootCommand}" AutomationProperties.Name="选择登记目录"><c:AppIcon Kind="Folder" /></Button></Grid>
+          <TextBlock Text="游戏／合集名称 *" /><TextBox Text="{Binding ContainerTitle}" AutomationProperties.Name="登记容器名称" AutomationProperties.IsRequiredForForm="True" />
+          <TextBlock Text="会社分组（可留空）" /><TextBox Text="{Binding Company}" AutomationProperties.Name="登记会社分组" />
+        </StackPanel></Border>
+        <Border Classes="panel"><StackPanel Classes="form">
+          <TextBlock Text="2 · 添加作品与特典" Classes="section-title" />
+          <TextBlock Text="{Binding SelectionLabel}" Classes="caption wrap" />
+          <TextBlock Text="作品名称" /><TextBox Text="{Binding WorkTitle}" AutomationProperties.Name="登记作品名称" />
+          <TextBlock Text="相对目录（游戏就在根目录时填写 .）" Classes="wrap" /><TextBox Text="{Binding RelativePath}" AutomationProperties.Name="登记组件相对目录" />
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="8"><ComboBox ItemsSource="{Binding ComponentKinds}" SelectedItem="{Binding ComponentKind}" ItemTemplate="{StaticResource ComponentKindTemplate}" AutomationProperties.Name="登记组件类型" /><TextBox Grid.Column="1" Text="{Binding ComponentLabel}" PlaceholderText="特典／版本说明" AutomationProperties.Name="登记组件说明" /></Grid>
+          <WrapPanel Classes="filters"><Button Content="添加组件" Command="{Binding AddComponentCommand}" /><Button Content="改填未收录作品" Command="{Binding ManualWorkCommand}" /></WrapPanel>
+          <ListBox ItemsSource="{Binding Components}" SelectedItem="{Binding SelectedComponent}" MaxHeight="220" AutomationProperties.Name="待登记作品组件">
+            <ListBox.ItemTemplate><DataTemplate x:DataType="vm:RegistrationRow"><StackPanel Classes="compact"><TextBlock Text="{Binding Title}" Classes="strong wrap" /><TextBlock Text="{Binding Location}" Classes="caption wrap" /></StackPanel></DataTemplate></ListBox.ItemTemplate>
+          </ListBox>
+          <Button Content="移除选中草稿组件" Command="{Binding RemoveComponentCommand}" Classes="quiet" />
+          <TextBlock Text="添加另一部作品时，可回书架或查询结果选择它，再点“登记本机安装”；当前合集草稿会保留；修改组件输入后需点“添加组件”才会加入本次登记。" Classes="caption wrap" />
+        </StackPanel></Border>
+      </StackPanel>
+    </ScrollViewer>
+    <Border x:Name="PreviewPane" Grid.Column="1" Classes="panel">
+      <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="12">
+        <TextBlock Text="3 · 核对本次登记" Classes="section-title" />
+        <Button Grid.Row="1" Content="生成登记预览" Command="{Binding PreviewCommand}" />
+        <ScrollViewer Grid.Row="2"><SelectableTextBlock Text="{Binding PreviewSummary}" Classes="wrap" AutomationProperties.Name="本机登记预览" /></ScrollViewer>
+        <StackPanel Grid.Row="3" Classes="form">
+          <TextBlock Text="{Binding ValidationMessage}" Classes="caption wrap" AutomationProperties.LiveSetting="Polite" />
+          <CheckBox HorizontalContentAlignment="Stretch" IsChecked="{Binding Approved}" AutomationProperties.Name="确认本机登记"><TextBlock Text="已核对完整目录和作品组件，确认保存关联" Classes="wrap" /></CheckBox>
+          <Button Classes="primary" Content="确认登记" Command="{Binding ConfirmCommand}" AutomationProperties.Name="保存本机关联" />
+          <Expander Classes="advanced" Header="高级：导出本次公开登记"><StackPanel Classes="form"><Button Content="导出本次公开登记JSON" Command="{Binding ExportCommand}" /><TextBlock Text="确认登记后可离线导出，在Web会话页导入活动JSON。文件不含安装路径，原稿留在本机。" Classes="caption wrap" /></StackPanel></Expander>
+          <TextBlock Text="游戏文件保持原位。登记后在本机启动页配置EXE；联网只同步公开作品及“在本地”，目录和组件留在本机。" Classes="caption wrap" />
+        </StackPanel>
+      </Grid>
+    </Border>
+  </Grid>
+  </ScrollViewer>
+</UserControl>

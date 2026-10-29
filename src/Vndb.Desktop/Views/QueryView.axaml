@@ -1,0 +1,17 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:Vndb.Desktop.ViewModels" xmlns:views="using:Vndb.Desktop.Views" xmlns:c="using:Vndb.Desktop.Controls"
+             x:Class="Vndb.Desktop.Views.QueryView" x:DataType="vm:MainViewModel">
+  <UserControl.KeyBindings><KeyBinding Gesture="Ctrl+Enter" Command="{Binding Discovery.SearchCommand}" /></UserControl.KeyBindings>
+  <Grid RowDefinitions="Auto,Auto,*" RowSpacing="12">
+    <Grid ColumnDefinitions="*,144,Auto,Auto" ColumnSpacing="8">
+      <TextBox Text="{Binding Discovery.Query}" PlaceholderText="游戏标题或 VNDB ID，如 v17" AutomationProperties.Name="VNDB查询文字"><TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding Discovery.SearchCommand}" /></TextBox.KeyBindings></TextBox>
+      <ComboBox Grid.Column="1" ItemsSource="{Binding Discovery.SourceChoices}" SelectedItem="{Binding Discovery.SelectedSource}" AutomationProperties.Name="查询来源"><ComboBox.ItemTemplate><DataTemplate x:DataType="vm:QuerySourceChoice"><TextBlock Text="{Binding Label}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+      <Button Grid.Column="2" Classes="primary" Command="{Binding Discovery.SearchCommand}" IsEnabled="{Binding !Busy}"><StackPanel Classes="inline"><c:AppIcon Kind="Search" /><TextBlock Text="查询" /></StackPanel></Button>
+      <Button Grid.Column="3" Command="{Binding Discovery.ExportCommand}" ToolTip.Tip="导出本次查询JSON" AutomationProperties.Name="导出查询JSON"><c:AppIcon Kind="Download" /></Button>
+    </Grid>
+    <StackPanel Grid.Row="1" Spacing="4">
+      <StackPanel Classes="inline"><Button Content="按作品ID查询发行版本" Command="{Binding Discovery.ReleasesCommand}" IsEnabled="{Binding !Busy}" /><CheckBox Content="刷新已缓存版本" IsChecked="{Binding Discovery.RefreshReleases}" /></StackPanel>
+      <TextBlock Text="发行版本查询需填写 v 开头ID；版本包含试玩、补丁和未来发行，不代表本机安装语言。下方筛选仅影响本次返回结果。" Classes="caption wrap" />
+    </StackPanel>
+    <views:ShelfView Grid.Row="2" />
+  </Grid>
+</UserControl>

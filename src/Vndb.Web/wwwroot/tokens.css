@@ -1,0 +1,24 @@
+:root {
+  --paper: #f4f5f9;
+  --panel: #eef0f6;
+  --light: #ffffff;
+  --ink: #25283a;
+  --muted: #626b80;
+  --line: #d5dae6;
+  --accent: #6551cd;
+  --accent-hover: #5743b9;
+  --accent-soft: #e7e1fa;
+  --success: #216b52;
+  --success-soft: #e0f0e9;
+  --danger: #a6293c;
+  --danger-soft: #fbe8ec;
+  --cover: #e7eaf2;
+  --focus: #6551cd;
+  --radius: 12px;
+  --space: 8px;
+  --font-body: 14px;
+  --font-caption: 12px;
+  --serif: "Segoe UI", "Yu Gothic UI", "Microsoft YaHei", sans-serif;
+  font-size: var(--font-body);
+  line-height: 1.6;
+}

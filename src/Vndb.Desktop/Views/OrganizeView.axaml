@@ -1,0 +1,56 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:Vndb.Desktop.ViewModels"
+             xmlns:local="using:Vndb.Local" x:Class="Vndb.Desktop.Views.OrganizeView" x:DataType="vm:MainViewModel">
+  <ScrollViewer x:Name="PageScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled">
+    <Grid x:Name="LayoutGrid" ColumnDefinitions="2*,3*" ColumnSpacing="16" RowSpacing="16">
+      <ScrollViewer x:Name="FormPane" HorizontalScrollBarVisibility="Disabled"><StackPanel Classes="form">
+        <Expander Classes="advanced" Header="本地已有：安装包／未安装资源" IsExpanded="True"><StackPanel Classes="form">
+          <TextBlock Text="检索根仅保存在本机。按文件名找候选，不解压、不启动、不移动；确认作品后才标记已有。" Classes="caption wrap" />
+          <TextBox Text="{Binding Packages.ScanRoot}" PlaceholderText="明确选择安装包检索根目录" AutomationProperties.Name="安装包检索根" />
+          <Button Content="选择安装包检索根" Command="{Binding Packages.ChooseRootCommand}" />
+          <Button Content="只读扫描安装包文件名" Command="{Binding Packages.ScanCommand}" />
+          <ComboBox ItemsSource="{Binding Packages.Candidates}" SelectedItem="{Binding Packages.Selected}" AutomationProperties.Name="安装包候选"><ComboBox.ItemTemplate><DataTemplate x:DataType="local:PackageCandidate"><TextBlock Text="{Binding Label}" Classes="wrap" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+          <Button Content="用所选文件名填写作品查询" Command="{Binding Packages.QuerySelectedCommand}" />
+          <TextBlock Text="查询／书架卡片菜单 → 登记安装包 → 核对下方预览。已有同作品多个条目时，请选择具体书架条目。" Classes="caption wrap" />
+          <TextBlock Text="{Binding Packages.MatchLabel}" Classes="strong wrap" />
+          <Button Content="预览安装包关联" Command="{Binding Packages.PreviewCommand}" />
+          <SelectableTextBlock Text="{Binding Packages.Summary}" Classes="wrap" AutomationProperties.Name="安装包登记预览" />
+          <CheckBox IsChecked="{Binding Packages.Approved}"><TextBlock Text="已核对文件与作品关联，仅登记本机已有" Classes="wrap" /></CheckBox>
+          <WrapPanel Classes="filters"><Button Content="确认登记安装包" Command="{Binding Packages.ConfirmCommand}" Classes="primary" /><Button Content="核对已登记安装包" Command="{Binding Packages.VerifyCommand}" /></WrapPanel>
+        </StackPanel></Expander>
+        <Border Classes="panel"><StackPanel Classes="form">
+          <TextBlock Text="1 · 明确范围与完整安装" Classes="section-title wrap" />
+          <TextBlock Text="完整容器内的本篇、特典与章节一起整理。只预览时不会移动文件。" Classes="caption wrap" />
+          <TextBlock Text="扫描源" /><TextBox Text="{Binding Organization.SourceScope}" AutomationProperties.Name="工作台源范围" />
+          <TextBlock Text="归档目标根" /><TextBox Text="{Binding Organization.TargetRoot}" AutomationProperties.Name="工作台目标根" />
+          <TextBlock Text="已登记的完整安装" /><ComboBox ItemsSource="{Binding Installations}" SelectedItem="{Binding SelectedInstallation}" ItemTemplate="{StaticResource InstallationTemplate}" AutomationProperties.Name="工作台完整安装" />
+          <TextBlock Text="确认会社" /><TextBox Text="{Binding Organization.Company}" AutomationProperties.Name="确认会社" />
+          <TextBlock Text="确认游戏日文原名" /><TextBox Text="{Binding Organization.JapaneseTitle}" AutomationProperties.Name="确认日文标题" />
+          <Button Content="生成完整计划预览" Command="{Binding Organization.PreviewCommand}" />
+        </StackPanel></Border>
+        <Expander Classes="advanced" Header="尚未登记：只读扫描与关联"><StackPanel Classes="form">
+          <TextBlock Text="仅点击扫描后读取上方明确源范围。未知目录先确认关联，再规划整理。" Classes="caption wrap" />
+          <Button Classes="form-action" Content="只读扫描明确范围" Command="{Binding Organization.ScanCommand}" />
+          <ComboBox ItemsSource="{Binding Organization.Candidates}" SelectedItem="{Binding Organization.SelectedCandidate}" AutomationProperties.Name="扫描候选"><ComboBox.ItemTemplate><DataTemplate x:DataType="local:DirectoryCandidate"><TextBlock Text="{Binding Path}" Classes="wrap" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+          <Button Classes="form-action" Content="登记选中的本机目录" Command="{Binding RegisterCandidateCommand}" />
+        </StackPanel></Expander>
+        <Expander Classes="advanced" Header="高级：回执、续跑与复原"><StackPanel Classes="form">
+          <TextBlock Text="本机回执目录" /><TextBox Text="{Binding Organization.RunDirectory}" AutomationProperties.Name="整理回执目录" />
+          <WrapPanel Classes="filters"><Button Content="选择回执" Command="{Binding Organization.ChooseRunCommand}" /><Button Content="续跑／核对回执" Command="{Binding Organization.ResumeCommand}" /><Button Content="预览复原" Command="{Binding Organization.PreviewRestoreCommand}" /><Button Content="撤销未移动计划" Command="{Binding Organization.CancelPlanCommand}" /></WrapPanel>
+          <TextBlock Text="复原也须核对右侧预览并输入本次SHA256。结果不明先续跑／核对原回执；取消不会清除证据。" Classes="caption wrap" />
+        </StackPanel></Expander>
+      </StackPanel></ScrollViewer>
+      <Border x:Name="PreviewPane" Grid.Column="1" Classes="panel"><ScrollViewer HorizontalScrollBarVisibility="Disabled"><StackPanel Classes="form">
+        <TextBlock Text="2 · 核对预览" Classes="section-title" />
+        <Border Classes="workflow-note"><TextBlock Text="{Binding Organization.PreviewKind}" Classes="strong wrap" AutomationProperties.Name="当前整理预览类型" /></Border>
+        <SelectableTextBlock Text="{Binding Organization.Summary}" Classes="wrap" AutomationProperties.Name="整理计划摘要" />
+        <Expander Classes="advanced" Header="完整计划、依赖线索与回执"><TextBox Text="{Binding Organization.Preview}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="380" Classes="technical" AutomationProperties.Name="计划及依赖预览" /></Expander>
+        <Separator />
+        <TextBlock Text="3 · 明确批准本次操作" Classes="section-title wrap" />
+        <TextBlock Text="当前预览SHA256" /><SelectableTextBlock Text="{Binding Organization.PlanHash}" Classes="wrap" />
+        <TextBox Text="{Binding Organization.Approval}" PlaceholderText="核对完整预览后输入对应SHA256" Classes="technical" AutomationProperties.Name="计划批准摘要" />
+        <WrapPanel Classes="filters"><Button Classes="primary" Content="执行整理" Command="{Binding Organization.ExecuteCommand}" /><Button Content="执行复原" Command="{Binding Organization.RestoreCommand}" /></WrapPanel>
+        <TextBlock Text="按钮按当前预览类型启用，执行时仍由本机用例核对原计划、摘要、文件身份及冲突。直接同卷移动，证据与回执留在本机。" Classes="caption wrap" />
+      </StackPanel></ScrollViewer></Border>
+    </Grid>
+  </ScrollViewer>
+</UserControl>

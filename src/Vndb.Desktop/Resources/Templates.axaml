@@ -1,0 +1,25 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:contracts="using:Vndb.Contracts" xmlns:local="using:Vndb.Local" xmlns:vm="using:Vndb.Desktop.ViewModels" xmlns:c="using:Vndb.Desktop.Controls" xmlns:conv="using:Vndb.Desktop.Converters" xmlns:sys="using:System">
+  <conv:LocalChoiceConverter x:Key="LocalChoiceLabel" />
+  <DataTemplate x:Key="StateChoiceTemplate" x:DataType="sys:String"><TextBlock Text="{Binding ., Converter={StaticResource LocalChoiceLabel}}" Classes="wrap" /></DataTemplate>
+  <DataTemplate x:Key="ComponentKindTemplate" x:DataType="sys:String"><TextBlock Text="{Binding ., Converter={StaticResource LocalChoiceLabel}, ConverterParameter=kind}" /></DataTemplate>
+  <DataTemplate x:Key="LaunchComponentTemplate" x:DataType="vm:LaunchComponentChoice"><StackPanel Classes="compact"><TextBlock Text="{Binding Title}" Classes="strong wrap" /><TextBlock Text="{Binding Kind}" Classes="caption" /><TextBlock Text="{Binding RelativePath}" Classes="caption wrap" /></StackPanel></DataTemplate>
+  <DataTemplate x:Key="SessionPlayTemplate" x:DataType="contracts:PersonalPlayView"><StackPanel Classes="compact" ToolTip.Tip="{Binding Id}"><TextBlock Text="{Binding Details.Title}" Classes="strong wrap" /><TextBlock Text="{Binding ., Converter={StaticResource LocalChoiceLabel}}" Classes="caption wrap" /></StackPanel></DataTemplate>
+  <DataTemplate x:Key="SessionTargetTemplate" x:DataType="local:LocalPlayTarget"><StackPanel Classes="compact" ToolTip.Tip="{Binding PlayRef}"><TextBlock Text="{Binding Title}" Classes="strong wrap" /><TextBlock Text="{Binding ., Converter={StaticResource LocalChoiceLabel}}" Classes="caption wrap" /></StackPanel></DataTemplate>
+  <DataTemplate x:Key="DetailFieldTemplate" x:DataType="vm:DetailField"><StackPanel Classes="compact detail-field"><TextBlock Text="{Binding Label}" Classes="caption" /><SelectableTextBlock Text="{Binding Value}" Classes="wrap" /></StackPanel></DataTemplate>
+  <DataTemplate x:Key="BookDetailHeadingTemplate" x:DataType="vm:BookViewModel"><StackPanel Classes="compact"><TextBlock Text="{Binding Title}" Classes="section-title wrap" /><TextBlock Text="{Binding Company}" Classes="caption wrap" /><TextBlock Text="{Binding Subtitle}" Classes="caption wrap" /></StackPanel></DataTemplate>
+  <DataTemplate x:Key="BookDescriptionTemplate" x:DataType="vm:BookViewModel"><Expander Header="作品简介与书架备注" IsExpanded="True" HorizontalContentAlignment="Stretch"><StackPanel Classes="form"><SelectableTextBlock Text="{Binding Description}" Classes="wrap" /><ItemsControl ItemsSource="{Binding BookNotes}" ItemTemplate="{StaticResource DetailFieldTemplate}" /></StackPanel></Expander></DataTemplate>
+  <DataTemplate x:Key="BookPlaySummaryTemplate" x:DataType="vm:BookViewModel"><StackPanel Classes="compact"><TextBlock Text="{Binding PlaySummary}" Classes="caption wrap" /><TextBlock Text="{Binding PlayAssociationNotice}" Classes="caption wrap" /><TextBlock Text="{Binding LocalLabel}" Classes="caption wrap" /><TextBlock Text="{Binding PackageLocations}" Classes="caption wrap" /></StackPanel></DataTemplate>
+  <DataTemplate x:Key="NavigationTemplate" x:DataType="vm:NavigationEntry">
+    <StackPanel Classes="inline nav-content" ToolTip.Tip="{Binding Title}" AutomationProperties.Name="{Binding Title}"><c:AppIcon Kind="{Binding Icon}" /><TextBlock Text="{Binding Title}" Classes="nav-label" /></StackPanel>
+  </DataTemplate>
+  <DataTemplate x:Key="InstallationTemplate" x:DataType="local:LocalInstallationView">
+    <StackPanel Classes="compact"><TextBlock Text="{Binding ., Converter={StaticResource LocalChoiceLabel}}" Classes="strong wrap" /><TextBlock Text="{Binding Installation.Details.RootPath}" Classes="caption ellipsis" ToolTip.Tip="{Binding Installation.Details.RootPath}" /></StackPanel>
+  </DataTemplate>
+  <DataTemplate x:Key="ComponentTemplate" x:DataType="local:LocalInstallationComponent"><TextBlock Text="{Binding ., Converter={StaticResource LocalChoiceLabel}}" Classes="caption wrap" ToolTip.Tip="{Binding Id}" /></DataTemplate>
+  <DataTemplate x:Key="LaunchProfileTemplate" x:DataType="local:LaunchProfile">
+    <StackPanel Classes="compact"><TextBlock Text="{Binding Title}" Classes="strong wrap" /><TextBlock Text="{Binding Executable}" Classes="caption wrap" /></StackPanel>
+  </DataTemplate>
+  <DataTemplate x:Key="LocaleProfileTemplate" x:DataType="local:LocaleProfile">
+    <StackPanel Classes="compact"><TextBlock Text="{Binding Name}" Classes="strong" /><TextBlock Text="{Binding Language}" Classes="caption" /><TextBlock Text="{Binding Description}" Classes="caption wrap" /></StackPanel>
+  </DataTemplate>
+</ResourceDictionary>
