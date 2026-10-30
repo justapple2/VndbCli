@@ -15,6 +15,7 @@ using Xunit;
 
 namespace Vndb.Tests;
 
+[Collection("Synthetic native session")]
 public sealed class M7Tests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;

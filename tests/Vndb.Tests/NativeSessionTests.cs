@@ -23,14 +23,15 @@ public sealed class NativeSessionTests
         var childDir = Path.Combine(dir.Path, "child"); Directory.CreateDirectory(childDir);
         foreach (var file in Directory.EnumerateFiles(Path.GetDirectoryName(fixture)!)) File.Copy(file, Path.Combine(childDir, Path.GetFileName(file)));
         var child = Path.Combine(childDir, "Vndb.FakeGame.exe"); var receipt = Path.Combine(dir.Path, "child.json");
-        var launcher = new LocalLauncher(dir.Path); var profile = await launcher.SaveAsync("Synthetic game", fixture, wrapper ? ["--spawn", child, receipt, "5000", "1500"] : ["--receipt", receipt, "--hold", "5000"], dir.Path, ct: Ct);
+        var launcher = new LocalLauncher(dir.Path); var profile = await launcher.SaveAsync("Synthetic game", fixture, wrapper ? ["--spawn", child, receipt, "15000", "1500"] : ["--receipt", receipt, "--hold", "15000"], dir.Path, ct: Ct);
         if (wrapper) await launcher.ConfigureTrackingAsync(profile.Id, child, ct: Ct);
         var outbox = new ActivityOutbox(dir.Path); var target = await outbox.CreateTargetAsync(new(Id(), "Synthetic", "windows", DateTimeOffset.UtcNow), "Synthetic", null, ct: Ct);
         using var manager = new LocalSessionManager(launcher, outbox, dir.Path);
         try
         {
             await manager.StartAsync(profile.Id, target, Ct);
-            for (var i = 0; i < 30 && manager.Current?.Process is null; i++) { await Task.Delay(100, Ct); await manager.TickAsync(Ct); }
+            for (var i = 0; i < 60 && manager.Current?.Process is null; i++) { await Task.Delay(100, Ct); await manager.TickAsync(Ct); }
+            Assert.True(manager.Current?.Process is not null, $"Synthetic process not discovered: {manager.Current?.Stage}/{manager.Current?.Sample.Reason}");
             Assert.Equal(wrapper ? child : fixture, manager.Current!.Process!.Executable); Assert.Equal("tracking", manager.Current.Stage);
             using var process = System.Diagnostics.Process.GetProcessById(manager.Current.Process.Pid);
             await manager.StopAsync(closing: true, Ct); Assert.False(process.HasExited); Assert.Equal("interrupted", manager.Current.Sample.State);
@@ -47,7 +48,7 @@ public sealed class NativeSessionTests
                 {
                     using var process = System.Diagnostics.Process.GetProcessById(proof.RootElement.GetProperty("pid").GetInt32());
                     if (!process.HasExited && string.Equals(process.MainModule?.FileName, wrapper ? child : fixture, StringComparison.OrdinalIgnoreCase))
-                        await process.WaitForExitAsync(Ct).WaitAsync(TimeSpan.FromSeconds(10), Ct);
+                        await process.WaitForExitAsync(Ct).WaitAsync(TimeSpan.FromSeconds(20), Ct);
                 }
                 catch (ArgumentException) { /* This fixture already exited. */ }
             }

@@ -73,14 +73,23 @@ public sealed partial class OwnedPackages(LocalLibraryStore library, ClientDevic
         var stripped = PrefixTag().Replace(title, "").Trim();
         return (stripped.Length == 0 ? title : stripped, kind);
     }
-    public static PackageScan Scan(string root, int depth = 3, CancellationToken ct = default)
+    public static async Task<PackageScan> ScanAsync(LocalLibraryStore library, string root, int depth, bool outsideInstallations, CancellationToken ct = default)
+    {
+        var excluded = outsideInstallations ? (await library.ReadAsync(ct)).Installations
+            .Where(i => i.Installation.RemovedAt is null && i.Installation.Status == "present" && Directory.Exists(i.Installation.Details.RootPath))
+            .Select(i => i.Installation.Details.RootPath).ToArray() : [];
+        return await Task.Run(() => Scan(root, depth, ct, excluded), ct);
+    }
+    public static PackageScan Scan(string root, int depth = 3, CancellationToken ct = default, IReadOnlyList<string>? excludedDirectories = null)
     {
         root = Root(root);
         if (!Directory.Exists(root) || depth is < 1 or > 6) throw new ArgumentException("检索根须存在，深度为1–6。");
+        var excluded = new HashSet<string>((excludedDirectories ?? []).Select(Root), OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
         var candidates = new List<PackageCandidate>(); var issues = new List<ScanIssue>(); int directories = 0, files = 0;
         void Walk(string directory, int level)
         {
             ct.ThrowIfCancellationRequested();
+            if (excluded.Contains(directory)) return;
             if (++directories > 5000) throw new IOException("扫描超过5000目录，请缩小范围。");
             try
             {

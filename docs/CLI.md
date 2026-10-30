@@ -172,6 +172,7 @@ plan、restore-plan、query-data／presence预览的批准SHA在stderr显示，�
 
 ```powershell
 vndb organize package-scan "F:\VN-Packages" --depth 3 --json
+vndb organize package-scan "F:\" --depth 6 --outside-installations --json
 vndb organize package-query "F:\VN-Packages" --relative-path "Studio/Game.7z" --server http://nas.local:5187/ --json
 # 从候选中明确选出一条metadata或书架条目另存chosen-item.json，不把整个带路径的扫描报告上传Web。
 vndb organize package-register --scan-root "F:\VN-Packages" --relative-path "Studio/Game.7z" --item-json ./chosen-item.json --json
@@ -180,6 +181,8 @@ vndb organize registration-sync --server http://nas.local:5187/ --json
 ```
 
 包清单、检索根与相对路径只留本机；同一作品的版本须选精确条目。核对文件只读，未知观测不会直接撤销存在标记。支持常见压缩包和镜像，分卷只建议首卷，不判断是否齐全，不解压或执行。资源位置与未知观测规则见[数据与隐私](DATA-AND-PRIVACY.md)。
+
+全盘查找未安装资料时，可用`--outside-installations`跳过本机JSON中现存且标为present的完整安装目录，避免重复遍历引擎资源和把游戏内补丁作为独立安装包。默认扫描行为不变；需要检查游戏内部资料时不加此选项。
 
 ## 8. 退出码与故障处理
 

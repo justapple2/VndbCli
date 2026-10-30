@@ -11,11 +11,13 @@ public sealed partial class CliApplication
     {
         var scan = new Command("package-scan", "只读扫描安装包／镜像文件名；不解压、不自动匹配作品，不创建启动配置。");
         var scope = new Argument<string>("scope"); var depth = new Option<int>("--depth") { DefaultValueFactory = _ => 3 };
-        scan.Add(scope); scan.Add(depth);
+        var outside = new Option<bool>("--outside-installations") { Description = "跳过本机JSON中现存的完整安装目录，专门查找外部安装包；不扫描游戏内部资源。" };
+        scan.Add(scope); scan.Add(depth); scan.Add(outside);
         Bind(scan, async (_, parsed, ct) =>
         {
             CheckPackageOutput(parsed, parsed.GetValue(scope)!);
-            return await Task.Run(() => OwnedPackages.Scan(parsed.GetValue(scope)!, parsed.GetValue(depth), ct), ct);
+            return await OwnedPackages.ScanAsync(new(parsed.GetValue(identityDirectory) ?? ClientSettings.UserDirectory),
+                parsed.GetValue(scope)!, parsed.GetValue(depth), parsed.GetValue(outside), ct);
         }); group.Add(scan);
 
         var match = new Command("package-query", "使用所选包文件名查询作品候选；默认Web优先，只发送查询标题，不自动确认关联。");

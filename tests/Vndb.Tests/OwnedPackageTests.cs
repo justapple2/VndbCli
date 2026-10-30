@@ -63,6 +63,28 @@ public sealed class OwnedPackageTests
         Assert.Throws<OperationCanceledException>(() => OwnedPackages.Scan(dir.Path, ct: cancel.Token));
     }
     [Fact]
+    public async Task ExternalPackageScanSkipsOnlyTheExactRegisteredInstallationTree()
+    {
+        using var dir = new TestDirectory(); var root = Folder(dir.Path, "scope"); var data = Folder(dir.Path, "client");
+        var game = Folder(root, "game"); var sibling = Folder(root, "game-backup");
+        File.WriteAllText(Path.Combine(game, "internal-patch.zip"), "fixture");
+        File.WriteAllText(Path.Combine(sibling, "uninstalled.zip"), "fixture");
+        Assert.Equal(2, OwnedPackages.Scan(root, ct: Ct).Candidates.Count);
+        Assert.Equal("game-backup/uninstalled.zip", Assert.Single(OwnedPackages.Scan(root, ct: Ct, excludedDirectories: [game]).Candidates).RelativePath);
+        var now = DateTimeOffset.UtcNow;
+        var installation = new LocalInstallation("fixture", new("device", game, "Synthetic game"), "present", now, 1, now, now);
+        var local = new LocalLibraryStore(data); await local.SaveAsync(new([new(installation, [])], []), Ct);
+        var before = await File.ReadAllBytesAsync(local.FilePath, Ct);
+        using var output = new StringWriter(); using var error = new StringWriter();
+        using var handler = new StubHandler((_, _) => throw new InvalidOperationException("Local scanning must not use the network"));
+        var cli = new CliApplication(output, error, () => new HttpClient(handler, false), _ => null, VndbClientTests.FastOptions, new());
+        Assert.Equal(0, await cli.RunAsync(["organize", "package-scan", root, "--identity-dir", data, "--outside-installations", "--json"], Ct));
+        var scan = JsonSerializer.Deserialize<PackageScan>(output.ToString(), VndbJson.Options)!;
+        Assert.Equal("game-backup/uninstalled.zip", Assert.Single(scan.Candidates).RelativePath);
+        Assert.Equal(before, await File.ReadAllBytesAsync(local.FilePath, Ct));
+        Assert.Equal("fixture", File.ReadAllText(Path.Combine(game, "internal-patch.zip")));
+    }
+    [Fact]
     public async Task ExplicitPackageRegistrationKeepsRelativePathAndNeverCreatesInstallationOrPlay()
     {
         using var dir = new TestDirectory(); var root = Folder(dir.Path, "packages"); var data = Folder(dir.Path, "client");
