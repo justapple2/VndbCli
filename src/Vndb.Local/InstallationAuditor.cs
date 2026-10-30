@@ -100,6 +100,8 @@ public static class InstallationAuditor
                 var safeCompany = GameDirectoryNaming.IsCompatibleName(company);
                 if (!safeCompany) return new("manual_company_name", null, "既有会社目录含不兼容符号；先确认会社整体映射，不逐个游戏擅自更改默认安装目录。");
                 if (currentName == canonical && GameDirectoryNaming.IsCompatibleName(relative[1])) return new("already_organized", source, "兼容名与日文原名一致；不会重新加入原文装饰符号，增量保留。");
+                if (currentName != canonical && IsReleaseTitle(item?.Metadata, currentName, Compact))
+                    return new("preserve_variant", null, "既有名称与该作品的日文发行版本名一致；保留版本差异，不替换为基础作品名。");
                 if (currentName != canonical && (currentName.Contains(canonical, StringComparison.Ordinal) ||
                     new[] { "EDITION", "REMAKE", "リメイク", "特典", "予約", "体験", "DL版", "WIN8", "WIN10", "WIN11", "R18版", "コスプレ" }.Any(currentName.Contains))
                     )
@@ -120,5 +122,17 @@ public static class InstallationAuditor
         }
         catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException)
         { return new("manual_layout", null, "名称、路径或重解析边界需人工核对，未生成可执行计划。"); }
+    }
+
+    private static bool IsReleaseTitle(MetadataSnapshot? metadata, string current, Func<string, string> compact)
+    {
+        if (metadata?.Novel?.ReleaseCatalog is not { } catalog) return false;
+        foreach (var title in catalog.Items.Where(r => r.Vns.Any(v => v.Id == metadata.VndbId))
+            .SelectMany(r => r.Languages).Where(l => l.Lang == "ja" && !string.IsNullOrWhiteSpace(l.Title)))
+        {
+            try { if (compact(OrganizationPlanner.Name(title.Title!)) == current) return true; }
+            catch (ArgumentException) { } // An unusable release title cannot establish a filesystem match.
+        }
+        return false;
     }
 }

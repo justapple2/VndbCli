@@ -60,6 +60,27 @@ public sealed class DirectoryNamingTests
         Assert.Equal(title, entry.Book.Metadata!.Novel!.Titles[0].Title); Assert.Equal("unchanged", File.ReadAllText(Path.Combine(game, "story.dat")));
     }
     [Fact]
+    public void AuditPreservesJapaneseReleaseTitlesOnlyForTheAssociatedNovel()
+    {
+        using var dir = new TestDirectory(); var target = Directory.CreateDirectory(Path.Combine(dir.Path, "library")).FullName;
+        var game = Directory.CreateDirectory(Path.Combine(target, "Studio", "物語 おかえり")).FullName;
+        File.WriteAllText(Path.Combine(game, "story.dat"), "keep edition data");
+        var device = Guid.NewGuid().ToString("D"); var entry = Entry(game, "物語～いもうと～", "edition", device);
+        foreach (var (novel, language, expected) in new[] { ("v17", "ja", "preserve_variant"), ("v18", "ja", "proposed_only"), ("v17", "en", "proposed_only") })
+        {
+            var metadata = entry.Book.Metadata! with { Novel = entry.Book.Metadata.Novel! with {
+                ReleaseCatalog = new([new() { Id = "r1", Title = "Story: Welcome Home", Languages = [new(language, "物語…おかえり!!", null, false, true)],
+                    Vns = [new(novel, "complete")] }], DateTimeOffset.UtcNow) } };
+            var book = entry.Book with { Metadata = metadata };
+            var row = Assert.Single(InstallationAuditor.Check("local", device, dir.Path, target, [entry.View], ct: Ct, items: [book]).Items);
+            Assert.Equal(expected, row.Suggestion!.State);
+            if (expected == "preserve_variant") Assert.Null(row.Suggestion.DestinationPath);
+        }
+        Assert.Equal("keep edition data", File.ReadAllText(Path.Combine(game, "story.dat")));
+        Assert.True(Directory.Exists(game));
+    }
+
+    [Fact]
     public void SanitizationCollisionsNeverMergeGamesAndExistingCompanyNamesNeedReview()
     {
         using var dir = new TestDirectory(); var target = Directory.CreateDirectory(Path.Combine(dir.Path, "library")).FullName; var device = Guid.NewGuid().ToString("D");
