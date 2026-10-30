@@ -37,7 +37,12 @@ public static partial class NativeFiles
     {
         Supported();
         var handle = CreateFile(Path.GetFullPath(path), 0x80u | (rename ? 0x10000u : 0) | (read ? 0x80000000u : 0), read ? 1u : gate || rename ? 3u : 7u, 0, 3, 0x02200000, 0);
-        if (handle.IsInvalid) { var error = Marshal.GetLastPInvokeError(); handle.Dispose(); throw new IOException("无法取得文件身份／独占改名权限。", new Win32Exception(error)); }
+        if (handle.IsInvalid)
+        {
+            var error = Marshal.GetLastPInvokeError(); handle.Dispose();
+            var cause = new Win32Exception(error);
+            throw new IOException($"无法取得文件身份／独占改名权限（Win32 {error}：{cause.Message}）。", cause);
+        }
         try { if ((Facts(handle).Attributes & 1024) != 0) throw new IOException("拒绝重解析入口。"); return handle; }
         catch { handle.Dispose(); throw; }
     }
