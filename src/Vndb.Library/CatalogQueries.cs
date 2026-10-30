@@ -140,17 +140,26 @@ public sealed class CatalogQueries(ILibraryStore store, CatalogEnricher catalog,
         var key = CatalogRules.Key(r.Query);
         var associated = catalog.Rows().Where(row => row.Source.Key.Contains(key, StringComparison.Ordinal))
             .SelectMany(row => row.Source.NovelIds).ToHashSet(StringComparer.Ordinal);
-        var matches = new List<LibraryEntry>();
-        for (var page = 1; ; page++)
+        if (store is SqliteLibraryStore sqlite)
         {
-            var entries = store.List(producer: r.Producer, page: page, limit: 100);
-            matches.AddRange(entries.Results.Where(e => associated.Contains(e.Novel.Id) ||
-                CatalogRules.Titles(e.Novel).Any(t => CatalogRules.Key(t).Contains(key, StringComparison.Ordinal))));
-            if (!entries.More) break;
+            var normalized = sqlite.FindNormalized(key, associated, r.Producer, r.Page, r.Limit);
+            if (normalized.Total > 0)
+                return new(normalized.Results, normalized.Total, normalized.Page, normalized.PageSize, normalized.More, "local");
         }
-        if (matches.Count > 0)
-            return new((store is SqliteLibraryStore sqlite ? sqlite.PrioritizeMatches(matches) : matches).Skip((r.Page - 1) * r.Limit).Take(r.Limit).ToArray(), matches.Count, r.Page, r.Limit,
-                (long)r.Page * r.Limit < matches.Count, "local");
+        else
+        {
+            var matches = new List<LibraryEntry>();
+            for (var page = 1; ; page++)
+            {
+                var entries = store.List(producer: r.Producer, page: page, limit: 100);
+                matches.AddRange(entries.Results.Where(e => associated.Contains(e.Novel.Id) ||
+                    CatalogRules.Titles(e.Novel).Any(t => CatalogRules.Key(t).Contains(key, StringComparison.Ordinal))));
+                if (!entries.More) break;
+            }
+            if (matches.Count > 0)
+                return new(matches.Skip((r.Page - 1) * r.Limit).Take(r.Limit).ToArray(), matches.Count, r.Page, r.Limit,
+                    (long)r.Page * r.Limit < matches.Count, "local");
+        }
         var cached = automation.GetLibrarySearchCache(AutomationRules.SearchKey(r));
         if (cached is not null)
         {

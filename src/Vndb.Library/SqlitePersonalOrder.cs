@@ -22,13 +22,4 @@ public sealed partial class SqliteLibraryStore
     private const string PersonalOrderJoin = " LEFT JOIN personal_priority priority ON priority.novel_id=n.id ";
     private const string PersonalOrder = "coalesce(priority.tier,2),n.title COLLATE NOCASE,n.id";
 
-    internal IReadOnlyList<LibraryEntry> PrioritizeMatches(IReadOnlyList<LibraryEntry> entries)
-    {
-        using var read = new LibraryReadScope(this, "personal-query-order");
-        using var select = read.Query(PersonalOrderCte + "SELECT novel_id,tier FROM personal_priority");
-        using var reader = select.ExecuteReader(); var tiers = new Dictionary<string, int>(StringComparer.Ordinal);
-        while (reader.Read()) tiers.Add(reader.GetString(0), reader.GetInt32(1));
-        return entries.OrderBy(e => tiers.GetValueOrDefault(e.Novel.Id, 2)).ThenBy(e => e.Novel.Title, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(e => e.Novel.Id, StringComparer.Ordinal).ToArray();
-    }
 }
