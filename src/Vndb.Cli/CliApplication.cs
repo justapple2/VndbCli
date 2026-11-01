@@ -162,7 +162,7 @@ public sealed partial class CliApplication(
             using var http = CreateHttpClient(); var sdk = new WebLibraryClient(http, ClientSettings.ServerUri(server), Env("VN_LIBRARY_KEY"), TimeSpan.FromSeconds(parsed.GetValue(_timeout)));
             return await sdk.ClaimDeviceAsync(parsed.GetValue(legacyDeviceId)!, new(identity.Id, parsed.GetValue(legacyRevision)), "device-claim-" + Guid.NewGuid().ToString("N"), token);
         });
-        device.Add(claimDevice); root.Add(device); AddOrganization(root); AddPresence(root); AddQueryData(root);
+        device.Add(claimDevice); root.Add(device); AddOrganization(root); AddPresence(root); AddQueryData(root); AddLocalData(root); AddObservation(root);
         return root;
     }
 

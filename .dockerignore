@@ -40,6 +40,12 @@
 **/device.json
 **/desktop-settings.json
 **/local-library.json
+**/local-library.v2.json
+**/local-metadata
+**/item-details
+**/observation-settings.json
+**/local-observations.json
+**/local-resource-intents
 **/launch-profiles.json
 **/credential.*
 **/library_write_key

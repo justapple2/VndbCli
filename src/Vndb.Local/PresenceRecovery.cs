@@ -31,17 +31,35 @@ public sealed partial class PresenceSync
     }
     private static async Task<Authority> AuthorityAsync(ISyncApi web, CancellationToken ct)
     {
-        var active = new HashSet<string>(StringComparer.Ordinal); var removed = new HashSet<string>(StringComparer.Ordinal); var versions = new List<ItemVersion>();
+        var active = new HashSet<string>(StringComparer.Ordinal); var removed = new HashSet<string>(StringComparer.Ordinal); var versions = new List<ItemVersion>(); bool? light = null;
         foreach (var deleted in new[] { false, true })
         {
             var target = deleted ? removed : active;
+            int? total = null; int? size = null;
             for (var page = 1; ; page++)
             {
-                var result = deleted ? await web.RemovedItemsAsync(page, ct) : await web.ItemsAsync(page, ct);
-                if (result.Page != page || result.PageSize is < 1 or > 100 || result.Items is null || result.Items.Count > result.PageSize ||
-                    result.Items.Any(i => i?.Item is null || (i.Item.DeletedAt is not null) != deleted || !target.Add(i.Item.Id))) throw new InvalidDataException("Web条目分页或移除状态无效。");
-                versions.AddRange(result.Items.Select(i => new ItemVersion(i.Item.Id, i.Item.Revision, deleted)));
-                if (!result.More) break;
+                var heads = await web.ItemHeadsAsync(page, deleted, ct);
+                if (page == 1 && !deleted) light = heads is not null;
+                if (light != (heads is not null)) throw new InvalidDataException("条目头读取能力发生变化，请重新核对。");
+                if (heads is not null)
+                {
+                    total ??= heads.Total; size ??= heads.PageSize;
+                    if (total != heads.Total || size != heads.PageSize) throw new InvalidDataException("Web条目头分页期间条目总数变化，请重新核对。");
+                    if (heads.Page != page || heads.PageSize is < 1 or > 100 || heads.Total < 0 || heads.Items is null ||
+                        heads.More != ((long)page * heads.PageSize < heads.Total) || heads.Items.Count != Math.Min(heads.PageSize, Math.Max(0, heads.Total - (long)(page - 1) * heads.PageSize)) ||
+                        heads.Items.Any(i => i is null || string.IsNullOrWhiteSpace(i.Id) || i.Revision < 1 || i.Deleted != deleted || !target.Add(i.Id)))
+                        throw new InvalidDataException("Web条目头分页无效。");
+                    versions.AddRange(heads.Items.Select(i => new ItemVersion(i.Id, i.Revision, deleted)));
+                    if (!heads.More) break;
+                }
+                else
+                {
+                    var result = deleted ? await web.RemovedItemsAsync(page, ct) : await web.ItemsAsync(page, ct);
+                    if (result.Page != page || result.PageSize is < 1 or > 100 || result.Items is null || result.Items.Count > result.PageSize ||
+                        result.Items.Any(i => i?.Item is null || (i.Item.DeletedAt is not null) != deleted || !target.Add(i.Item.Id))) throw new InvalidDataException("Web条目分页或移除状态无效。");
+                    versions.AddRange(result.Items.Select(i => new ItemVersion(i.Item.Id, i.Item.Revision, deleted)));
+                    if (!result.More) break;
+                }
                 if (page >= 100) throw new InvalidDataException("条目分页超过核对范围，请缩小资料库。");
             }
         }
@@ -58,7 +76,7 @@ public sealed partial class PresenceSync
         var bytes = await BytesAsync(Pending, ct); var batch = await ReadAsync<PresenceBatch>(Pending, ct);
         var info = await web.OrganizationInfoAsync(ct); Validate(batch, origin, deviceId, info.ServiceInstanceId);
         if (File.Exists(FileName("presence-receipts", batch.Id))) throw new InvalidDataException("同一批次存在成功回执，不能替代，请先核对。");
-        var head = await web.PresenceHeadAsync(deviceId, ct); var authority = await AuthorityAsync(web, ct); var library = await local.ReadAsync(ct);
+        var head = await web.PresenceHeadAsync(deviceId, ct); var authority = await AuthorityAsync(web, ct); var library = await local.ReadSummaryAsync(ct);
         var observations = Observe(library, deviceId, head); var flags = observations.Where(i => authority.Active.Contains(i.ItemId)).ToArray();
         return new(origin, deviceId, info.ServiceInstanceId, batch.Id, Sha(bytes),
             LocalArchiveFormat.Hash(await ReadAsync<PresenceConflict>(FileName("presence-conflicts", batch.Id), ct)), LocalArchiveFormat.Hash(library), authority.Sha256, head.Revision,
@@ -71,7 +89,7 @@ public sealed partial class PresenceSync
         var state = await StateAsync(preview.Origin, preview.DeviceId, ct);
         var info = await web.OrganizationInfoAsync(ct); var head = await web.PresenceHeadAsync(preview.DeviceId, ct); var authority = await AuthorityAsync(web, ct);
         if (state.Status != "conflict" || state.BatchId != preview.RejectedBatchId || info.ServiceInstanceId != preview.ServiceInstanceId || head.Revision != preview.HeadRevision || authority.Sha256 != preview.AuthoritySha256 ||
-            LocalArchiveFormat.Hash(await local.ReadAsync(ct)) != preview.LibrarySha256 || Sha(await BytesAsync(Pending, ct)) != preview.OriginalSha256 ||
+            LocalArchiveFormat.Hash(await local.ReadSummaryAsync(ct)) != preview.LibrarySha256 || Sha(await BytesAsync(Pending, ct)) != preview.OriginalSha256 ||
             LocalArchiveFormat.Hash(await ReadAsync<PresenceConflict>(FileName("presence-conflicts", preview.RejectedBatchId), ct)) != preview.ConflictSha256)
             throw new InvalidDataException("预览后服务、条目、原稿或本机观测变化，请重新核对。");
         var file = FileName("presence-recovery", preview.RejectedBatchId);

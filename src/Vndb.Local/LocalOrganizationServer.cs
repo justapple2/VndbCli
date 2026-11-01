@@ -19,12 +19,13 @@ public sealed class LocalOrganizationServer(LocalLibraryStore library, LocalLaun
     private Task Save(LocalArchiveRunView run, CancellationToken ct) => JsonSnapshotStore.AtomicWriteAsync(RunFile(run.Plan.Id), run, true, ct);
     public async Task<ArchiveReceipt> PlanArchiveAsync(LocalArchivePlan plan, CancellationToken ct)
     {
+        using var observation = await LocalFileLease.AcquireAsync(library.DirectoryPath, ObservationResourceIntents.Resource, ct);
         OrganizationPlanner.RequireCompatibleDestination(plan);
         using var held = Lock();
         LocalArchiveFormat.Validate(plan.Before);
         if (plan.Before.Root.Volume != plan.TargetRootIdentity.Volume || plan.SourceScopeIdentity.Volume != plan.TargetRootIdentity.Volume) throw new InvalidDataException("不允许跨卷整理。");
         if (File.Exists(RunFile(plan.Id)))
-        { var prior = await ArchiveRunAsync(plan.Id, ct); if (LocalArchiveFormat.Hash(plan) != prior.Receipt.PlanSha256) throw new InvalidDataException("已有不同计划。"); return prior.Receipt; }
+        { var prior = await ArchiveRunAsync(plan.Id, ct); if (LocalArchiveFormat.Hash(plan) != prior.Receipt.PlanSha256) throw new InvalidDataException("已有不同计划。"); await ObservationResourceIntents.SetAsync(library.DirectoryPath, plan.InstallationId, plan.Id, prior.Receipt.State is "planned" or "restore_planned", ct); return prior.Receipt; }
         foreach (var file in Directory.EnumerateFiles(Root, "*.json"))
         {
             var prior = JsonSerializer.Deserialize<LocalArchiveRunView>(await File.ReadAllTextAsync(file, ct), VndbJson.Options)!;
@@ -35,17 +36,18 @@ public sealed class LocalOrganizationServer(LocalLibraryStore library, LocalLaun
         if (plan.DeviceId != deviceId || installation.Details.DeviceId != deviceId || installation.Revision != plan.InstallationRevision || !LocalFiles.Same(installation.Details.RootPath, plan.SourcePath)) throw new InvalidDataException("安装身份／修订已改变。");
         if (local.Installations.Any(i => i.Installation.RemovedAt is null && i.Installation.Id != installation.Id && LocalFiles.Same(i.Installation.Details.RootPath, plan.DestinationPath))) throw new IOException("目标已有安装，不覆盖或合并。");
         var now = DateTimeOffset.UtcNow; var receipt = new ArchiveReceipt(plan.Id, LocalArchiveFormat.Hash(plan), deviceId, installation.Id, "planned", 1, installation.Revision, now, now);
-        await Save(new(plan, receipt), ct); return receipt;
+        await Save(new(plan, receipt), ct); await ObservationResourceIntents.SetAsync(library.DirectoryPath, plan.InstallationId, plan.Id, true, ct); return receipt;
     }
     public async Task<ArchiveReceipt> PlanRestoreAsync(LocalRestorePlan plan, CancellationToken ct)
     {
+        using var observation = await LocalFileLease.AcquireAsync(library.DirectoryPath, ObservationResourceIntents.Resource, ct);
         using var held = Lock(); var run = await ArchiveRunAsync(plan.RunId, ct);
         if (run.RestorePlan is not null)
-        { if (!LocalArchiveFormat.MatchesHash(plan, run.Receipt.RestoreSha256 ?? "")) throw new InvalidDataException("复原计划不同。"); return run.Receipt; }
+        { if (!LocalArchiveFormat.MatchesHash(plan, run.Receipt.RestoreSha256 ?? "")) throw new InvalidDataException("复原计划不同。"); await ObservationResourceIntents.SetAsync(library.DirectoryPath, run.Plan.InstallationId, plan.RunId, run.Receipt.State == "restore_planned", ct); return run.Receipt; }
         if (run.Receipt.State != "archived" || run.Receipt.Revision != plan.RunRevision || run.Receipt.InstallationRevision != plan.InstallationRevision || plan.ArchiveSha256 != run.Receipt.PlanSha256 ||
             !LocalFiles.Same(plan.SourcePath, run.Plan.DestinationPath) || !LocalFiles.Same(plan.DestinationPath, run.Plan.SourcePath)) throw new InvalidDataException("复原边界／修订无效。");
         var receipt = run.Receipt with { State = "restore_planned", Revision = run.Receipt.Revision + 1, UpdatedAt = DateTimeOffset.UtcNow, RestoreSha256 = LocalArchiveFormat.Hash(plan) };
-        await Save(run with { RestorePlan = plan, Receipt = receipt }, ct); return receipt;
+        await Save(run with { RestorePlan = plan, Receipt = receipt }, ct); await ObservationResourceIntents.SetAsync(library.DirectoryPath, run.Plan.InstallationId, plan.RunId, true, ct); return receipt;
     }
     public async Task<EvidenceReceipt> UploadEvidenceAsync(string file, string runId, string phase, CancellationToken ct)
     {
@@ -62,8 +64,9 @@ public sealed class LocalOrganizationServer(LocalLibraryStore library, LocalLaun
     }
     public async Task<ArchiveReceipt> CompleteArchiveAsync(string runId, ArchiveCompletion completion, bool restore, CancellationToken ct)
     {
+        using var observation = await LocalFileLease.AcquireAsync(library.DirectoryPath, ObservationResourceIntents.Resource, ct);
         using var held = Lock(); var run = await ArchiveRunAsync(runId, ct); var state = restore ? "restored" : "archived"; var phase = restore ? "restore" : "archive";
-        if (run.Receipt.State == state) return run.Receipt;
+        if (run.Receipt.State == state) { await ObservationResourceIntents.SetAsync(library.DirectoryPath, run.Plan.InstallationId, runId, false, ct); return run.Receipt; }
         if (run.Receipt.State != (restore ? "restore_planned" : "planned") || run.Receipt.Revision != completion.ExpectedRevision || !LocalArchiveFormat.IsHash(completion.EvidenceSha256)) throw new InvalidDataException("本机阶段／修订不符。");
         var evidence = RunJournal.Read<LocalMoveEvidence>(Path.Combine(Root, runId, phase, completion.EvidenceSha256 + ".json"));
         var expected = restore ? run.RestorePlan!.Before : run.Plan.Before;
@@ -72,7 +75,7 @@ public sealed class LocalOrganizationServer(LocalLibraryStore library, LocalLaun
         var local = await library.ReadAsync(ct); var view = local.Installations.Single(i => i.Installation.Id == run.Plan.InstallationId); var installation = view.Installation;
         if (LocalFiles.Same(installation.Details.RootPath, source) && installation.Revision == run.Receipt.InstallationRevision)
         {
-            installation = installation with { Details = installation.Details with { RootPath = target }, Status = "present", ObservedAt = DateTimeOffset.UtcNow, Revision = installation.Revision + 1, UpdatedAt = DateTimeOffset.UtcNow };
+            installation = installation with { Details = installation.Details with { RootPath = target }, DirectoryIdentity = evidence.After.Root, Status = "present", ObservedAt = DateTimeOffset.UtcNow, Revision = installation.Revision + 1, UpdatedAt = DateTimeOffset.UtcNow };
             await library.UpdateAsync(current =>
             {
                 var previous = current.Installations.Single(i => i.Installation.Id == installation.Id).Installation;
@@ -85,14 +88,15 @@ public sealed class LocalOrganizationServer(LocalLibraryStore library, LocalLaun
         await launcher.RebaseAsync(installation.Id, source, target, ct);
         var receipt = run.Receipt with { State = state, Revision = run.Receipt.Revision + 1, InstallationRevision = installation.Revision, UpdatedAt = DateTimeOffset.UtcNow,
             EvidenceSha256 = restore ? run.Receipt.EvidenceSha256 : completion.EvidenceSha256, RestoreEvidenceSha256 = restore ? completion.EvidenceSha256 : run.Receipt.RestoreEvidenceSha256 };
-        await Save(run with { Receipt = receipt }, ct); return receipt;
+        await Save(run with { Receipt = receipt }, ct); await ObservationResourceIntents.SetAsync(library.DirectoryPath, run.Plan.InstallationId, runId, false, ct); return receipt;
     }
     public async Task<ArchiveReceipt> CancelArchiveAsync(string runId, ArchiveCompletion completion, CancellationToken ct)
     {
+        using var observation = await LocalFileLease.AcquireAsync(library.DirectoryPath, ObservationResourceIntents.Resource, ct);
         using var held = Lock(); var run = await ArchiveRunAsync(runId, ct);
-        if (run.Receipt.State == "cancelled") return run.Receipt;
+        if (run.Receipt.State == "cancelled") { await ObservationResourceIntents.SetAsync(library.DirectoryPath, run.Plan.InstallationId, runId, false, ct); return run.Receipt; }
         if (run.Receipt.State != "planned" || completion.ExpectedRevision != run.Receipt.Revision || !LocalArchiveFormat.IsHash(completion.EvidenceSha256) || !File.Exists(Path.Combine(Root, runId, "cancel", completion.EvidenceSha256 + ".json"))) throw new InvalidDataException("撤销证据／修订无效。");
         var receipt = run.Receipt with { State = "cancelled", Revision = run.Receipt.Revision + 1, UpdatedAt = DateTimeOffset.UtcNow };
-        await Save(run with { Receipt = receipt }, ct); return receipt;
+        await Save(run with { Receipt = receipt }, ct); await ObservationResourceIntents.SetAsync(library.DirectoryPath, run.Plan.InstallationId, runId, false, ct); return receipt;
     }
 }

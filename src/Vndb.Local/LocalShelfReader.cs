@@ -11,52 +11,60 @@ public sealed record ShelfSnapshot(string Origin, IReadOnlyList<LibraryItemView>
     IReadOnlyList<PersonalPlayView> Plays, IReadOnlyList<LocalInstallationView> Installations, DateTimeOffset FetchedAt,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<LibraryItemView>? RemovedItems = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? ConfirmedPlayItems = null,
-    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<LocalOwnedPackage>? Packages = null);
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<LocalOwnedPackage>? Packages = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] bool SummaryOnly = false);
 public enum ShelfSource { Web, LocalLibrary, Snapshot }
 public sealed record ShelfReadResult(ShelfSnapshot Snapshot, ShelfSource Source);
 
 /// <summary>Two read operations supplied by the composition root; no concrete SDK dependency.</summary>
 public sealed record LibraryReadOperations(Func<int, CancellationToken, Task<ItemPage>> Items,
     Func<string?, CancellationToken, Task<IReadOnlyList<PersonalPlayView>>> Plays,
-    Func<int, CancellationToken, Task<ItemPage>>? RemovedItems = null);
+    Func<int, CancellationToken, Task<ItemPage>>? RemovedItems = null,
+    Func<int, bool, CancellationToken, Task<ShelfSummaryPage?>>? Summaries = null,
+    Func<string, CancellationToken, Task<LibraryItemView>>? Item = null);
 
 /// <summary>Client-only aggregation and offline snapshots. Never opens a business database.</summary>
-public sealed class LocalShelfReader(LocalLibraryStore local, string directory, string? origin,
+public sealed partial class LocalShelfReader(LocalLibraryStore local, string directory, string? origin,
     LibraryReadOperations? remote = null, TimeProvider? time = null)
 {
+    // An aggregate shelf spans many bounded HTTP pages; it is not one query/config JSON.
+    private const long SnapshotMaxBytes = 64 * 1024 * 1024;
+    private JsonStateFile<ShelfSnapshot> SnapshotState() => new(directory, "shelf.json", SnapshotMaxBytes);
     private readonly TimeProvider _time = time ?? TimeProvider.System;
     public LocalLibrary Catalog { get; private set; } = new([], []);
     public bool RegistrationReviewNeeded { get; private set; }
     public async Task<ShelfReadResult> ShelfAsync(CancellationToken ct)
     {
         RegistrationReviewNeeded = false;
-        var state = new JsonStateFile<ShelfSnapshot>(directory, "shelf.json"); await state.ObserveAsync(ct);
+        var state = SnapshotState(); await state.ObserveAsync(ct);
         if (remote is not null)
         {
             try
             {
-                var items = await ReadPagesAsync(remote.Items, ct);
-                var removedItems = remote.RemovedItems is null ? null : (await ReadPagesAsync(remote.RemovedItems, ct)).Where(i => i.Item.DeletedAt is not null).ToArray();
+                var summary = remote.Summaries is null ? null : await ReadSummariesAsync(remote.Summaries, ct);
+                var items = summary?.Active ?? await ReadPagesAsync(remote.Items, ct);
+                var removedItems = summary?.Removed ?? (remote.RemovedItems is null ? null : (await ReadPagesAsync(remote.RemovedItems, ct)).Where(i => i.Item.DeletedAt is not null).ToArray());
                 var removed = (removedItems ?? []).Select(i => i.Item.Id).ToHashSet(StringComparer.Ordinal);
-                var plays = await remote.Plays(null, ct);
+                var plays = summary is null ? await remote.Plays(null, ct) : [];
                 var prior = await state.ReadAsync(ct, observe: false);
-                if (prior is not null && prior.Origin != origin) throw new InvalidDataException("快照服务地址不符。");
-                Catalog = await local.ReadAsync(ct);
+                if (prior is not null) RequireSnapshot(prior);
+                Catalog = await local.ReadSummaryAsync(ct);
                 var ids = items.Select(i => i.Item.Id).ToHashSet(StringComparer.Ordinal);
-                items.AddRange(Catalog.Items.Where(i => i.Item.DeletedAt is null && !removed.Contains(i.Item.Id) && ids.Add(i.Item.Id)));
-                var snapshot = new ShelfSnapshot(origin!, items, plays, Catalog.Installations, _time.GetUtcNow(), removedItems, Packages: Catalog.Packages);
-                await state.SaveAsync(snapshot, ct);
+                items.AddRange(Catalog.Items.Where(i => i.Item.DeletedAt is null && !removed.Contains(i.Item.Id) && ids.Add(i.Item.Id)).Select(i => summary is null ? i : LocalSummary(i)));
+                var snapshot = new ShelfSnapshot(origin!, items, plays, Catalog.Installations, _time.GetUtcNow(), removedItems, Packages: Catalog.Packages, SummaryOnly: summary is not null);
+                // LocalLibrary is the filesystem authority and is overlaid again on every read.
+                await state.SaveAsync(snapshot with { Installations = [], Packages = null }, ct);
                 return new(snapshot, ShelfSource.Web);
             }
             catch (CatalogUnavailableException) { }
         }
-        Catalog = await local.ReadAsync(ct);
+        Catalog = await local.ReadSummaryAsync(ct);
         var cached = await state.ReadAsync(ct);
-        if (cached is not null && cached.Origin != origin) throw new InvalidDataException("快照服务地址不符。");
+        if (cached is not null) RequireSnapshot(cached);
         if (cached is null)
         {
             if (Catalog.Items.Count == 0) throw new CatalogCacheMissException();
-            return new(new(origin ?? "", Catalog.Items.Where(i => i.Item.DeletedAt is null).ToArray(), [], Catalog.Installations, _time.GetUtcNow(), Packages: Catalog.Packages), ShelfSource.LocalLibrary);
+            return new(new(origin ?? "", Catalog.Items.Where(i => i.Item.DeletedAt is null).Select(i => File.Exists(local.IndexPath) ? LocalSummary(i) : i).ToArray(), [], Catalog.Installations, _time.GetUtcNow(), Packages: Catalog.Packages, SummaryOnly: File.Exists(local.IndexPath)), ShelfSource.LocalLibrary);
         }
         var refreshed = new List<LibraryItemView>();
         var mappings = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -77,7 +85,7 @@ public sealed class LocalShelfReader(LocalLibraryStore local, string directory, 
         }
         var known = refreshed.Select(i => i.Item.Id).ToHashSet(StringComparer.Ordinal);
         // Newly registered offline works have no Web tombstone; older Web removals remain authoritative.
-        var pendingItems = Catalog.Items.Where(i => i.Item.DeletedAt is null && LocalInstallationRegistration.IsPending(i.Item.Id) && known.Add(i.Item.Id));
+        var pendingItems = Catalog.Items.Where(i => i.Item.DeletedAt is null && LocalInstallationRegistration.IsPending(i.Item.Id) && known.Add(i.Item.Id)).Select(i => cached.SummaryOnly ? LocalSummary(i) : i);
         return new(await OverlayPlaysAsync(cached with { Items = refreshed.Concat(pendingItems).DistinctBy(i => i.Item.Id).ToArray(), Installations = Catalog.Installations, Packages = Catalog.Packages,
             Plays = cached.Plays.Select(p => p.ItemId is { } old && mappings.TryGetValue(old, out var id) ? p with { ItemId = id } : p).ToArray() }, ct), ShelfSource.Snapshot);
     }
@@ -97,8 +105,9 @@ public sealed class LocalShelfReader(LocalLibraryStore local, string directory, 
         var file = Path.Combine(directory, "item-plays", hash + ".json");
         var currentFile = Path.Combine(directory, "item-plays", hash + ".v2.json");
         var observed = File.Exists(currentFile) ? QueryDataMigration.Hash(await QueryDataMigration.BytesAsync(currentFile, ct)) : "missing";
-        var shelfFile = Path.Combine(directory, "shelf.json");
-        var shelfObserved = File.Exists(shelfFile) ? QueryDataMigration.Hash(await QueryDataMigration.BytesAsync(shelfFile, ct)) : "missing";
+        var shelfState = SnapshotState();
+        var shelfBytes = await shelfState.BytesAsync(ct);
+        var shelfObserved = shelfBytes is null ? "missing" : QueryDataMigration.Hash(shelfBytes);
         if (remote is not null)
         {
             try
@@ -108,11 +117,12 @@ public sealed class LocalShelfReader(LocalLibraryStore local, string directory, 
                 var current = File.Exists(currentFile) ? QueryDataMigration.Hash(await QueryDataMigration.BytesAsync(currentFile, ct)) : "missing";
                 if (current != observed) throw new InvalidDataException("个人记录快照已被其他客户端更新，请重新读取。");
                 var priorItem = File.Exists(currentFile) ? await ReadItemPlaysAsync(currentFile, itemId, ct) : null; // Corrupt/foreign state is never reset by a successful network read.
-                var shelfCurrent = File.Exists(shelfFile) ? QueryDataMigration.Hash(await QueryDataMigration.BytesAsync(shelfFile, ct)) : "missing";
+                shelfBytes = await shelfState.BytesAsync(ct);
+                var shelfCurrent = shelfBytes is null ? "missing" : QueryDataMigration.Hash(shelfBytes);
                 if (shelfCurrent != shelfObserved) throw new InvalidDataException("书架快照已更新，请重新读取该条目的记录。");
-                var priorShelf = shelfCurrent == "missing" ? null : JsonSerializer.Deserialize<ShelfSnapshot>(await QueryDataMigration.BytesAsync(shelfFile, ct), VndbJson.Options)
+                var priorShelf = shelfBytes is null ? null : JsonSerializer.Deserialize<ShelfSnapshot>(shelfBytes, VndbJson.Options)
                     ?? throw new InvalidDataException("书架快照无效。");
-                if (priorShelf is not null && priorShelf.Origin != origin) throw new InvalidDataException("快照服务地址不符。");
+                if (priorShelf is not null) RequireSnapshot(priorShelf);
                 var floor = priorItem?.FetchedAt ?? DateTimeOffset.MinValue;
                 if (priorShelf is not null && priorShelf.FetchedAt > floor) floor = priorShelf.FetchedAt;
                 var fetchedAt = _time.GetUtcNow(); if (fetchedAt <= floor) fetchedAt = floor.AddTicks(1);
@@ -124,7 +134,7 @@ public sealed class LocalShelfReader(LocalLibraryStore local, string directory, 
         {
             var snapshot = await ShelfAsync(ct);
             var resolved = ShelfPlayResolver.Resolve(snapshot.Snapshot).SingleOrDefault(i => i.Item.Item.Id == itemId);
-            if (resolved is not null && !resolved.NeedsReview) return resolved.Plays;
+            if (resolved is not null && !resolved.NeedsReview && (!snapshot.Snapshot.SummaryOnly || snapshot.Snapshot.ConfirmedPlayItems?.Contains(itemId) == true || resolved.Item.PlayCount == 0)) return resolved.Plays;
             if (snapshot.Source == ShelfSource.Snapshot) throw new CatalogUnavailableException(); // An authoritative newer shelf must not fall back to a superseded item cache.
         }
         catch (CatalogCacheMissException) { }
@@ -163,7 +173,8 @@ public sealed class LocalShelfReader(LocalLibraryStore local, string directory, 
             var newer = current.Plays.Where(p => plays.Any(other => other.Id == p.Id && other.Revision > p.Revision)).Select(p => p.Id).ToHashSet(StringComparer.Ordinal);
             var replaced = accepted.Select(p => p.Id).ToHashSet(StringComparer.Ordinal);
             plays.RemoveAll(p => !newer.Contains(p.Id) && (p.ItemId == id || p.ItemId is null && prior.Contains(p.Id) || replaced.Contains(p.Id))); plays.AddRange(accepted);
-            items[n] = item with { PlayCount = current.Plays.Count };
+            items[n] = item with { PlayCount = current.Plays.Count, State = item.State is null ? null : item.State with {
+                Progress = PersonalProgress.FromStatuses(current.Plays.Select(p => p.Details.Status)), LatestStatus = current.Plays.OrderByDescending(p => p.UpdatedAt).FirstOrDefault()?.Details.Status } };
         }
         return snapshot with { Items = items, Plays = plays, ConfirmedPlayItems = confirmed.ToArray() };
     }

@@ -15,6 +15,7 @@ public interface IDesktopLibrary
     Task<MetadataResponse> ReleasesAsync(string id, string source, bool refresh, CancellationToken ct) =>
         throw new NotSupportedException("当前资料适配器不支持发行版本查询。");
     Task<IReadOnlyList<PersonalPlayView>> PlaysAsync(string itemId, CancellationToken ct);
+    Task<LibraryItemView?> ItemAsync(string itemId, CancellationToken ct) => Task.FromResult<LibraryItemView?>(null);
 }
 
 /// <summary>Read-only presentation adapter; transport and local policies remain injected services.</summary>
@@ -48,6 +49,11 @@ public sealed class DesktopLibraryAdapter : IDesktopLibrary
     }
     public Task<MetadataResponse> QueryAsync(string text, string source, CancellationToken ct) =>
         (_query ?? throw new InvalidOperationException("请先加载设置。")).QueryAsync(ClientQuery.FromText(text, 20), source, ct);
+    public async Task<LibraryItemView?> ItemAsync(string itemId, CancellationToken ct)
+    {
+        try { return await (_shelf ?? throw new InvalidOperationException("请先加载设置。")).ItemAsync(itemId, ct); }
+        catch (CatalogUnavailableException) { throw new WebUnavailableException(); }
+    }
     public Task<MetadataResponse> ReleasesAsync(string id, string source, bool refresh, CancellationToken ct) =>
         (_query ?? throw new InvalidOperationException("请先加载设置。")).QueryAsync(
             new("vn_releases", new(Mode: refresh ? "explicit_refresh" : "local_first"), VndbId.Normalize(id, 'v')), source, ct);

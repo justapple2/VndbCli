@@ -14,6 +14,7 @@ public sealed partial class SqliteLibraryStore
         Execute(db, tx, """
             CREATE TABLE IF NOT EXISTS library_items(id TEXT PRIMARY KEY,novel_id TEXT REFERENCES novels(id),record_json TEXT NOT NULL CHECK(json_valid(record_json)));
             CREATE INDEX IF NOT EXISTS ix_item_novel ON library_items(novel_id);
+            CREATE INDEX IF NOT EXISTS ix_item_shelf_summary ON library_items((json_extract(record_json,'$.deleted_at') IS NOT NULL),json_extract(record_json,'$.updated_at') DESC,id);
             CREATE TABLE IF NOT EXISTS play_item_links(play_id TEXT PRIMARY KEY REFERENCES play_records(id),item_id TEXT NOT NULL REFERENCES library_items(id));
             CREATE INDEX IF NOT EXISTS ix_play_item ON play_item_links(item_id);
             CREATE TABLE IF NOT EXISTS operation_receipts(scope TEXT NOT NULL,key TEXT NOT NULL,payload_sha TEXT NOT NULL,result_json TEXT NOT NULL,PRIMARY KEY(scope,key));

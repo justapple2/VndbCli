@@ -28,7 +28,8 @@ public partial class App : Application
                 services.Settings.Server is { } server ? ClientSettings.ServerUri(server) : null);
             vm.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(vm.StateLocation)) ReconfigureCovers(); };
             var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) }; timer.Tick += (_, _) => vm.UpdateSessionStatus();
-            window.Opened += async (_, _) => { await vm.InitializeAsync(); ReconfigureCovers(); await vm.RefreshCommand.ExecuteAsync(null); await vm.InitializeSessionsAsync(); timer.Start(); };
+            window.Opened += async (_, _) => { if (await vm.StartAsync(ReconfigureCovers)) timer.Start(); };
+            window.Activated += (_, _) => { if (vm.SelectedInstallation is { } selected) services.ObservationHost?.Focus(selected.Installation.Details.RootPath); };
             var closing = false;
             window.Closing += async (_, e) =>
             {
@@ -36,8 +37,8 @@ public partial class App : Application
                 e.Cancel = true;
                 if (vm.KeepTimingOnClose && services.Sessions?.Running == true) { window.WindowState = WindowState.Minimized; return; }
                 closing = true;
-                try { if (services.ActivityHost is { } host) await host.DisposeAsync(); }
-                catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException)
+                try { await services.StopObservationAsync(); if (services.ActivityHost is { } host) await host.DisposeAsync(); }
+                catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or InvalidOperationException)
                 { closing = false; vm.Status = "关闭前检查点未保存，窗口保留：" + error.Message; return; }
                 timer.Stop(); window.Close();
             };

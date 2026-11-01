@@ -5,13 +5,25 @@ using Vndb.Core;
 
 namespace Vndb.Desktop.ViewModels;
 
-public sealed partial class BookViewModel(LibraryItemView? item, MetadataSnapshot? metadata, IReadOnlyList<PersonalPlayView>? plays = null, bool associationNeedsReview = false) : ObservableObject
+public sealed partial class BookViewModel(LibraryItemView? item, MetadataSnapshot? metadata, IReadOnlyList<PersonalPlayView>? plays = null, bool associationNeedsReview = false, bool summaryOnly = false) : ObservableObject
 {
     private IReadOnlyList<PersonalPlayView> _plays = plays?.Where(p => p.DeletedAt is null).ToArray() ?? [];
-    private bool _needsPlayReview = associationNeedsReview || plays is null && item?.PlayCount > 0;
+    private bool _needsPlayReview = associationNeedsReview || !summaryOnly && plays is null && item?.PlayCount > 0;
+    private bool _summaryPlays = summaryOnly;
+    public bool PlaysPending => _summaryPlays;
+    public bool DetailsPending { get; private set; } = summaryOnly;
     [ObservableProperty] private bool _selected;
     public bool IsLocal { get; set; }
     public bool HasInstallation { get; private set; }
+    public string LocalObservation { get; private set; } = "";
+    public bool CanLaunchObserved { get; private set; } = true;
+    public void SetObservation(IReadOnlyList<LocalInstallationObservation> rows, IReadOnlyList<LaunchProfile>? profiles = null)
+    {
+        LocalObservation = string.Join(" / ", rows.Select(r => ObservationText.Reason(r.Reason)).Distinct());
+        CanLaunchObserved = rows.Count == 0 || rows.Any(r => r.Status == "present" && (r.LaunchState == "not_configured" ||
+            (profiles is null || r.ReadyProfiles is null ? r.LaunchState == "ready" : profiles.Any(p => r.ReadyProfiles.Contains(p.Id)))));
+        OnPropertyChanged(nameof(LocalObservation)); OnPropertyChanged(nameof(CanLaunchObserved));
+    }
     public IReadOnlyList<string> PackagePaths { get; private set; } = [];
     public IReadOnlyList<string> PackageRecords { get; private set; } = [];
     public string PackageLocations => string.Join('\n', PackageRecords.Select(p => "安装包相对位置（仅本机）：" + p));
@@ -25,21 +37,21 @@ public sealed partial class BookViewModel(LibraryItemView? item, MetadataSnapsho
     public string? Released => Metadata?.Novel?.Released;
     public string LastOpenedLabel => LastOpenedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "尚未从本客户端打开";
     public IReadOnlyList<string> Companies => Metadata?.Developers.Count > 0 ? Metadata.Developers.Select(p => p.Original ?? p.Name).ToArray() : [Company];
-    public string ShelfState => NeedsPlayReview ? "关联待核对" : Plays.Count > 0 ? Status(Plays.OrderByDescending(p => p.UpdatedAt).First().Details.Status) : "未记录";
+    public string ShelfState => NeedsPlayReview ? "关联待核对" : _summaryPlays ? Item?.State?.LatestStatus is { } latest ? Status(latest) : Progress.HasRecord ? string.Join(" / ", Progress.Statuses.Select(Status)) : "未记录" : Plays.Count > 0 ? Status(Plays.OrderByDescending(p => p.UpdatedAt).First().Details.Status) : "未记录";
     public string CollectionLabel => Item is null ? "公共资料 · 未加入书架" : "个人书架";
     public string LocalLabel => HasInstallation ? PackagePaths.Count > 0 ? "▣ 已安装 · 有安装包" : "▣ 已安装" : PackagePaths.Count > 0 ? "▣ 本地已有安装包 · 未登记安装" : PackageRecords.Count > 0 ? "安装包记录：缺失／待核对" : IsLocal ? "本机有副本" : "";
-    public LibraryItemView? Item { get; } = item;
-    public MetadataSnapshot? Metadata { get; } = metadata;
+    public LibraryItemView? Item { get; private set; } = item;
+    public MetadataSnapshot? Metadata { get; private set; } = metadata;
     public IReadOnlyList<PersonalPlayView> Plays => _plays;
-    public bool NeedsPlayReview => _needsPlayReview || Plays.Any(p => !PersonalRules.States.Contains(p.Details.Status));
-    public PersonalProgress Progress => PersonalProgress.FromStatuses(Plays.Select(p => p.Details.Status), NeedsPlayReview);
+    public bool NeedsPlayReview => _needsPlayReview || _summaryPlays && Item?.State?.Progress.NeedsReview == true || Plays.Any(p => !PersonalRules.States.Contains(p.Details.Status));
+    public PersonalProgress Progress => _summaryPlays && Item?.State is { } state ? state.Progress : PersonalProgress.FromStatuses(Plays.Select(p => p.Details.Status), NeedsPlayReview);
     public bool IsUnplayed => Progress.State == "unplayed";
     public bool IsUnrecorded => Progress.State == "unrecorded";
     public string PlayAssociationNotice => NeedsPlayReview ? "关联待核对：请联网刷新或读取此条目的记录；未将不明记录归入本作品。" : "";
     public void ApplyPlays(IReadOnlyList<PersonalPlayView> values, bool needsReview = false)
     {
-        _plays = values.Where(p => p.DeletedAt is null).ToArray(); _needsPlayReview = needsReview;
-        foreach (var name in new[] { nameof(Plays), nameof(HasPlayed), nameof(IsUnplayed), nameof(IsUnrecorded), nameof(Progress), nameof(NeedsPlayReview), nameof(ShelfState), nameof(PlaySummary), nameof(PlayAssociationNotice) }) OnPropertyChanged(name);
+        _plays = values.Where(p => p.DeletedAt is null).ToArray(); _needsPlayReview = needsReview; _summaryPlays = false;
+        foreach (var name in new[] { nameof(Plays), nameof(PlaysPending), nameof(HasPlayed), nameof(IsUnplayed), nameof(IsUnrecorded), nameof(Progress), nameof(NeedsPlayReview), nameof(ShelfState), nameof(PlaySummary), nameof(PlayAssociationNotice) }) OnPropertyChanged(name);
     }
     public string Id => Item?.Item.Id ?? Metadata?.VndbId ?? "";
     public string Title => Item?.Item.Details.TitleOverride ?? Metadata?.Novel?.Titles.FirstOrDefault(t => t.Lang == "ja" && t.Main)?.Title
@@ -48,12 +60,19 @@ public sealed partial class BookViewModel(LibraryItemView? item, MetadataSnapsho
         ? string.Join(" / ", Metadata.Developers.Select(p => p.Original ?? p.Name)) : Item?.Item.Details.CompanyHint ?? "会社待补全";
     public string GroupCompany => Item?.Item.Details.CompanyOverride ?? Metadata?.Developers.FirstOrDefault()?.Original
         ?? Metadata?.Developers.FirstOrDefault()?.Name ?? Item?.Item.Details.CompanyHint ?? "";
-    public bool HasPlayed => Plays.Any(p => PersonalRules.IsPlayed(p.Details.Status));
+    public bool HasPlayed => Progress.HasPlayed;
+    public void ApplyDetails(LibraryItemView value)
+    {
+        if (Item is null || value.Item.Id != Item.Item.Id || value.Item.DeletedAt is not null || value.Item.Details.NovelId != Item.Item.Details.NovelId || value.Item.Revision < Item.Item.Revision)
+            throw new InvalidDataException("详情关联或修订已变化，请刷新书架。");
+        Item = _summaryPlays && value.State is null ? value with { State = Item.State } : value; Metadata = value.Metadata; DetailsPending = false;
+        foreach (var name in new[] { nameof(Item), nameof(Metadata), nameof(DetailsPending), nameof(Title), nameof(Company), nameof(Companies), nameof(GroupCompany), nameof(Released), nameof(Subtitle), nameof(Description), nameof(BookNotes) }) OnPropertyChanged(name);
+    }
     public string Subtitle => string.Join(" · ", new[] { Metadata?.VndbId, Metadata?.Novel?.Released,
         Item is not null && LocalInstallationRegistration.IsPending(Item.Item.Id) ? "本机登记待同步" : null }.Where(s => !string.IsNullOrEmpty(s)));
-    public string PlaySummary => (Plays.Count == 0 ? NeedsPlayReview ? "关联待核对" : "未记录游玩" :
+    public string PlaySummary => _summaryPlays ? (NeedsPlayReview ? "关联待核对" : !Progress.HasRecord ? "未记录游玩" : string.Join(" · ", Progress.Statuses.Select(Status))) + $" / {Item?.PlayCount ?? 0} 条记录 · 按需读取" : (Plays.Count == 0 ? NeedsPlayReview ? "关联待核对" : "未记录游玩" :
         string.Join(" · ", Plays.Select(p => Status(p.Details.Status)).Distinct()) + " / " + Plays.Count + " 条记录") + (NeedsPlayReview && Plays.Count > 0 ? " · 部分关联待核对" : "");
-    public string Description => Metadata?.Novel?.Description ?? "暂无简介；可通过查询补全资料。";
+    public string Description => Metadata?.Novel?.Description ?? (DetailsPending ? "作品详情尚未加载；读取详情后显示简介及完整资料。" : "暂无简介；可通过查询补全资料。");
     public IReadOnlyList<DetailField> BookNotes => new[] { new DetailField("书架备注一", Item?.Item.Details.Notes ?? ""), new("书架备注二", Item?.Item.Details.ExtraNotes ?? "") }.Where(f => f.Value.Length > 0).ToArray();
     public static string Status(string value) => value switch { "not_started" => "未游玩", "playing" => "游玩中", "played" => "已游玩", "completed" => "本次完成", "on_hold" => "搁置", "dropped" => "放弃", _ => "关联待核对" };
 }

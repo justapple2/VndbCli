@@ -28,15 +28,17 @@ public partial class MainViewModel
     private string? _shownSession;
     partial void OnSelectedTargetChanged(LocalPlayTarget? value)
     { if (value is not null) { QuickReview = value.Details.Review ?? ""; QuickStatus = value.Details.Status == "not_started" ? "playing" : value.Details.Status; } }
-    public async Task InitializeSessionsAsync()
+    public Task InitializeSessionsAsync() => GuardAsync(InitializeSessionsCoreAsync);
+    private async Task InitializeSessionsCoreAsync(CancellationToken ct)
     {
-        await GuardAsync(async ct => { await Services().StartSessionsAsync(ct); await LoadTargetsAsync(ct); UpdateSessionStatus(); });
+        await Services().StartSessionsAsync(ct); await LoadTargetsAsync(ct); UpdateSessionStatus();
     }
     private async Task LoadTargetsAsync(CancellationToken ct)
     { PlayTargets.Clear(); foreach (var target in await Services().Activities.TargetsAsync(ct)) PlayTargets.Add(target); }
     private void SetSessionPlays(IReadOnlyList<PersonalPlayView> plays) { SelectedPlay = null; SessionPlays.Clear(); foreach (var play in plays) SessionPlays.Add(play); }
     public void UpdateSessionStatus()
     {
+        ApplyObservation();
         var services = _services; if (services is null) return;
         ActivityStatus = services.ActivityHost?.Status ?? "会话服务尚未启动。";
         if (services.Sessions?.Current is not { } current) return;
@@ -59,6 +61,7 @@ public partial class MainViewModel
     [RelayCommand] private Task UseExistingPlayAsync() => CreatePlayTargetAsync(true);
     private Task CreatePlayTargetAsync(bool existing) => GuardAsync(async ct =>
     {
+        if (SelectedBook is { } selected) await RequireBookDetailsAsync(selected, ct);
         var services = Services(); var identity = services.Identity ?? throw new InvalidOperationException("本机身份尚未加载。");
         var play = existing ? SelectedPlay ?? throw new ArgumentException("请明确选择本次游玩记录。") : null;
         var title = SelectedBook?.Title ?? SelectedProfile?.Title ?? LaunchTitle;
@@ -71,6 +74,7 @@ public partial class MainViewModel
     {
         var services = Services(); var manager = services.Sessions ?? throw new InvalidOperationException("会话服务尚未启动。");
         var target = SelectedTarget ?? throw new ArgumentException("请先明确选定或新建本次游玩。");
+        await services.EnsureObservedLaunchAsync(SelectedProfile ?? throw new ArgumentException("请选择本机启动配置。"), ct);
         await manager.StartAsync(SelectedProfile?.Id ?? throw new ArgumentException("请选择本机启动配置。"), target, ct,
             LaunchMode == "LE 默认配置" ? LaunchMethod.GlobalLocale : LaunchMethod.Direct, services.Settings.DefaultLocale);
         services.ActivityHost?.SignalSync(); UpdateSessionStatus(); Status = "启动请求已处理；只有确认的游戏进程会计时。";

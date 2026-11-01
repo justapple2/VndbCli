@@ -11,6 +11,9 @@ public static class ManagementEndpoints
     {
         var group = app.MapGroup("/api/v1").WithTags("Personal library and metadata imports");
         group.MapGet("/items", ListItems);
+        group.MapGet("/shelf", (SqliteLibraryStore store, string? q, bool? deleted, bool? unmatched, int? page, int? page_size, string? progress, string? status, bool? is_local) =>
+            store.ReadShelfSummary(q, deleted ?? false, unmatched ?? false, page ?? 1, page_size ?? 100, progress, status, is_local));
+        group.MapGet("/item-heads", (SqliteLibraryStore store, int? page, int? page_size, bool? deleted) => store.ReadItemHeads(page ?? 1, page_size ?? 100, deleted ?? false));
         group.MapGet("/collection/stats", (SqliteLibraryStore store) => store.CollectionStatistics());
         group.MapGet("/items/{id}", (string id, SqliteLibraryStore store) => store.ReadItem(id) is { } item ? Results.Ok(item) : Results.NotFound());
         group.MapPost("/items", (ItemWrite edit, SqliteLibraryStore store, HttpContext ctx) => store.SaveItem(edit, null, Key(ctx)));

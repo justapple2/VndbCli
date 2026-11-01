@@ -32,6 +32,7 @@ public sealed class M5Tests
             if (Unauthorized) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized) { Content = JsonContent.Create(new ApiProblem("unauthorized", "test", 401), options: VndbJson.Options) });
             object response = request.RequestUri!.AbsolutePath switch
             {
+                "/api/v1/info" => new ServiceInfo("test-instance", [1], "test", 1, false, [], [1], true),
                 "/api/v1/items" => new ItemPage([Item()], 1, 100, 1, false),
                 "/api/v1/plays" => Array.Empty<PersonalPlayView>(),
                 "/api/v1/installations" => new InstallationPage([], 1, 24, 0, false),

@@ -76,6 +76,7 @@ public partial class MainViewModel : ObservableObject
             () => _services?.Settings.Server, GuardAsync, text => Status = text, text => { Discovery.Query = text; Section = 2; }, PackagesSavedAsync, dialogs);
         Presence = new(() => new(Services().LocalLibrary), () => _services?.Web, () => _services?.Settings.Server, () => _services?.Identity?.Id, GuardAsync, text => Status = text);
         QueryData = new(() => Services().QueryScope, GuardAsync, text => Status = text);
+        Observation = new(Services, dialogs, GuardAsync, UseObservationCandidate);
         Imports = new(ct => Services().ImportStatusAsync(ct), GuardAsync);
         InitializeNavigation();
     }
@@ -92,7 +93,15 @@ public partial class MainViewModel : ObservableObject
     public QueryDataFeatureViewModel QueryData { get; }
     public ImportFeedbackViewModel Imports { get; }
     [ObservableProperty] private string _queryRootOverride = "";
-    public async Task InitializeAsync() => await GuardAsync(async ct =>
+    public Task InitializeAsync() => GuardAsync(InitializeCoreAsync);
+    public Task<bool> StartAsync(Action initialized) => GuardAsync(async ct =>
+    {
+        await InitializeCoreAsync(ct);
+        initialized();
+        await RefreshCoreAsync(ct);
+        await InitializeSessionsCoreAsync(ct);
+    });
+    private async Task InitializeCoreAsync(CancellationToken ct)
     {
         if (_services is not null)
         {
@@ -100,6 +109,7 @@ public partial class MainViewModel : ObservableObject
             var settings = _services.Settings; ServerUrl = settings.Server ?? "";
             Organization.SourceScope = settings.SourceScope; Organization.TargetRoot = settings.TargetRoot; StateLocation = _services.QueryDirectory; QueryRootOverride = settings.CacheDirectory ?? "";
             DataRootLocation = _services.SettingsStore.DirectoryPath;
+            Observation.Load(_services.ObservationSettings);
             LocaleEmulatorPath = settings.LocaleEmulatorPath;
             LocaleProfileId = settings.DefaultLocale?.ProfileId ?? "";
             var ui = await new UiPreferencesStore(_services.SettingsStore.DirectoryPath).ReadAsync(ct);
@@ -108,22 +118,30 @@ public partial class MainViewModel : ObservableObject
         await LoadProfilesAsync(ct);
         await LoadShelfPreferencesAsync(ct);
         Status = "本机配置已加载。刷新书架或查询资料；本机启动独立于Web。";
-    });
+    }
 
-    [RelayCommand] private Task RefreshAsync() => GuardAsync(async ct =>
+    [RelayCommand] private Task RefreshAsync() => GuardAsync(RefreshCoreAsync);
+    private async Task RefreshCoreAsync(CancellationToken ct)
     {
         if (QuickEditor is { Applied: false }) { Status = "请先完成或退出当前游玩编辑。"; return; }
+        var reloadId = SelectedBook is { PlaysPending: false } selected ? selected.Id : null;
         var result = await _library.ShelfAsync(ct);
         _installations = result.Snapshot.Installations;
         _packages = result.Snapshot.Packages ?? [];
-        _books = ShelfPlayResolver.Resolve(result.Snapshot).Select(i => new BookViewModel(i.Item, i.Item.Metadata, i.Plays, i.NeedsReview)).ToArray();
+        _books = ShelfPlayResolver.Resolve(result.Snapshot).Select(i =>
+        {
+            var book = new BookViewModel(i.Item, i.Item.Metadata, i.Plays, i.NeedsReview, result.Snapshot.SummaryOnly);
+            if (result.Snapshot.SummaryOnly && result.Snapshot.ConfirmedPlayItems?.Contains(i.Item.Item.Id) == true) book.ApplyPlays(i.Plays, i.NeedsReview);
+            return book;
+        }).ToArray();
         foreach (var book in _books) UpdateOwnership(book);
         ApplyHistory(); Shelf.SetLibrary(_books, result.Source);
         Installations.Clear(); foreach (var i in _installations.Where(i => SelectedBook is null || MatchesBook(i, SelectedBook))) Installations.Add(i);
         OnPropertyChanged(nameof(LaunchInstallations));
         UpdateBookDetails();
-        Status = $"已读取 {_books.Count} 部作品、{result.Snapshot.Plays.Count} 条游玩记录。" + (_books.Any(b => b.NeedsPlayReview) ? "部分关联待核对，请联网刷新或读取所选条目的记录。" : "");
-    });
+        Status = $"已读取 {_books.Count} 部作品、{result.Snapshot.Items.Sum(i => i.PlayCount)} 条游玩记录摘要。详情按需读取。" + (_books.Any(b => b.NeedsPlayReview) ? "部分关联待核对，请联网刷新或读取所选条目的记录。" : "");
+        if (SelectedBook is { } current && current.Id == reloadId) await LoadBookDetailsAsync(current, ct);
+    }
     private void PresentQuery(MetadataResponse result)
     {
         _queryBooks = result.Items.Select(m => { var book = new BookViewModel(null, m); UpdateOwnership(book); return book; }).ToArray();
@@ -133,17 +151,26 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand] private Task DetailAsync() => GuardAsync(async ct =>
     {
         var book = SelectedBook ?? throw new ArgumentException("请先选择作品。");
+        await LoadBookDetailsAsync(book, ct);
+    });
+    private async Task LoadBookDetailsAsync(BookViewModel book, CancellationToken ct)
+    {
         IReadOnlyList<PersonalPlayView> plays = book.Plays;
         if (book.Item is not null)
         {
-            try { plays = await _library.PlaysAsync(book.Item.Item.Id, ct); }
+            try
+            {
+                if (book.DetailsPending && await _library.ItemAsync(book.Item.Item.Id, ct) is { } detail)
+                { if (SelectedBook != book) return; book.ApplyDetails(detail); }
+                plays = await _library.PlaysAsync(book.Item.Item.Id, ct);
+            }
             catch (WebUnavailableException) { Status = "Web不可达，详情使用本机已缓存的记录。"; }
         }
         if (SelectedBook != book) return;
         if (!ReferenceEquals(plays, book.Plays)) book.ApplyPlays(plays);
         if (SelectedBook == book) SetSessionPlays(book.Plays);
         UpdateBookDetails(); Shelf.Refresh();
-    });
+    }
     partial void OnSelectedBookChanged(BookViewModel? value)
     {
         Shelf.SelectIfVisible(value);
@@ -166,6 +193,7 @@ public partial class MainViewModel : ObservableObject
     partial void OnSectionChanged(int value) { Shelf.Activate(value); OnPropertyChanged(nameof(SelectedNavigation)); }
     partial void OnSelectedInstallationChanged(LocalInstallationView? value)
     {
+        if (_applyingObservation) { OnPropertyChanged(nameof(FilteredProfiles)); OnPropertyChanged(nameof(LaunchComponents)); Organization.Invalidate(); InvalidateRegistry(); UpdateBookDetails(); return; }
         OnPropertyChanged(nameof(FilteredProfiles));
         OnPropertyChanged(nameof(LaunchComponents)); OnPropertyChanged(nameof(SelectedLaunchComponent));
         OnPropertyChanged(nameof(LaunchInstallations)); OnPropertyChanged(nameof(SelectedLaunchInstallation)); OnPropertyChanged(nameof(LaunchDraftChanged)); OnPropertyChanged(nameof(LaunchDraftNotice));
@@ -279,16 +307,17 @@ public partial class MainViewModel : ObservableObject
         Status = $"已核对 {result.MetadataCount + result.PresenceCount} 个批次回执；最终处理结果以Web为准。";
     });
     private DesktopServices Services() => _services ?? throw new InvalidOperationException("此宿主没有配置管理服务。");
-    private async Task GuardAsync(Func<CancellationToken, Task> action)
+    private async Task<bool> GuardAsync(Func<CancellationToken, Task> action)
     {
-        if (Busy) return;
+        if (Busy) return false;
         Busy = true; using var cancel = new CancellationTokenSource(); _operation = cancel;
-        try { Status = "正在处理…可按Esc取消。"; await action(cancel.Token); if (Status == "正在处理…可按Esc取消。") Status = "已完成。"; }
+        try { Status = "正在处理…可按Esc取消。"; await action(cancel.Token); if (Status == "正在处理…可按Esc取消。") Status = "已完成。"; return true; }
         catch (OperationCanceledException) { Status = "操作已取消；已落盘的整理意图和回执保留，可续跑核对。"; }
         catch (Exception e) when (Recoverable(e)) { Status = "未完成：" + (e is WebUnavailableException ? "Web不可达。" : e.Message); }
         finally { _operation = null; Busy = false; }
+        return false;
     }
-    private static bool Recoverable(Exception e) => e is ArgumentException or InvalidOperationException or IOException or
+    private static bool Recoverable(Exception e) => e is ArgumentException or InvalidOperationException or IOException or InvalidDataException or
         UnauthorizedAccessException or ClientApiException or WebUnavailableException or OfflineCacheMissException or
         HttpRequestException or VndbApiException or TimeoutException or JsonException or System.ComponentModel.Win32Exception or PlatformNotSupportedException or System.Security.Cryptography.CryptographicException;
 }

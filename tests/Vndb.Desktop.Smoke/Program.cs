@@ -258,6 +258,20 @@ public static class Program
             vm.Section = 5; await Render(window);
             var settingsScope = window.GetVisualDescendants().OfType<TextBox>().Single(t => Avalonia.Automation.AutomationProperties.GetName(t) == "扫描源范围");
             Check(settingsScope.Text == "Synthetic scope", "settings binds organization state directly without shell forwarding");
+            var observation = window.GetVisualDescendants().OfType<Expander>().Single(e => Equals(e.Header, "本机变化观测／待匹配候选"));
+            observation.IsExpanded = true; await Render(window);
+            var observePath = window.GetVisualDescendants().OfType<TextBox>().Single(t => Avalonia.Automation.AutomationProperties.GetName(t) == "观测管理根");
+            observePath.Text = @"E:\Synthetic\Games"; Check(vm.Observation.RootPath == observePath.Text, "observation management root compiled binding");
+            var observationRoot = new ObservationRoot(Guid.NewGuid().ToString("D"), @"E:\Synthetic\Games", "games", 2, new("synthetic-volume", "synthetic-root", 1));
+            vm.Observation.Load(new(true, [observationRoot]));
+            var candidate = new ObservationCandidate("synthetic-candidate", observationRoot.Id, "Studio/NewGame", "directory", new("synthetic-volume", "synthetic-new", 1), 0, default, DateTimeOffset.UtcNow, "pending");
+            vm.Observation.Poll(new(new("synthetic-device", [], [], [candidate]), new(1, 12, 2, 5, 0, 0, 0, 0), [observationRoot.Path], false, false, DateTimeOffset.UtcNow), "合成浅层监控示例");
+            await Render(window);
+            Check(window.GetVisualDescendants().OfType<ListBox>().Any(b => ReferenceEquals(b.ItemsSource, vm.Observation.Candidates)), "local candidate ListBox compiled binding");
+            Check(vm.Observation.Candidates.Count == 1 && vm.Observation.Summary.Contains("哈希0字节"), "observation candidates and metadata-only disclosure are visible without scanning");
+            Check(window.GetVisualDescendants().OfType<Button>().Any(b => ReferenceEquals(b.Command, vm.Observation.CheckCommand)), "manual observation command binding");
+            observation.BringIntoView(); await Render(window);
+            Save(window, output, "k1-observation-settings.png"); observation.IsExpanded = false;
             var presence = window.GetVisualDescendants().OfType<Expander>().Single(e => Equals(e.Header, "本地存在标记／冲突恢复"));
             presence.IsExpanded = true; await Render(window);
             Check(window.GetVisualDescendants().OfType<Button>().Any(b => ReferenceEquals(b.Command, vm.Presence.ConfirmCommand) && !b.IsEffectivelyEnabled), "presence replacement requires preview and explicit approval");
@@ -373,6 +387,15 @@ public static class Program
                 }
             }
             Check(library.CatalogCalls == 1 && library.QueryCalls == beforeCatalog, "layout and theme changes do not refetch public catalogue or alter query results");
+            library.Summary = true; vm.Section = 0; vm.Shelf.Filter = ""; vm.Shelf.CompanyFilter = "全部会社"; vm.Shelf.ShelfState = "全部状态"; vm.Shelf.LocalOnly = false; vm.Shelf.SelectedBook = null;
+            await vm.RefreshCommand.ExecuteAsync(null); await Render(window);
+            var summaryBook = vm.Shelf.Books.First(b => b.HasPlayed); vm.SelectedBook = summaryBook;
+            Check(summaryBook.PlaysPending && summaryBook.DetailsPending && !summaryBook.NeedsPlayReview, "summary card retains played state without fabricated full records");
+            Check(summaryBook.Description.Contains("尚未加载"), "summary detail has an explicit unloaded state");
+            Save(window, output, "k1-summary-shelf.png");
+            await vm.DetailCommand.ExecuteAsync(null); await Render(window);
+            Check(!summaryBook.PlaysPending && !summaryBook.DetailsPending && summaryBook.HasPlayed && summaryBook.BookNotes.Count == 1, "lazy detail loads notes and exact play records without losing played state");
+            Save(window, output, "k1-lazy-detail.png");
             var chromeFocus = window.FindControl<Button>("ThemeButton")!;
             chromeFocus.Focus(NavigationMethod.Tab); await Render(window);
             Check(chromeFocus.IsFocused && chromeFocus.BorderThickness.Left == 2, "custom chrome keyboard focus has an explicit visible border");
@@ -406,6 +429,8 @@ public static class Program
     }
     private sealed class DemoLibrary : IDesktopLibrary
     {
+        public bool Summary { get; set; }
+        private IReadOnlyList<PersonalPlayView> _plays = [];
         public bool Block { get; set; }
         public int QueryCalls { get; private set; }
         public int PlayReads { get; private set; }
@@ -427,7 +452,9 @@ public static class Program
             var items = Enumerable.Range(1, 1200).Select(n => new LibraryItemView(new("item-" + n, new("Demo " + n, "v" + n, Notes: "合成备注：在本地"), 1, now, now), Metadata(n), n % 2)).ToArray();
             var plays = Enumerable.Range(1, 1200).Where(n => n % 2 == 1).Select(n => new PersonalPlayView("play-" + n,
                 new("Demo " + n, "v" + n, "completed", new(2026, 1, 1), new(2026, 1, 2), 120, 8.5m, "合成感想：温暖的故事。", null, null, "ja"), 1, now, now, ItemId: "item-" + n)).ToArray();
-            return Task.FromResult(new ShelfResult(new("http://test.local/", items, plays, [], now), "Web 本地资料库 · 合成演示"));
+            _plays = plays;
+            if (Summary) items = items.Select(i => ShelfSummaries.Item(i) with { State = new(PersonalProgress.FromStatuses(plays.Where(p => p.ItemId == i.Item.Id).Select(p => p.Details.Status)), false, plays.FirstOrDefault(p => p.ItemId == i.Item.Id)?.Details.Status) }).ToArray();
+            return Task.FromResult(new ShelfResult(new("http://test.local/", items, Summary ? [] : plays, [], now, SummaryOnly: Summary), "Web 本地资料库 · 合成演示"));
         }
         public async Task<MetadataResponse> QueryAsync(string text, string source, CancellationToken ct)
         {
@@ -435,7 +462,9 @@ public static class Program
             if (Block) await Task.Delay(Timeout.InfiniteTimeSpan, ct);
             return new([Metadata(17)], "client_vndb", DateTimeOffset.UtcNow, 1, 30, null, false, PendingImport: true);
         }
-        public Task<IReadOnlyList<PersonalPlayView>> PlaysAsync(string itemId, CancellationToken ct) { PlayReads++; return Task.FromResult<IReadOnlyList<PersonalPlayView>>([]); }
+        public Task<LibraryItemView?> ItemAsync(string id, CancellationToken ct)
+        { var n = int.Parse(id.AsSpan(5)); var now = DateTimeOffset.UtcNow; return Task.FromResult<LibraryItemView?>(new(new(id, new("Demo " + n, "v" + n, Notes: "合成备注：在本地"), 1, now, now), Metadata(n), n % 2)); }
+        public Task<IReadOnlyList<PersonalPlayView>> PlaysAsync(string itemId, CancellationToken ct) { PlayReads++; return Task.FromResult<IReadOnlyList<PersonalPlayView>>(Summary ? _plays.Where(p => p.ItemId == itemId).ToArray() : []); }
     }
     private sealed class Covers : HttpMessageHandler
     {

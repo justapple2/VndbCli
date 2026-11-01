@@ -6,7 +6,8 @@ public sealed record LibraryItemData(string Title, string? NovelId = null, strin
     string? TitleOverride = null, string? CompanyOverride = null, string? Notes = null, string? ExtraNotes = null);
 public sealed record LibraryItem(string Id, LibraryItemData Details, long Revision, DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt, DateTimeOffset? DeletedAt = null);
-public sealed record ItemState(Vndb.Core.PersonalProgress Progress, bool IsLocal);
+public sealed record ItemState(Vndb.Core.PersonalProgress Progress, bool IsLocal,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? LatestStatus = null);
 public sealed record LibraryItemView(LibraryItem Item, MetadataSnapshot? Metadata, int PlayCount,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] ItemState? State = null);
 public sealed record CollectionStatistics(int PublicNovels, int PersonalItems, int Played, int Unplayed,

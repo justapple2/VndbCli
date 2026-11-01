@@ -3,7 +3,7 @@ using Vndb.Core;
 
 namespace Vndb.Local;
 
-public sealed record QuickPlayBook(string Id, string Title, LibraryItemView? Item, IReadOnlyList<PersonalPlayView> Plays, bool NeedsReview = false);
+public sealed record QuickPlayBook(string Id, string Title, LibraryItemView? Item, IReadOnlyList<PersonalPlayView> Plays, bool NeedsReview = false, bool PlaysPending = false);
 
 public interface IQuickPlayService
 {
@@ -33,6 +33,7 @@ public sealed class QuickPlayService(PersonalEditOutbox edits, Func<string?> ser
         catch (ClientApiException e) when (e.Status == 404) { throw new ArgumentException("此条目尚未收录到Web书架，请先确认作品关联。"); }
         catch (WebUnavailableException)
         {
+            if (book.PlaysPending) throw new ArgumentException("此条目的游玩明细尚未缓存，请联网读取后再编辑；书架摘要不会作为空记录使用。");
             if (book.NeedsReview && book.Plays.Count == 0) throw new ArgumentException("个人记录关联待核对，请联网读取此条目的记录后再编辑。");
             return book.Plays;
         }

@@ -98,6 +98,8 @@ public sealed class LocalRegistrationSync(LocalLibraryStore library)
     }
     public async Task<int> SyncAsync(ISyncApi api, string origin, string deviceId, CancellationToken ct = default)
     {
+        var summary = await library.ReadSummaryAsync(ct);
+        if (!summary.Items.Any(i => LocalInstallationRegistration.IsPending(i.Item.Id) && OwnedPackages.References(summary, deviceId, i.Item.Id))) return 0;
         var local = await library.ReadAsync(ct); var pending = local.Items.Where(i => LocalInstallationRegistration.IsPending(i.Item.Id) &&
             OwnedPackages.References(local, deviceId, i.Item.Id)).ToArray();
         if (pending.Length == 0) return 0;

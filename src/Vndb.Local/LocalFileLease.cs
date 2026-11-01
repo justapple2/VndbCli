@@ -8,6 +8,13 @@ public sealed class LocalFileLease : IDisposable
 {
     private readonly FileStream _stream;
     private LocalFileLease(FileStream stream) => _stream = stream;
+    public static LocalFileLease? TryAcquire(string directory, string resource)
+    {
+        RequireOrdinaryAncestors(directory); var locks = Path.Combine(directory, "locks"); RejectLink(locks); Directory.CreateDirectory(locks);
+        var path = Path.Combine(locks, Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(resource))) + ".lock"); RejectLink(path);
+        try { return new(new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None)); }
+        catch (IOException e) when ((e.HResult & 0xffff) is 32 or 33 or 11) { return null; }
+    }
     public static async Task<LocalFileLease> AcquireAsync(string directory, string resource, CancellationToken ct = default)
     {
         var root = Path.GetFullPath(directory);

@@ -17,6 +17,13 @@ import package_release
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_new_local_index_and_lazy_details_are_blocked_from_release(self):
+        from privacy_rules import name_issues
+        for name in ['web/local-library.v2.json', 'web/local-metadata/synthetic.json', 'cli/item-details/synthetic.json',
+                     'desktop/observation-settings.json', 'desktop/local-observations.json', 'desktop/local-resource-intents/synthetic.json']:
+            with self.subTest(name=name):
+                self.assertTrue(name_issues(name))
+
     def setUp(self):
         scratch = ROOT.parent / 'VndbCli.private' / 'test-scratch'
         scratch.mkdir(parents=True, exist_ok=True)

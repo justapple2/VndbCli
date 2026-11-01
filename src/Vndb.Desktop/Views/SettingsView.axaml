@@ -50,6 +50,31 @@
       <Button Classes="form-action" Content="读取导入限额与回执" Command="{Binding Imports.RefreshCommand}" AutomationProperties.Name="读取导入限额与回执" />
       <ItemsControl ItemsSource="{Binding Imports.DisplayResults}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:ImportFeedbackDisplay"><Border Classes="panel"><StackPanel Classes="form"><TextBlock Text="{Binding Kind}" Classes="caption" /><TextBlock Text="{Binding State}" Classes="strong wrap" /><TextBlock Text="{Binding Key}" Classes="caption wrap" /><TextBlock Text="{Binding Message}" Classes="wrap" /><Expander Classes="advanced" Header="原始状态与键"><SelectableTextBlock Text="{Binding Evidence}" Classes="technical wrap" /></Expander></StackPanel></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
     </StackPanel></Expander>
+    <Expander Classes="advanced" Header="本机变化观测／待匹配候选"><StackPanel Classes="form">
+      <TextBlock Text="仅在客户端运行时观察明确配置的目录，不移动、删除、安装或启动游戏，不自动查询VNDB。首版自动观测支持本机NTFS；网络／其他文件系统请手动核对。" Classes="caption wrap" />
+      <CheckBox Content="启用后台浅层监控" IsChecked="{Binding Observation.Enabled}" />
+      <TextBlock Text="管理根（游戏默认按会社／游戏两层；深度是目录布局，不是递归读取游戏文件）" Classes="caption wrap" />
+      <TextBox Text="{Binding Observation.RootPath}" PlaceholderText="选择明确的游戏根或安装包根" AutomationProperties.Name="观测管理根" />
+      <WrapPanel Classes="filters">
+        <Button Content="选择管理根" Command="{Binding Observation.ChooseRootCommand}" />
+        <ComboBox ItemsSource="{Binding Observation.Kinds}" SelectedItem="{Binding Observation.Kind}" AutomationProperties.Name="管理根类型" />
+        <NumericUpDown Minimum="1" Maximum="3" Value="{Binding Observation.Depth}" AutomationProperties.Name="观测布局深度" />
+        <Button Content="加入范围草稿" Command="{Binding Observation.AddRootCommand}" />
+      </WrapPanel>
+      <ListBox ItemsSource="{Binding Observation.Roots}" SelectedItem="{Binding Observation.SelectedRoot}" MaxHeight="160" AutomationProperties.Name="观测管理根列表">
+        <ListBox.ItemTemplate><DataTemplate x:DataType="vm:ObservationRootRow"><TextBlock Text="{Binding Label}" Classes="wrap" /></DataTemplate></ListBox.ItemTemplate>
+      </ListBox>
+      <Button Classes="form-action" Content="移出选定范围（保留游戏与登记）" Command="{Binding Observation.RemoveRootCommand}" />
+      <CheckBox IsChecked="{Binding Observation.Approved}"><TextBlock Text="已核对以上范围，同意建立元数据观测基线；不会重新信任变化后的程序" Classes="wrap" /></CheckBox>
+      <WrapPanel Classes="filters"><Button Content="保存观测设置" Command="{Binding Observation.SaveCommand}" /><Button Content="立即检查本机变化" Command="{Binding Observation.CheckCommand}" /></WrapPanel>
+      <TextBlock Text="{Binding Observation.Summary}" Classes="wrap" AutomationProperties.LiveSetting="Polite" />
+      <TextBlock Text="{Binding Observation.ResourceSummary}" Classes="caption wrap" />
+      <ListBox ItemsSource="{Binding Observation.Candidates}" SelectedItem="{Binding Observation.SelectedCandidate}" MaxHeight="200" AutomationProperties.Name="本机待匹配候选">
+        <ListBox.ItemTemplate><DataTemplate x:DataType="vm:ObservationCandidateRow"><TextBlock Text="{Binding Label}" Classes="wrap" /></DataTemplate></ListBox.ItemTemplate>
+      </ListBox>
+      <WrapPanel Classes="filters"><Button Content="使用选定候选登记…" Command="{Binding Observation.UseCandidateCommand}" /><Button Content="忽略候选（保留文件）" Command="{Binding Observation.IgnoreCommand}" /></WrapPanel>
+      <TextBlock Text="候选与提示最多展示前100项。未知不撤销Web上次存在标记；确认缺失也保留作品、评价、启动配置和复原证据。" Classes="caption wrap" />
+    </StackPanel></Expander>
     <Expander Classes="advanced" Header="本地存在标记／冲突恢复"><StackPanel Classes="form">
       <TextBlock Text="{Binding Presence.StateLabel}" Classes="wrap" AutomationProperties.LiveSetting="Polite" />
       <WrapPanel Classes="filters"><Button Content="读取存在标记状态" Command="{Binding Presence.RefreshCommand}" /><Button Content="按原批次重试" Command="{Binding Presence.RetryCommand}" /><Button Content="预览重新核对" Command="{Binding Presence.PreviewCommand}" /></WrapPanel>

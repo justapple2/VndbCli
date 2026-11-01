@@ -14,7 +14,7 @@ public sealed record PlayChoice(PersonalPlayView Play, string Label);
 public sealed partial class QuickPlayEditorViewModel : ObservableObject
 {
     private readonly BookViewModel _book;
-    private QuickPlayBook Reference => new(_book.Id, _book.Title, _book.Item, _book.Plays, _book.NeedsPlayReview);
+    private QuickPlayBook Reference => new(_book.Id, _book.Title, _book.Item, _book.Plays, _book.NeedsPlayReview, _book.PlaysPending);
     private readonly IQuickPlayService _service;
     private readonly Action _close;
     private readonly Func<Task> _saved;

@@ -186,9 +186,9 @@ public sealed class StableShelfTests
         await new LocalLibraryStore(client.Path).SaveAsync(new([installation], [store.ReadItem(a.Id)!, store.ReadItem(b.Id)!]), Ct);
         using var services = new DesktopServices(client.Path, http); await services.InitializeAsync(Ct); await services.ConfigureAsync(new(http.BaseAddress!.AbsoluteUri), "shelf-test-key", false, Ct);
         var vm = new MainViewModel(services.Library, services.Launcher, new Dialogs(), services); await vm.RefreshCommand.ExecuteAsync(null);
-        var book = Assert.Single(vm.Shelf.Books, i => i.Id == a.Id); Assert.Equal(2, book.Plays.Count); Assert.True(book.HasPlayed); Assert.False(Assert.Single(vm.Shelf.Books, i => i.Id == b.Id).HasPlayed);
+        var book = Assert.Single(vm.Shelf.Books, i => i.Id == a.Id); Assert.Empty(book.Plays); Assert.Equal(2, book.Item!.PlayCount); Assert.True(book.HasPlayed); Assert.False(Assert.Single(vm.Shelf.Books, i => i.Id == b.Id).HasPlayed);
         Assert.True(book.IsLocal); Assert.False(Assert.Single(vm.Shelf.Books, i => i.Id == b.Id).IsLocal);
-        vm.SelectedBook = book; Assert.Equal(2, vm.SessionPlays.Count); await vm.DetailCommand.ExecuteAsync(null); Assert.Equal(2, book.Plays.Count);
+        vm.SelectedBook = book; Assert.Empty(vm.SessionPlays); await vm.DetailCommand.ExecuteAsync(null); Assert.Equal(2, book.Plays.Count); Assert.Equal(2, vm.SessionPlays.Count);
         await vm.EditBookPlayCommand.ExecuteAsync(book); var editor = Assert.IsType<QuickPlayEditorViewModel>(vm.QuickEditor); Assert.Equal(2, editor.Plays.Count); Assert.False(editor.HasSelection);
         editor.SelectedPlay = Assert.Single(editor.Plays, p => p.Play.Id == a2.Id); editor.DurationKnown = true; editor.Hours = 1; editor.Minutes = 30;
         await editor.SaveCommand.ExecuteAsync(null); Assert.True(editor.Applied); Assert.Equal(90, store.GetPlay(a2.Id)!.Details.DurationMinutes);

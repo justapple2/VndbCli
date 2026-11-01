@@ -9,7 +9,7 @@ public sealed class LocalClientProfile(LocalClientSettingsStore settingsStore, L
     {
         if (Path.GetFullPath(settingsStore.DirectoryPath).Equals(Path.GetFullPath(LocalDataRoot.Default), StringComparison.OrdinalIgnoreCase))
             await LocalDataRoot.MigrateAsync(LocalDataRoot.Legacy, settingsStore.DirectoryPath, ct);
-        var catalog = await library.ReadAsync(ct);
+        var catalog = await library.ReadSummaryAsync(ct);
         var settings = await settingsStore.LoadAsync(ct);
         if (settings.DefaultLocale is null)
         {

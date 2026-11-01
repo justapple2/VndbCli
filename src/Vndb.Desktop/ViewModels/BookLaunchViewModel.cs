@@ -47,7 +47,7 @@ public partial class MainViewModel
     [RelayCommand] private void ConfigureBook(BookViewModel? book)
     {
         if (book is null) { Status = "请先选择作品。"; return; }
-        if (book.Item is null) { RegisterBook(book); Status = "请先登记或关联具体书架条目，再进入本机启动配置。"; return; }
+        if (book.Item is null) { SelectedBook = book; Registration.Select(new(book.Title, book.Item, book.Metadata, book.GroupCompany)); Section = 7; Status = "请先登记或关联具体书架条目，再进入本机启动配置。"; return; }
         SelectedBook = book;
         // Never leave another game's editor selected when opening an unconfigured book.
         if (SelectedInstallation is null) { NewLaunch(); LaunchTitle = book.Title; }
@@ -72,6 +72,7 @@ public partial class MainViewModel
     }
     private async Task LaunchProfileAsync(LaunchProfile profile, LaunchMethod method)
     {
+        if (_services is not null) await _services.EnsureObservedLaunchAsync(profile, CancellationToken.None);
         var pid = await _launcher.LaunchAsync(profile.Id, method: method, globalLocale: _services?.Settings.DefaultLocale);
         Status = $"已启动，PID {pid}。";
         if (_services is not null)

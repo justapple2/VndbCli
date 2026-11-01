@@ -39,7 +39,7 @@ public static class ShelfPlayResolver
             result[id].Add(play.ItemId == id ? play : play with { ItemId = id });
             if (!PersonalRules.States.Contains(play.Details.Status)) review.Add(id);
         }
-        return items.Select(i => new ShelfBookPlays(i, result[i.Item.Id], review.Contains(i.Item.Id) || i.PlayCount > result[i.Item.Id].Count)).ToArray();
+        return items.Select(i => new ShelfBookPlays(i, result[i.Item.Id], review.Contains(i.Item.Id) || (snapshot.SummaryOnly ? i.State?.Progress.NeedsReview == true : i.PlayCount > result[i.Item.Id].Count))).ToArray();
     }
     public static IReadOnlyList<PersonalPlayView> ForItem(IReadOnlyList<PersonalPlayView> plays, string itemId)
     {

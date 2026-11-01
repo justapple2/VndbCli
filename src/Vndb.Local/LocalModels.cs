@@ -5,7 +5,11 @@ namespace Vndb.Local;
 // Canonical local JSON models. Legacy Contracts equivalents are server-maintenance compatibility only.
 public sealed record LocalInstallationData(string DeviceId, string RootPath, string Title, string? CompanyGroup = null);
 public sealed record LocalInstallation(string Id, LocalInstallationData Details, string Status, DateTimeOffset? ObservedAt,
-    long Revision, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, DateTimeOffset? RemovedAt = null, string? MergedIntoId = null);
+    long Revision, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, DateTimeOffset? RemovedAt = null, string? MergedIntoId = null)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public LocalPhysicalIdentity? DirectoryIdentity { get; init; }
+}
 public sealed record LocalComponentData(string ItemId, string RelativePath, string Kind = "game", string? Label = null);
 public sealed record LocalInstallationComponent(string Id, string InstallationId, LocalComponentData Details, long Revision,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);

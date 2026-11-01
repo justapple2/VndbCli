@@ -60,6 +60,12 @@ known_hosts*
 
 # Local-only JSON introduced by the privacy boundary. Never commit client collections.
 **/local-library.json
+**/local-library.v2.json
+**/observation-settings.json
+**/local-observations.json
+**/local-resource-intents/
+**/local-metadata/
+**/item-details/
 **/credential.json
 **/presence-pending.json
 **/local-presence-seed.json

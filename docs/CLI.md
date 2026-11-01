@@ -15,6 +15,20 @@
 
 下面省略可执行文件目录，以`vndb`表示。源码开发可用`dotnet run --project src/Vndb.Cli -- <参数>`；普通用户直接用已发布程序，无需SDK。
 
+### 本机登记的轻量索引迁移
+
+退出所有桌面与 CLI 写入任务，先备份整个本机数据根。以下命令只操作指定数据根的 JSON，不联网、不触碰游戏；默认根与桌面一致，可用 `--identity-dir <数据根>` 明确指定。
+
+```powershell
+vndb local-data index-preview --json --output ./index-preview.json
+# 核对预览的目录、条目数、原件与索引大小，并使用 stderr 给出的批准摘要
+vndb local-data index-apply --preview-json ./index-preview.json --approve <批准SHA256> --json
+```
+
+预览文件也含本机目录，只能存放在库外私有位置。启用后使用 `local-library.v2.json` 及 `local-metadata/`，保留 `local-library.json` 原件。原件或预览变化会拒绝切换；中断后没有完整索引就仍使用旧登记，可以重新预览。旧版本不能维护新索引：不要混用旧程序写入原件，否则新程序会停止读写并提示核对。
+
+迁移不改设备、启动配置、组件 ID、待同步稿和回执。尚未产生新编辑时可在备份后将 v2 索引移出数据根以回到原件；产生新编辑后不能直接退回旧原件，应保留整个数据根进行核对。不要删除引用的详情快照或未同步资料。
+
 ## 2. 连接配置与数据根
 
 | 项目 | 优先级／含义 |
@@ -202,3 +216,17 @@ vndb organize registration-sync --server http://nas.local:5187/ --json
 ## 9. 语言与发行版本
 
 使用 `vndb vn releases v17 --json` 获取已收录发行版本，`--refresh` 明确刷新；同样支持 `--source web/vndb/cache/auto` 和 `--output`。Web不可达时沿用Core查询与JSON缓存/待导入流程，旧Web没有该能力时明确报错，不隐式绕过。实际安装版本由用户核对；未知目录不显示为零版本。
+
+## 10. 一次性本机观测
+
+`observe` 只操作本机元数据与JSON，不联网、不提供常驻watch命令，不移动、删除、安装或启动游戏。修改范围前退出桌面客户端，使用与桌面相同的数据根；省略 `--identity-dir` 为默认用户文档目录。
+
+```powershell
+vndb observe root-add --root "E:\SyntheticGames" --kind games --depth 2 --identity-dir "D:\SyntheticClient" --json
+vndb observe check --identity-dir "D:\SyntheticClient" --json
+# 缺失需要间隔至少10秒后再次check；新候选约15秒稳定后等待人工匹配
+vndb observe candidates --identity-dir "D:\SyntheticClient" --json
+vndb observe status --identity-dir "D:\SyntheticClient" --json
+```
+
+示例目录必须替换为实际存在、明确管理的本机NTFS目录。kind 为 games／packages；深度1–3，32个管理根上限，不能嵌套、选择盘根或包含客户端数据根。root-add 捕获目录／卷身份，保留桌面的启用开关状态，不在CLI创建后台宿主。check 只保存实际变化；输出含本机候选和观测信息，只能存放在库外私有位置，不能拿来导入Web。没有变动不会重复推进安装修订；Unknown不当作卸载，现有 presence 命令继续负责同步。

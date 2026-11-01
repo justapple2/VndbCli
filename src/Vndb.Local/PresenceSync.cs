@@ -67,7 +67,7 @@ public sealed partial class PresenceSync(LocalLibraryStore local)
         if (File.Exists(Pending)) batch = await ReadAsync<PresenceBatch>(Pending, ct);
         else
         {
-            var head = await web.PresenceHeadAsync(deviceId, ct); var library = await local.ReadAsync(ct);
+            var head = await web.PresenceHeadAsync(deviceId, ct); var library = await local.ReadSummaryAsync(ct);
             var observed = Observe(library, deviceId, head); if (Unchanged(observed, head)) return 0;
             var authority = await AuthorityAsync(web, ct);
             var flags = observed.Where(i => authority.Active.Contains(i.ItemId)).ToArray();

@@ -5,13 +5,14 @@ namespace Vndb.Desktop.ViewModels;
 
 public partial class MainViewModel
 {
-    [RelayCommand] private void RegisterPackageBook(BookViewModel? book)
+    [RelayCommand] private Task RegisterPackageBookAsync(BookViewModel? book) => GuardAsync(async ct =>
     {
-        if (book is null) { Status = "请先选择作品。"; return; }
+        if (book is null) throw new ArgumentException("请先选择作品。");
+        await RequireBookDetailsAsync(book, ct);
         Packages.Select(new(book.Title, book.Item, book.Metadata, book.GroupCompany));
         Section = 4;
         Status = "作品已选定。请在目录整理页的安装包登记中选择／核对文件，预览后确认。";
-    }
+    });
     private void UpdateOwnership(BookViewModel book)
     {
         // A metadata-only result has no exact personal ItemId. Never borrow variant ownership.

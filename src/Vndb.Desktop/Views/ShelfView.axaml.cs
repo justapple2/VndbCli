@@ -20,8 +20,8 @@ public partial class ShelfView : UserControl
         var vm = (MainViewModel)DataContext!;
         return new ContextMenu { Items =
         {
-            new MenuItem { Header = "直接启动", Icon = new AppIcon { Kind = "Play" }, Command = vm.DirectBookCommand, CommandParameter = book, IsEnabled = book.Item is not null && book.HasInstallation },
-            new MenuItem { Header = "使用LE默认配置启动", Icon = new AppIcon { Kind = "Play" }, Command = vm.LocaleBookCommand, CommandParameter = book, IsEnabled = book.Item is not null && book.HasInstallation },
+            new MenuItem { Header = "直接启动", Icon = new AppIcon { Kind = "Play" }, Command = vm.DirectBookCommand, CommandParameter = book, IsEnabled = book.Item is not null && book.HasInstallation && book.CanLaunchObserved },
+            new MenuItem { Header = "使用LE默认配置启动", Icon = new AppIcon { Kind = "Play" }, Command = vm.LocaleBookCommand, CommandParameter = book, IsEnabled = book.Item is not null && book.HasInstallation && book.CanLaunchObserved },
             new MenuItem { Header = "更新游玩状态与时间…", Icon = new AppIcon { Kind = "Clock" }, Command = vm.EditBookPlayCommand, CommandParameter = book, IsEnabled = book.Item is not null },
             new MenuItem { Header = "打开目录", Icon = new AppIcon { Kind = "Folder" }, Command = vm.OpenBookFolderCommand, CommandParameter = book, IsEnabled = book.Item is not null && book.HasInstallation },
             new Separator(),

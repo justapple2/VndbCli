@@ -10,6 +10,7 @@ public interface ISyncApi
     Task<LibraryItemView> ItemAsync(string id, CancellationToken ct = default);
     Task<ItemPage> ItemsAsync(int page = 1, CancellationToken ct = default);
     Task<ItemPage> RemovedItemsAsync(int page = 1, CancellationToken ct = default);
+    Task<ItemHeadPage?> ItemHeadsAsync(int page, bool deleted, CancellationToken ct = default) => Task.FromResult<ItemHeadPage?>(null);
     Task<PersonalPlayView> PersonalPlayAsync(string id, CancellationToken ct = default);
     Task<PersonalPlayView> SavePersonalPlayAsync(PersonalPlayWrite request, string? id, string operationKey, CancellationToken ct = default);
     Task<ActivityReceipt> SubmitActivityAsync(ActivityBatch batch, CancellationToken ct = default);

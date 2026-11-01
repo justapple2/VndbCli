@@ -67,6 +67,19 @@ MetadataQuery示例：
 
 MetadataResponse字段：`items`、`source`（library／query_cache／vndb）、`fetched_at`、`page`、`page_size`、`total`、`more`、`partial`、`needs_remote`、`pending_import`、`verification_status`及可选`warnings`。本机回退也沿用该结构，但pending与验证状态不同；不能只凭source认定已同步。
 
+### 个人书架的轻量读取
+
+`GET /info` 的 `shelf_summary_v1`、`item_heads_v1` 分别声明以下可选能力；API v1 与原 `/items`、`/plays` 和导出保持兼容，不需升级数据库 schema。能力缺失可使用旧接口；401、协议错误或声明支持后接口出错不能静默降级。
+
+| 方法与路径 | 用途 |
+| --- | --- |
+| `GET /shelf` | 个人卡片摘要，支持与 `/items` 相同的 q／deleted／unmatched／progress／status／is_local 筛选；page 从1开始，page_size 默认100，最大100 |
+| `GET /item-heads` | 权威核对，仅返回 id、revision、deleted；page／page_size／deleted，不返回作品详情或本机路径 |
+| `GET /items/{id}` | 打开详情或编辑前获取完整条目，包括备注与作品资料 |
+| `GET /plays?item_id={id}` | 打开个人明细时获取该精确条目的记录，不按作品名猜关联 |
+
+`/shelf` 返回 `format="vn-shelf-summary"`、`format_version=1`、items／page／page_size／total／more。items 沿用 LibraryItemView 的身份和展示字段，但不含书架长备注、作品简介、发行目录、关系及别名；`state.progress` 是完整状态聚合，`state.latest_status` 是最近记录状态，`play_count` 是记录数量。摘要缺少这些重字段不代表资料库没有它们，**摘要不可作为完整编辑、元数据导入或备份请求**。重玩不会抹去已玩标记。`/item-heads` 同样返回分页包，items 为 `{id, revision, deleted}`。
+
 每个MetadataSnapshot含`vndb_id`、`title`、`kind`（vn／producer）、`novel`、全部`developers`、可选`producer`、`cover`、`fetched_at`、`provenance`、`completeness`。cover含status、Web可访问url、content_type、sha256，不包含NAS文件位置。不同公司角色不等价于唯一主会社，未知发行日期不强制转完整日期。
 
 ### 最小查询示例

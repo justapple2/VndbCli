@@ -36,7 +36,7 @@ const time={play_id:'play-a',base_minutes:null,session_seconds:10,adjustment_sec
 test('personal shelf handlers display server state and send filters before paging without creating records',async()=>{
  const item={id:'exact-item',details:{title:'合成个人条目',novel_id:'v17'},revision:1};
  const p=page('manage',async c=>{
-  if(c.url.includes('/items?'))return {items:[{item,metadata:null,play_count:0,state:{progress:{state:'unrecorded',statuses:[]},is_local:true}}],total:1,more:false};
+  if(c.url.includes('/shelf?'))return {format:'vn-shelf-summary',format_version:1,items:[{item,metadata:null,play_count:0,state:{progress:{state:'unrecorded',statuses:[]},is_local:true}}],total:1,more:false};
   throw Error(c.url);
  },'shelf');await drain();
  assert.match(p.text('items'),/未记录/);assert.match(p.text('items'),/在本地/);
@@ -47,6 +47,22 @@ test('personal shelf handlers display server state and send filters before pagin
  assert.ok(p.calls.every(c=>c.method==='GET'));
  p.elements['clear-filters'].onclick();await drain();
  assert.equal(new URL(p.calls.at(-1).url,'https://example.test').searchParams.get('is_local'),null);
+});
+
+test('opening summary cards fetches full item before editing and preserves long notes',async()=>{
+ const item={id:'exact-item',details:{title:'Synthetic',novel_id:'v17'},revision:1};
+ const p=page('manage',async c=>{
+  if(c.url.includes('/shelf?'))return {format:'vn-shelf-summary',format_version:1,items:[{item,metadata:null,play_count:0,state:{progress:{state:'unrecorded',statuses:[]},is_local:false}}],total:1,more:false};
+  if(c.url.endsWith('/items/exact-item'))return {item:{...item,details:{...item.details,notes:'完整备注一',extra_notes:'完整备注二'}},metadata:{novel:{description:'完整简介'},developers:[]},play_count:0};
+  if(c.url.includes('/plays?item_id='))return [];
+  throw Error(c.url);
+ },'shelf');await drain();
+ const card=p.elements.items.children[0];
+ // The actual card exposes the same open handler to click and keyboard users.
+ const open=p.buttons('items').find(b=>/详情|编辑/.test(b.textContent));
+ assert.ok(open);await open.onclick();await drain();
+ assert.equal(p.elements['item-notes'].value,'完整备注一');assert.equal(p.elements['item-extra'].value,'完整备注二');
+ assert.match(p.text('managed-details'),/完整简介/);assert.ok(p.calls.every(c=>c.method==='GET'));assert.ok(card);
 });
 
 test('official dataset confirmation retains accepted creation across a failed progress refresh',async()=>{

@@ -5,16 +5,16 @@ using Vndb.Core;
 namespace Vndb.Local;
 
 /// <summary>JSON read/compare/replace primitive, not a second business database.</summary>
-internal sealed class JsonStateFile<T>(string directory, string name) where T : class
+internal sealed class JsonStateFile<T>(string directory, string name, long maxBytes = 8 * 1024 * 1024) where T : class
 {
     private readonly string _file = Path.Combine(directory, name);
     private string? _observed;
     private static string Hash(byte[]? bytes) => bytes is null ? "missing" : Convert.ToHexStringLower(SHA256.HashData(bytes));
-    private async Task<byte[]?> BytesAsync(CancellationToken ct)
+    internal async Task<byte[]?> BytesAsync(CancellationToken ct)
     {
         LocalFileLease.RequireOrdinaryAncestors(_file);
         if (!File.Exists(_file)) return null;
-        if ((File.GetAttributes(_file) & FileAttributes.ReparsePoint) != 0 || new FileInfo(_file).Length > 8 * 1024 * 1024) throw new InvalidDataException("本机JSON不是普通文件或过大。");
+        if ((File.GetAttributes(_file) & FileAttributes.ReparsePoint) != 0 || new FileInfo(_file).Length > maxBytes) throw new InvalidDataException("本机JSON不是普通文件或过大。");
         return await File.ReadAllBytesAsync(_file, ct);
     }
     public async Task ObserveAsync(CancellationToken ct) => _observed = Hash(await BytesAsync(ct));
@@ -32,7 +32,7 @@ internal sealed class JsonStateFile<T>(string directory, string name) where T : 
         { _observed = hash; return; } // Do not rewrite equivalent legacy bytes or unknown extension fields.
         if (current is not null && _observed is null || _observed is not null && _observed != hash)
             throw new InvalidDataException("本机JSON已被其他客户端修改，请重新读取后编辑；原件保留。");
-        await JsonSnapshotStore.AtomicWriteAsync(_file, value, true, ct, 8 * 1024 * 1024);
+        await JsonSnapshotStore.AtomicWriteAsync(_file, value, true, ct, maxBytes);
         _observed = Hash(await BytesAsync(ct));
     }
     public async Task<T> UpdateAsync(Func<T?, T> update, CancellationToken ct)
@@ -43,7 +43,7 @@ internal sealed class JsonStateFile<T>(string directory, string name) where T : 
         var value = update(prior);
         if (current is not null && JsonSerializer.Serialize(prior, VndbJson.Options) == JsonSerializer.Serialize(value, VndbJson.Options))
         { _observed = Hash(current); return value; }
-        await JsonSnapshotStore.AtomicWriteAsync(_file, value, true, ct, 8 * 1024 * 1024);
+        await JsonSnapshotStore.AtomicWriteAsync(_file, value, true, ct, maxBytes);
         _observed = Hash(await BytesAsync(ct)); return value;
     }
 }

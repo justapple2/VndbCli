@@ -91,9 +91,10 @@ public sealed class LocalInstallationRegistration(LocalLibraryStore library, Cli
             }
             components.Add(new(Guid.NewGuid().ToString("D"), installId, new(work.Item.Id, relative, input.Kind, input.Label), 1, now, now));
         }
-        var changed = old is null || components.Count != old.Components.Count || old.Installation.Status != "present";
+        var changed = old is null || components.Count != old.Components.Count || old.Installation.Status != "present" || old.Installation.DirectoryIdentity != directories[0].Identity;
         var installation = old?.Installation ?? new(installId, new(device.Id, root, request.Title, request.Company), "present", now, 1, now, now);
         if (changed && old is not null) installation = installation with { Status = "present", Revision = installation.Revision + 1, ObservedAt = now, UpdatedAt = now };
+        installation = installation with { DirectoryIdentity = directories[0].Identity };
         return new(request with { Components = normalized }, device.Id, LocalArchiveFormat.Hash(local), new(installation, components), selected.DistinctBy(i => i.Item.Id).ToArray(), directories, !changed);
     }
     private static string Relative(string path)

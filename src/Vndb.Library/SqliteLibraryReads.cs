@@ -32,12 +32,24 @@ public sealed partial class SqliteLibraryStore
     }
 
     public ItemPage ReadItems(string? query = null, bool deleted = false, bool unmatched = false, int page = 1, int pageSize = 24, string? progress = null, string? status = null, bool? isLocal = null)
+        => ReadItemsCore(query, deleted, unmatched, page, pageSize, progress, status, isLocal, false);
+    private ItemPage ReadItemsCore(string? query, bool deleted, bool unmatched, int page, int pageSize, string? progress, string? status, bool? isLocal, bool summary)
     {
         LibraryRules.ValidatePage(page, pageSize);
         if (!string.IsNullOrEmpty(progress) && progress is not ("played" or "unplayed" or "unrecorded" or "review") ||
             !string.IsNullOrEmpty(status) && !Vndb.Core.PersonalRules.States.Contains(status)) throw new ArgumentException("无效的个人状态筛选。");
         using var read = new LibraryReadScope(this, "items"); var rows = new List<LibraryItem>();
-        using (var select = read.Query("SELECT record_json FROM library_items"))
+        if (summary && string.IsNullOrEmpty(query) && string.IsNullOrEmpty(progress) && string.IsNullOrEmpty(status) && isLocal is null)
+        {
+            const string where = " WHERE (json_extract(record_json,'$.deleted_at') IS NOT NULL)=$deleted AND ($unmatched=0 OR novel_id IS NULL)";
+            using var count = read.Query("SELECT count(*) FROM library_items" + where, ("$deleted", deleted), ("$unmatched", unmatched));
+            var total = Convert.ToInt32(count.ExecuteScalar());
+            using (var select = read.Query("SELECT json_remove(record_json,'$.details.notes','$.details.extra_notes') FROM library_items" + where + " ORDER BY json_extract(record_json,'$.updated_at') DESC,id LIMIT $limit OFFSET $offset",
+                ("$deleted", deleted), ("$unmatched", unmatched), ("$limit", pageSize), ("$offset", (page - 1) * pageSize)))
+            using (var reader = select.ExecuteReader()) while (reader.Read()) rows.Add(Read<LibraryItem>(reader.GetString(0)));
+            return new(ProjectItems(read, rows, summary: true), page, pageSize, total, (long)page * pageSize < total);
+        }
+        using (var select = read.Query(summary && string.IsNullOrEmpty(query) ? "SELECT json_remove(record_json,'$.details.notes','$.details.extra_notes') FROM library_items" : "SELECT record_json FROM library_items"))
         using (var reader = select.ExecuteReader())
             while (reader.Read())
             {
@@ -48,7 +60,8 @@ public sealed partial class SqliteLibraryStore
         var states = ReadItemStates(read);
         rows = rows.Where(i => Matches(states[i.Id].State, progress, status, isLocal)).ToList();
         var selected = rows.OrderByDescending(i => i.UpdatedAt).ThenBy(i => i.Id, StringComparer.Ordinal).Skip((page - 1) * pageSize).Take(pageSize).ToArray();
-        return new(ProjectItems(read, selected, states), page, pageSize, rows.Count, (long)page * pageSize < rows.Count);
+        var views = ProjectItems(read, selected, states, summary);
+        return new(views, page, pageSize, rows.Count, (long)page * pageSize < rows.Count);
     }
     public LibraryItemView? ReadItem(string id)
     {
@@ -56,20 +69,31 @@ public sealed partial class SqliteLibraryStore
         using var select = read.Query("SELECT record_json FROM library_items WHERE id=$id", ("$id", id));
         return select.ExecuteScalar() is string json ? ProjectItems(read, [Read<LibraryItem>(json)])[0] : null;
     }
-    private static IReadOnlyList<LibraryItemView> ProjectItems(LibraryReadScope read, IReadOnlyList<LibraryItem> items, IReadOnlyDictionary<string, StateRow>? states = null)
+    private static IReadOnlyList<LibraryItemView> ProjectItems(LibraryReadScope read, IReadOnlyList<LibraryItem> items, IReadOnlyDictionary<string, StateRow>? states = null, bool summary = false)
     {
         if (items.Count == 0) return [];
         var metadata = new Dictionary<string, MetadataSnapshot>(StringComparer.Ordinal);
         var novels = items.Select(i => i.Details.NovelId).OfType<string>().Distinct(StringComparer.Ordinal).ToArray();
         if (novels.Length > 0)
         {
-            using var select = read.ForIds("SELECT id,entry_json FROM novels WHERE id IN ({ids})", novels);
+            var projection = summary ? "json_set(json_remove(n.entry_json,'$.novel.release_catalog','$.novel.description','$.novel.relations','$.novel.aliases','$.novel.developers','$.producers'),'$.producers',json((SELECT json_group_array(json_object('id',p.id,'name',p.name,'original',p.original)) FROM (SELECT producer_id FROM novel_developers WHERE novel_id=n.id ORDER BY ordinal) d JOIN producers p ON p.id=d.producer_id)))" : "n.entry_json";
+            using var select = read.ForIds("SELECT n.id," + projection + " FROM novels n WHERE n.id IN ({ids})", novels);
             using var reader = select.ExecuteReader();
             while (reader.Read()) metadata.Add(reader.GetString(0), MetadataImports.Snapshot(Deserialize(reader.GetString(1))));
         }
         states ??= ReadItemStates(read, items.Select(i => i.Id).ToArray());
-        return items.Select(i => new LibraryItemView(i, i.Details.NovelId is { } vn ? metadata.GetValueOrDefault(vn) : null,
-            states[i.Id].Count, states[i.Id].State)).ToArray();
+        var latest = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (summary)
+        {
+            using var select = read.ForIds("SELECT l.item_id,p.status FROM play_item_links l JOIN play_records p ON p.id=l.play_id WHERE l.item_id IN ({ids}) AND json_extract(p.record_json,'$.deleted_at') IS NULL ORDER BY p.updated_at DESC,p.id", items.Select(i => i.Id).ToArray());
+            using var reader = select.ExecuteReader(); while (reader.Read()) latest.TryAdd(reader.GetString(0), reader.GetString(1));
+        }
+        return items.Select(i =>
+        {
+            var view = new LibraryItemView(i, i.Details.NovelId is { } vn ? metadata.GetValueOrDefault(vn) : null, states[i.Id].Count,
+                summary ? states[i.Id].State with { LatestStatus = latest.GetValueOrDefault(i.Id) } : states[i.Id].State);
+            return summary ? ShelfSummaries.Item(view) : view;
+        }).ToArray();
     }
 
     public IReadOnlyList<PersonalPlayView> ReadPersonalPlays(string? itemId = null, bool deleted = false)

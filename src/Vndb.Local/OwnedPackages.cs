@@ -48,7 +48,7 @@ public sealed partial class OwnedPackages(LocalLibraryStore library, ClientDevic
         LocalFileLease.RequireOrdinaryAncestors(path);
         return path;
     }
-    private static (string Title, string Kind)? Identify(string name)
+    internal static (string Title, string Kind)? Identify(string name)
     {
         var rar = RarPart().Match(name); var split = SplitPart().Match(name);
         string title; string kind;

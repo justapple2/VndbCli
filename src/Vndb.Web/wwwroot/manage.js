@@ -55,14 +55,15 @@
  async function loadBooks(restore=false){
   const ticket=reads.begin(),position=display.scroll;notice('');$('items').setAttribute('aria-busy','true');$('items-prev').disabled=true;$('items-next').disabled=true;
   try{
-   const data=await api('/items?'+new URLSearchParams({q:display.query,unmatched:display.unmatched,progress:display.progress,...(display.presence?{is_local:display.presence}:{}),page,page_size:24}),'GET',undefined,ticket.signal);
+   const data=await api('/shelf?'+new URLSearchParams({q:display.query,unmatched:display.unmatched,progress:display.progress,...(display.presence?{is_local:display.presence}:{}),page,page_size:24}),'GET',undefined,ticket.signal);
+   if(data.format!=='vn-shelf-summary'||data.format_version!==1||!Array.isArray(data.items)||data.items.some(v=>!v?.item?.id||!v.state?.progress))throw Error('书架摘要格式无效，保留最近结果。');
    if(!ticket.current()||tab!=='shelf')return;lastBooks=data;renderBooks(data);if(restore)VnView.restoreScroll(position);
   }catch(e){if(ticket.current()){notice(VnView.failure(e),true);$('item-count').textContent='读取失败 · 已显示的结果保留';if(!$('items').children.length)empty($('items'),'暂时无法读取，请检查连接后重新查找。');}}
   finally{if(ticket.current()){$('items').setAttribute('aria-busy','false');$('items-prev').disabled=page===1;$('items-next').disabled=!lastBooks?.more;}}
  }
   function structuredDetails(item){
     const parent=$('managed-details');parent.replaceChildren();if(!item)return;
-    const view=lastBooks?.items.find(v=>v.item.id===item.id),metadata=view?.metadata,novel=metadata?.novel;
+    const view=detailView?.item.id===item.id?detailView:lastBooks?.items.find(v=>v.item.id===item.id),metadata=view?.metadata,novel=metadata?.novel;
     parent.append(node('h2',item.details.title_override||novel?.titles?.find(t=>t.lang==='ja'&&t.main)?.title||novel?.titles?.find(t=>t.lang==='ja')?.title||metadata?.title||item.details.title));
     const layout=node('div',undefined,'managed-detail-header');
     if(metadata?.cover?.status!=='none'&&item.details.novel_id){const image=node('img');image.src='/api/v1/vns/'+encodeURIComponent(item.details.novel_id)+'/cover';image.alt='作品封面';image.onerror=()=>image.replaceWith(node('span','暂无封面','small'));layout.append(image);}
@@ -72,9 +73,12 @@
     info.append(node('p','存在状态来自客户端同步，具体位置与启动配置仅在本机客户端。','small'));layout.append(info);parent.append(layout);
   }
   function itemDraft(){return Object.fromEntries(['item-title','item-company','item-title-override','item-company-override','item-notes','item-extra'].map(id=>[id,$(id).value]));}
+  let itemRead=0,detailView=null;
   async function editItem(item=null){
     if(itemAttempt){if(!$('item-dialog').open)$('item-dialog').showModal();feedback('item-feedback','前次条目修改尚未确认，请重试原操作。');return;}
 
+    const ticket=++itemRead;
+    if(item){const full=await api('/items/'+encodeURIComponent(item.id));if(ticket!==itemRead||itemAttempt)return;if(full.item.id!==item.id||full.item.deleted_at)throw Error('条目身份或移除状态变化，请刷新。');detailView=full;item=full.item;}else detailView=null;
     book=item;structuredDetails(item);const d=item?.details||{};$('item-editor-title').textContent=item?'编辑个人条目':'新增作品（可暂不关联 VNDB）';
     for(const [id,value] of Object.entries({'item-title':d.title,'item-company':d.company_hint,'item-title-override':d.title_override,'item-company-override':d.company_override,'item-notes':d.notes,'item-extra':d.extra_notes}))$(id).value=value||'';
     $('item-fields').open=!item;$('item-inputs').disabled=false;$('item-reload').hidden=true;$('item-save').textContent='保存个人条目';
