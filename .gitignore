@@ -90,6 +90,8 @@ known_hosts*
 **/legacy-records/
 **/registry-repairs/
 **/shelf-preferences.json
+**/search-history-*.json
+**/catalog-producers.json
 **/launch-history.json
 **/ui-preferences.json
 **/personal-edits/

@@ -114,7 +114,7 @@ public sealed class DesktopServices : IDisposable
         Web = uri is null ? null : new(_http, uri, key, TimeSpan.FromSeconds(12));
         Library.Bind(new(LocalLibrary, StateDirectory, settings.Server, Web is null ? null : new(Web.ItemsAsync, Web.PlaysAsync, Web.RemovedItemsAsync, Web.ShelfSummaryAsync, Web.ItemAsync)),
             new(_core, new JsonSnapshotStore(QueryDirectory, uri?.AbsoluteUri), Web),
-            new(QueryDirectory, uri?.AbsoluteUri, Web is null ? null : Web.BrowseCatalogAsync));
+            new(QueryDirectory, uri?.AbsoluteUri, Web is null ? null : Web.BrowseCatalogAsync, Web is null ? null : Web.CatalogProducersAsync));
     }
     public LocalClientSync SyncService() => new(Web ?? throw new WebUnavailableException(), Settings.Server ?? throw new WebUnavailableException(),
         QueryDirectory, Activities, PersonalEdits, LocalLibrary, Identity?.Id);

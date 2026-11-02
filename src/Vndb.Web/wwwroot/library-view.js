@@ -15,6 +15,7 @@ globalThis.VnView = (() => {
     unmatched: v => typeof v === 'boolean',
     progress: v => ['', 'unrecorded', 'unplayed', 'played', 'review'].includes(v),
     presence: v => ['', 'true', 'false'].includes(v),
+    statusFilter: v => ['', 'not_started', 'playing', 'played', 'completed', 'on_hold', 'dropped'].includes(v),
     language: v => typeof v === 'string' && /^[a-zA-Z0-9-]{0,20}$/.test(v),
     releaseType: v => ['', 'complete', 'trial', 'partial', 'patch'].includes(v),
     platform: v => typeof v === 'string' && /^[a-zA-Z0-9-]{0,30}$/.test(v),
@@ -123,9 +124,31 @@ globalThis.VnView = (() => {
   }
   function itemBadges(state) {
     const badges=[element('span','vn-badge',progressLabel(state))];
-    if(state?.is_local)badges.push(element('span','vn-badge','在本地（客户端上报）'));
+    badges.push(element('span','vn-badge',state?.is_local?'在本地（客户端上报）':'Web存在：未标记已有'));
     return badges;
   }
-  return {storage, store, latest, failure, element, cover, card, appearance, select, restoreScroll, progressLabel, itemBadges};
+  const shelfQuickViews = Object.freeze({all:{progress:'',presence:'',statusFilter:''},owned:{progress:'',presence:'true',statusFilter:''},
+    owned_unplayed:{progress:'unplayed',presence:'true',statusFilter:''},playing:{progress:'',presence:'',statusFilter:'playing'},
+    unrecorded:{progress:'unrecorded',presence:'',statusFilter:''},review:{progress:'review',presence:'',statusFilter:''}});
+  function searchHistory(scope, env=globalThis) {
+    if(!['lookup','catalog','shelf'].includes(scope))throw Error('Invalid history scope');
+    const key='vndb-search-history-'+scope, saved=storage('localStorage',env);let values=[];
+    const valid=q=>typeof q==='string'&&q.trim()===q&&q.length>0&&q.length<=200&&!/[\u0000-\u001f\u007f]/.test(q);
+    function read(){try{const raw=saved.get(key);if(raw&&raw.length<=32768){const parsed=JSON.parse(raw);if(Array.isArray(parsed))values=[...new Map(parsed.filter(valid).map(q=>[q.toLowerCase(),q])).values()].slice(0,20);}}catch{}return [...values];}
+    function save(next){values=next;saved.set(key,JSON.stringify(values));return [...values];}
+    return {read,record(text){const q=text.trim();if(!valid(q))return read();return save([q,...read().filter(v=>v.toLowerCase()!==q.toLowerCase())].slice(0,20));},remove(q){return save(read().filter(v=>q!==null&&v!==q));}};
+  }
+  function historyControl(parent,input,scope){
+    const history=searchHistory(scope),details=element('details','search-history'),heading=element('summary','','最近搜索（此站点，仅本浏览器）'),select=element('select');
+    select.setAttribute('aria-label','本服务最近搜索');const bar=element('div','vn-history-actions');
+    function render(){select.replaceChildren();for(const q of history.read()){const option=element('option','',q);option.value=q;select.append(option);}select.disabled=!select.children.length;}
+    const fill=element('button','secondary','回填，不查询'),remove=element('button','plain','删除选中'),clear=element('button','plain','清空历史');
+    for(const b of [fill,remove,clear])b.type='button';
+    fill.onclick=()=>{if(!select.disabled){input.value=select.value;input.focus?.();}};
+    remove.onclick=()=>{history.remove(select.value);render();};clear.onclick=()=>{history.remove(null);render();};
+    bar.append(select,fill,remove,clear);details.append(heading,element('p','small','最多20项；仅显式提交时记录，回填不会联网。'),bar);parent.append(details);render();
+    return {record(text){history.record(text);render();}};
+  }
+  return {storage, store, latest, failure, element, cover, card, appearance, select, restoreScroll, progressLabel, itemBadges,shelfQuickViews,searchHistory,historyControl};
 })();
 if (typeof module !== 'undefined') module.exports = globalThis.VnView;

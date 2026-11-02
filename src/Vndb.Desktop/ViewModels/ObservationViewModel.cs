@@ -14,13 +14,9 @@ public partial class MainViewModel
         Observation.Poll(result, _services.ObservationHost?.Status ?? "后台监控未启用；可在设置中添加管理根或手动核对。");
         if (result is null || ReferenceEquals(result, _shownObservation) || result.Catalog is null) return;
         _shownObservation = result; _installations = result.Catalog.Installations; _packages = result.Catalog.Packages ?? []; _services.Library.Seed(result.Catalog);
-        var managed = (_services.ObservationSettings.Roots ?? []).Select(r => r.Id).ToHashSet(StringComparer.Ordinal);
         foreach (var book in _books.Concat(_queryBooks))
         {
             UpdateOwnership(book);
-            var ids = _installations.Where(i => MatchesBook(i, book)).Select(i => i.Installation.Id).ToHashSet(StringComparer.Ordinal);
-            var componentIds = _installations.SelectMany(i => BookComponents(i, book)).Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
-            book.SetObservation(result.Snapshot.Installations.Where(r => ids.Contains(r.Id) && managed.Contains(r.RootId)).ToArray(), Profiles.Where(p => p.ComponentId is not null && componentIds.Contains(p.ComponentId)).ToArray());
         }
         var chosenId = SelectedInstallation?.Installation.Id;
         _applyingObservation = true;

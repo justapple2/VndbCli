@@ -20,7 +20,8 @@ class ReleaseTests(unittest.TestCase):
     def test_new_local_index_and_lazy_details_are_blocked_from_release(self):
         from privacy_rules import name_issues
         for name in ['web/local-library.v2.json', 'web/local-metadata/synthetic.json', 'cli/item-details/synthetic.json',
-                     'desktop/observation-settings.json', 'desktop/local-observations.json', 'desktop/local-resource-intents/synthetic.json']:
+                     'desktop/observation-settings.json', 'desktop/local-observations.json', 'desktop/local-resource-intents/synthetic.json',
+                     'desktop/search-history-lookup.json', 'desktop/search-history-catalog.json', 'desktop/catalog-producers.json']:
             with self.subTest(name=name):
                 self.assertTrue(name_issues(name))
 

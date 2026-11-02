@@ -12,6 +12,10 @@ public sealed record CatalogPersonalSummary(int LinkedItems, int Played, int Unp
         $"关联 {LinkedItems} 项 · ✓ 曾玩过 {Played} · ◷ 未玩 {Unplayed} · ○ 未记录 {Unrecorded}" + (NeedsReview > 0 ? $" · ! 待核对 {NeedsReview}" : "");
 }
 public sealed record PublicCatalogEntry(MetadataSnapshot Metadata, CatalogPersonalSummary Personal, bool ReleasesKnown);
+public sealed record CatalogProducerChoice(string Id, string Name, string? Original, int NovelCount)
+{
+    public string Label => $"{Original ?? Name} · {Id} ({NovelCount})";
+}
 public sealed record CatalogCoverage(int PublicNovels, DateTimeOffset? CompletedSnapshotAt, string? ActiveState,
     long Processed, long Total);
 public sealed record PublicCatalogPage(IReadOnlyList<PublicCatalogEntry> Items, int Page, int PageSize, int Total,

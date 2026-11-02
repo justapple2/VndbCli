@@ -1,7 +1,8 @@
 "use strict";
 (() => {
  const $=id=>document.getElementById(id),node=(tag,text,cls)=>VnView.element(tag,cls,text);
- const stored=VnView.store('shelf',{query:'',page:1,layout:VnView.storage('localStorage').get('vndb-manager-view')==='list'?'list':'grid',density:'comfortable',fit:'contain',selected:'',scroll:0,unmatched:false,progress:'',presence:'',tab:'shelf'});
+ const stored=VnView.store('shelf',{query:'',page:1,layout:VnView.storage('localStorage').get('vndb-manager-view')==='list'?'list':'grid',density:'comfortable',fit:'contain',selected:'',scroll:0,unmatched:false,progress:'',presence:'',statusFilter:'',tab:'shelf'});
+ const searchHistory=VnView.historyControl($('item-history'),$('item-query'),'shelf');
  let display=stored.read(),key=VnView.storage('sessionStorage').get('library-key')||'',tab='shelf',page=display.page,book=null,limits=null,lastBooks=null;
  let itemAttempt=null,itemInitial='';
  const reads=VnView.latest(),keys=new Map();
@@ -26,10 +27,12 @@
  function remember(){display.scroll=scrollY;persist();}
  function controls(){
   $('item-progress').value=display.progress;$('item-presence').value=display.presence;
+  $('item-status').value=display.statusFilter;
+  $('item-quick').value=Object.keys(VnView.shelfQuickViews).find(k=>Object.entries(VnView.shelfQuickViews[k]).every(([name,value])=>display[name]===value))||'custom';
   $('item-query').value=display.query;$('item-unmatched').checked=display.unmatched;
   for(const name of ['layout','density','fit'])$('collection-'+name).value=display[name];
   VnView.appearance($('items'),display);
-  $('filter-summary').textContent=[display.query?'搜索：'+display.query:'',display.unmatched?'待关联 VNDB':'',display.progress?$('item-progress').selectedOptions?.[0]?.text:'',display.presence?$('item-presence').selectedOptions?.[0]?.text:''].filter(Boolean).join(' · ')||'未设置筛选';$('clear-filters').hidden=!display.query&&!display.unmatched&&!display.progress&&!display.presence;
+  $('filter-summary').textContent=[display.query?'搜索：'+display.query:'',display.unmatched?'待关联 VNDB':'',display.progress?$('item-progress').selectedOptions?.[0]?.text:'',display.presence?$('item-presence').selectedOptions?.[0]?.text:'',display.statusFilter?$('item-status').selectedOptions?.[0]?.text:''].filter(Boolean).join(' · ')||'未设置筛选';$('clear-filters').hidden=!display.query&&!display.unmatched&&!display.progress&&!display.presence&&!display.statusFilter;
  }
  function selected(item){display.selected=item.id;remember();VnView.select($('items'),item.id);}
  function change(patch){remember();Object.assign(display,patch,{scroll:0});page=1;persist(true);controls();loadBooks(true);}
@@ -55,7 +58,7 @@
  async function loadBooks(restore=false){
   const ticket=reads.begin(),position=display.scroll;notice('');$('items').setAttribute('aria-busy','true');$('items-prev').disabled=true;$('items-next').disabled=true;
   try{
-   const data=await api('/shelf?'+new URLSearchParams({q:display.query,unmatched:display.unmatched,progress:display.progress,...(display.presence?{is_local:display.presence}:{}),page,page_size:24}),'GET',undefined,ticket.signal);
+   const data=await api('/shelf?'+new URLSearchParams({q:display.query,unmatched:display.unmatched,progress:display.progress,status:display.statusFilter,...(display.presence?{is_local:display.presence}:{}),page,page_size:24}),'GET',undefined,ticket.signal);
    if(data.format!=='vn-shelf-summary'||data.format_version!==1||!Array.isArray(data.items)||data.items.some(v=>!v?.item?.id||!v.state?.progress))throw Error('书架摘要格式无效，保留最近结果。');
    if(!ticket.current()||tab!=='shelf')return;lastBooks=data;renderBooks(data);if(restore)VnView.restoreScroll(position);
   }catch(e){if(ticket.current()){notice(VnView.failure(e),true);$('item-count').textContent='读取失败 · 已显示的结果保留';if(!$('items').children.length)empty($('items'),'暂时无法读取，请检查连接后重新查找。');}}
@@ -225,9 +228,11 @@
  $('item-dialog').addEventListener('cancel',e=>{e.preventDefault();closeItem();});
  window.addEventListener('beforeunload',e=>{if(itemAttempt){e.preventDefault();e.returnValue='';}});
  document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{if(b.dataset.close==='item-dialog')closeItem();else $(b.dataset.close).close();});$('new-item').onclick=()=>editItem();
- $('item-search').onsubmit=e=>{e.preventDefault();change({query:$('item-query').value.trim(),unmatched:$('item-unmatched').checked});};
+ $('item-search').onsubmit=e=>{e.preventDefault();searchHistory.record($('item-query').value);change({query:$('item-query').value.trim(),unmatched:$('item-unmatched').checked});};
  $('item-unmatched').onchange=()=>change({unmatched:$('item-unmatched').checked});
- $('clear-filters').onclick=()=>change({query:'',unmatched:false,progress:'',presence:''});
+ $('clear-filters').onclick=()=>change({query:'',unmatched:false,progress:'',presence:'',statusFilter:''});
+ $('item-status').onchange=()=>change({statusFilter:$('item-status').value});
+ $('item-quick').onchange=()=>{const patch=VnView.shelfQuickViews[$('item-quick').value];if(patch)change(patch);};
  $('item-progress').onchange=()=>change({progress:$('item-progress').value});
  $('item-presence').onchange=()=>change({presence:$('item-presence').value});
  for(const name of ['layout','density','fit'])$('collection-'+name).onchange=()=>{display[name]=$('collection-'+name).value;remember();VnView.appearance($('items'),display);};

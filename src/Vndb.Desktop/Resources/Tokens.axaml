@@ -11,6 +11,8 @@
   <sys:Double x:Key="ShelfDrawerWidth">360</sys:Double>
   <sys:Double x:Key="ShelfWideThreshold">1040</sys:Double>
   <sys:Double x:Key="ShelfCardMinimumWidth">205</sys:Double>
+  <sys:Double x:Key="ShelfCardHeight">400</sys:Double>
+  <sys:Double x:Key="ShelfListMinimumHeight">160</sys:Double>
   <sys:Double x:Key="ShelfDetailCoverHeight">168</sys:Double>
   <sys:Double x:Key="ShelfDrawerCoverHeight">96</sys:Double>
   <sys:Double x:Key="FormWideThreshold">900</sys:Double>

@@ -57,6 +57,9 @@
 .vn-collection[aria-busy="true"] { opacity: .75; }
 .release-catalog { border-top: 1px solid var(--line); padding-top: 16px; }
 .release-filter { display: grid; gap: 6px; margin-block: 12px; }
+.search-history { margin-block: 8px; }
+.vn-history-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-block: 8px; }
+.vn-history-actions select { min-width: 0; max-width: 100%; width: min(340px, 100%); }
 .release-filter input { min-width: 0; width: 100%; }
 .release-catalog > button { margin: 4px 8px 4px 0; }
 @media (max-width: 600px) {

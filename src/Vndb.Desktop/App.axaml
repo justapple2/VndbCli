@@ -10,6 +10,13 @@
     </ResourceDictionary>
   </Application.Resources>
   <Application.DataTemplates>
+    <DataTemplate DataType="{x:Type vm:SearchHistoryViewModel}" x:DataType="vm:SearchHistoryViewModel">
+      <Expander Classes="advanced" Header="最近搜索（仅本机）" HorizontalContentAlignment="Stretch"><StackPanel Classes="compact">
+        <TextBlock Text="{Binding Notice}" Classes="caption wrap" />
+        <WrapPanel Classes="filters"><ComboBox Classes="company-filter" ItemsSource="{Binding Entries}" SelectedItem="{Binding Selected}" AutomationProperties.Name="本服务最近搜索" />
+          <Button Content="回填，不查询" Command="{Binding RecallCommand}" /><Button Content="删除选中" Command="{Binding RemoveCommand}" /><Button Content="清空历史" Command="{Binding ClearCommand}" /></WrapPanel>
+      </StackPanel></Expander>
+    </DataTemplate>
     <DataTemplate DataType="{x:Type vm:PublicCatalogPageView}" x:DataType="vm:PublicCatalogPageView"><views:PublicCatalogView DataContext="{Binding Owner.PublicCatalog}" /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:ShelfPage}" x:DataType="vm:ShelfPage"><views:ShelfView DataContext="{Binding Owner}" /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:QueryPage}" x:DataType="vm:QueryPage"><views:QueryView DataContext="{Binding Owner}" /></DataTemplate>

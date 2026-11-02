@@ -4,6 +4,11 @@ namespace Vndb.Client;
 
 public sealed partial class WebLibraryClient
 {
+    public Task<IReadOnlyList<CatalogProducerChoice>> CatalogProducersAsync(string text, CancellationToken ct)
+    {
+        if (text.Length > 200 || text.Any(char.IsControl)) throw new ArgumentException("会社搜索无效。");
+        return SendAsync<IReadOnlyList<CatalogProducerChoice>>(HttpMethod.Get, "api/v1/catalog/producers?q=" + Uri.EscapeDataString(text.Trim()), null, ct);
+    }
     public async Task<PublicCatalogPage> BrowseCatalogAsync(PublicCatalogQuery query, CancellationToken ct)
     {
         var q = PublicCatalogRules.Validate(query);

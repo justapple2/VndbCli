@@ -15,13 +15,34 @@ public partial class ShelfView : UserControl
 {
     private ShelfBrowserViewModel? _browser;
     private bool _overlay;
+    private string? _positionKey;
+    private long _positionRevision;
+    private void CapturePosition()
+    {
+        if (_browser is null || _positionKey is null || !IsEffectivelyVisible) return;
+        var list = _positionKey.EndsWith("/True", StringComparison.Ordinal) ? BookList : CardRows;
+        var scroll = list.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+        if (scroll is not null) _browser.RememberPosition(_positionKey, scroll.Offset.Y);
+    }
+    private void RestorePosition()
+    {
+        if (_browser is null || !IsEffectivelyVisible) return;
+        var key = _browser.ViewKey; _positionKey = key; var revision = ++_positionRevision;
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_browser is null || !IsEffectivelyVisible || revision != _positionRevision || key != _browser.ViewKey) return;
+            var list = _browser.ListMode ? BookList : CardRows; list.UpdateLayout();
+            var scroll = list.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+            if (scroll is not null) scroll.Offset = new(0, _browser.Position(key));
+        }, DispatcherPriority.Loaded);
+    }
     public ContextMenu CreateBookMenu(BookViewModel book)
     {
         var vm = (MainViewModel)DataContext!;
         return new ContextMenu { Items =
         {
-            new MenuItem { Header = "直接启动", Icon = new AppIcon { Kind = "Play" }, Command = vm.DirectBookCommand, CommandParameter = book, IsEnabled = book.Item is not null && book.HasInstallation && book.CanLaunchObserved },
-            new MenuItem { Header = "使用LE默认配置启动", Icon = new AppIcon { Kind = "Play" }, Command = vm.LocaleBookCommand, CommandParameter = book, IsEnabled = book.Item is not null && book.HasInstallation && book.CanLaunchObserved },
+            new MenuItem { Header = "直接启动", Icon = new AppIcon { Kind = "Play" }, Command = vm.DirectBookCommand, CommandParameter = book, IsEnabled = book.Item is not null && book.CanQuickLaunch },
+            new MenuItem { Header = "使用LE默认配置启动", Icon = new AppIcon { Kind = "Play" }, Command = vm.LocaleBookCommand, CommandParameter = book, IsEnabled = book.Item is not null && book.CanQuickLaunch },
             new MenuItem { Header = "更新游玩状态与时间…", Icon = new AppIcon { Kind = "Clock" }, Command = vm.EditBookPlayCommand, CommandParameter = book, IsEnabled = book.Item is not null },
             new MenuItem { Header = "打开目录", Icon = new AppIcon { Kind = "Folder" }, Command = vm.OpenBookFolderCommand, CommandParameter = book, IsEnabled = book.Item is not null && book.HasInstallation },
             new Separator(),
@@ -29,7 +50,8 @@ public partial class ShelfView : UserControl
             new MenuItem { Header = "检查／修复注册路径…", Command = vm.RegistryBookCommand, CommandParameter = book, IsEnabled = book.Item is not null && book.HasInstallation },
             new MenuItem { Header = "登记安装包…", Command = vm.RegisterPackageBookCommand, CommandParameter = book },
             new Separator(),
-            new MenuItem { Header = "查看详情", Command = vm.Shelf.ShowDetailsCommand, CommandParameter = book }
+            new MenuItem { Header = "查看详情", Command = vm.Shelf.ShowDetailsCommand, CommandParameter = book },
+            new MenuItem { Header = book.LaunchLabel, CommandParameter = book, IsEnabled = false }
         } };
     }
     private void OpenMenu(Control host, BookViewModel book)
@@ -71,11 +93,11 @@ public partial class ShelfView : UserControl
         if (!ReferenceEquals(next, _browser))
         {
             Unsubscribe(); _browser = next;
-            if (_browser is not null) _browser.PropertyChanged += BrowserChanged;
+            if (_browser is not null) { _browser.PropertyChanged += BrowserChanged; _browser.DisplayChanging += CapturePosition; _browser.DisplayChanged += RestorePosition; }
         }
-        UpdateAdaptive();
+        UpdateAdaptive(); RestorePosition();
     }
-    private void Unsubscribe() { if (_browser is not null) _browser.PropertyChanged -= BrowserChanged; _browser = null; }
+    private void Unsubscribe() { CapturePosition(); _positionRevision++; if (_browser is not null) { _browser.PropertyChanged -= BrowserChanged; _browser.DisplayChanging -= CapturePosition; _browser.DisplayChanged -= RestorePosition; } _browser = null; }
     private void BrowserChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(ShelfBrowserViewModel.SelectedBook) or nameof(ShelfBrowserViewModel.DetailsOpen)) UpdateAdaptive();

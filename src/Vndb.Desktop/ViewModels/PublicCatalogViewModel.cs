@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Vndb.Contracts;
 using Vndb.Desktop.Services;
+using Vndb.Local;
 
 namespace Vndb.Desktop.ViewModels;
 
@@ -22,8 +23,33 @@ public sealed record CatalogRow(IReadOnlyList<CatalogBookViewModel> Books, int C
 
 /// <summary>Explicit server paging; no filtering of just the visible page or implicit network work.</summary>
 public sealed partial class PublicCatalogViewModel(IDesktopLibrary library,
-    Func<Func<CancellationToken, Task>, Task> run, Action<string> status, Action<MetadataResponse> showDetails) : ObservableObject
+    Func<Func<CancellationToken, Task>, Task> run, Action<string> status, Action<MetadataResponse> showDetails, Func<LocalQueryScope?>? historyScope = null) : ObservableObject
 {
+    private SearchHistoryViewModel? _history;
+    public SearchHistoryViewModel History => _history ??= new(historyScope ?? (() => null), "catalog", text => Query = text, run);
+    [ObservableProperty] private string _producerQuery = "";
+    [ObservableProperty] private IReadOnlyList<CatalogProducerChoice> _producers = [];
+    [ObservableProperty] private CatalogProducerChoice? _producer;
+    private long _producerGeneration;
+    public event Action? DisplayChanging;
+    public event Action? DisplayChanged;
+    private readonly Dictionary<string, double> _positions = [];
+    public string ViewKey => (_applied is null ? "empty" : LocalArchiveFormat.Hash(_applied)) + "/" + ListMode;
+    public void RememberPosition(string key, double offset)
+    { if (!double.IsFinite(offset)) return; _positions.Remove(key); _positions[key] = Math.Clamp(offset, 0, 10000000); if (_positions.Count > 128) _positions.Remove(_positions.Keys.First()); }
+    public double Position(string key) => _positions.GetValueOrDefault(key);
+    public void CaptureViewport() => DisplayChanging?.Invoke();
+    partial void OnListModeChanging(bool value) => DisplayChanging?.Invoke();
+    partial void OnListModeChanged(bool value) => DisplayChanged?.Invoke();
+    partial void OnProducerChanged(CatalogProducerChoice? value) { if (value is not null) ProducerId = value.Id; }
+    [RelayCommand] private Task FindProducersAsync() => run(async ct =>
+    {
+        var generation = ++_producerGeneration; var query = ProducerQuery;
+        var rows = await library.CatalogProducersAsync(query, CacheOnly, ct); ct.ThrowIfCancellationRequested();
+        if (generation != _producerGeneration) return;
+        var previous = Producer; Producers = rows; Producer = rows.FirstOrDefault(p => p.Id == ProducerId) ?? previous;
+        status("会社选项已读取；选择只修改筛选草稿，点击浏览后生效。最多60项，可输入名称缩小范围。");
+    });
     [ObservableProperty] private string _query = "";
     [ObservableProperty] private string _producerId = "";
     [ObservableProperty] private string _platform = "";
@@ -58,7 +84,7 @@ public sealed partial class PublicCatalogViewModel(IDesktopLibrary library,
     {
         var parts = new List<string>();
         if (q.Query.Length > 0) parts.Add(q.Query);
-        if (q.ProducerId is not null) parts.Add(q.ProducerId);
+        if (q.ProducerId is not null) parts.Add(Producers.FirstOrDefault(p => p.Id == q.ProducerId)?.Label ?? q.ProducerId);
         if (q.Language.Length > 0) parts.Add(Languages.FirstOrDefault(l => l.Code == q.Language)?.Label ?? q.Language);
         if (q.ReleaseType.Length > 0) parts.Add(ReleaseTypes.First(t => t.Code == q.ReleaseType).Label);
         if (q.Platform.Length > 0) parts.Add(q.Platform);
@@ -74,7 +100,7 @@ public sealed partial class PublicCatalogViewModel(IDesktopLibrary library,
     private PublicCatalogQuery Draft() => new(Query.Trim(), string.IsNullOrWhiteSpace(ProducerId) ? null : ProducerId.Trim(), Language.Code, ReleaseType.Code, Platform.Trim(), IncludeMtl, Sort.Code);
     private void DraftChanged() { OnPropertyChanged(nameof(HasPendingFilters)); OnPropertyChanged(nameof(FilterStatus)); }
     partial void OnQueryChanged(string value) => DraftChanged();
-    partial void OnProducerIdChanged(string value) => DraftChanged();
+    partial void OnProducerIdChanged(string value) { if (Producer?.Id != value) Producer = null; DraftChanged(); }
     partial void OnPlatformChanged(string value) => DraftChanged();
     partial void OnIncludeMtlChanged(bool value) => DraftChanged();
     partial void OnLanguageChanged(CatalogChoice value) => DraftChanged();
@@ -93,15 +119,22 @@ public sealed partial class PublicCatalogViewModel(IDesktopLibrary library,
         NextCommand.NotifyCanExecuteChanged(); DetailsCommand.NotifyCanExecuteChanged(); ResetFiltersCommand.NotifyCanExecuteChanged();
         DraftChanged();
     }
-    public void Clear() { _generation++; _applied = null; _more = false; Books = []; Rows = []; Selected = null; HasLoaded = false; IsLoading = false; Summary = "连接已切换，请重新浏览。"; Coverage = "尚未读取此Web的目录覆盖范围。"; NavigationChanged(); }
-    public void Resize(double width) { _columns = Math.Clamp((int)(width / 210), 1, 6); RebuildRows(); }
+    public void Clear() { _generation++; _producerGeneration++; Producers = []; Producer = null; ProducerId = ""; ProducerQuery = ""; _applied = null; _more = false; Books = []; Rows = []; Selected = null; HasLoaded = false; IsLoading = false; Summary = "连接已切换，请重新浏览。"; Coverage = "尚未读取此Web的目录覆盖范围。"; _positions.Clear(); NavigationChanged(); }
+    public void Resize(double width) { var columns = Math.Clamp((int)(width / 210), 1, 6); if (_columns == columns) return; DisplayChanging?.Invoke(); _columns = columns; RebuildRows(); DisplayChanged?.Invoke(); }
     private void RebuildRows() => Rows = Books.Chunk(_columns).Select(b => new CatalogRow(b, _columns)).ToArray();
-    [RelayCommand(CanExecute = nameof(CanBrowse))] private Task BrowseAsync() => run(ct => LoadAsync(PublicCatalogRules.Validate(Draft()), ct));
+    [RelayCommand(CanExecute = nameof(CanBrowse))] private Task BrowseAsync() => run(async ct =>
+    {
+        var generation = _generation;
+        var query = PublicCatalogRules.Validate(Draft());
+        if (query.Query.Length > 0) await History.RecordAsync(query.Query, ct);
+        ct.ThrowIfCancellationRequested(); if (generation != _generation) return;
+        await LoadAsync(query, ct);
+    });
     [RelayCommand(CanExecute = nameof(CanPrevious))] private Task PreviousAsync() => run(ct => _applied is { Page: > 1 } q ? LoadAsync(q with { Page = q.Page - 1 }, ct) : Task.CompletedTask);
     [RelayCommand(CanExecute = nameof(CanNext))] private Task NextAsync() => run(ct => _applied is { } q && _more ? LoadAsync(q with { Page = q.Page + 1 }, ct) : Task.CompletedTask);
     [RelayCommand(CanExecute = nameof(CanBrowse))] private void ResetFilters()
     {
-        Query = ""; ProducerId = ""; Platform = ""; IncludeMtl = false;
+        Query = ""; ProducerId = ""; Producer = null; Platform = ""; IncludeMtl = false;
         Language = Languages[0]; ReleaseType = ReleaseTypes[0]; Sort = Sorts[0];
     }
     private async Task LoadAsync(PublicCatalogQuery query, CancellationToken ct)
@@ -112,6 +145,7 @@ public sealed partial class PublicCatalogViewModel(IDesktopLibrary library,
             var page = await library.BrowseCatalogAsync(query, CacheOnly, ct);
             ct.ThrowIfCancellationRequested();
             if (generation != _generation) return;
+            DisplayChanging?.Invoke();
             _applied = query; _more = page.More;
             var selectedId = Selected?.Id;
             Books = page.Items.Select(i => new CatalogBookViewModel(i)).ToArray(); RebuildRows();
@@ -119,6 +153,7 @@ public sealed partial class PublicCatalogViewModel(IDesktopLibrary library,
             Summary = $"{(page.Source == "client_catalog_cache" ? "本机历史页JSON" : "Web已收录目录")} · {page.Total} 部 · 第 {page.Page} 页 · 读取 {page.ObservedAt.ToLocalTime():g}";
             Coverage = PublicCatalogRules.CoverageLabel(page.Coverage);
             HasLoaded = true;
+            DisplayChanged?.Invoke();
             status("目录已读取；全库筛选排序后分页。翻页沿用已应用条件，修改筛选后请点击浏览。" + (page.Source == "client_catalog_cache" ? "当前是历史页；状态可能过期，没有自动重试。" : ""));
         }
         finally { if (generation == _generation) { IsLoading = false; NavigationChanged(); } }

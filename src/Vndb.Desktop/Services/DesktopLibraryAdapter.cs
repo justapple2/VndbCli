@@ -10,6 +10,7 @@ public interface IDesktopLibrary
 {
     Task<ShelfResult> ShelfAsync(CancellationToken ct);
     Task<MetadataResponse> QueryAsync(string text, string source, CancellationToken ct);
+    Task<IReadOnlyList<CatalogProducerChoice>> CatalogProducersAsync(string query, bool cacheOnly, CancellationToken ct) => throw new NotSupportedException("当前资料适配器不支持会社选择。");
     Task<PublicCatalogPage> BrowseCatalogAsync(PublicCatalogQuery query, bool cacheOnly, CancellationToken ct) =>
         throw new NotSupportedException("当前资料适配器不支持公共目录浏览。");
     Task<MetadataResponse> ReleasesAsync(string id, string source, bool refresh, CancellationToken ct) =>
@@ -24,6 +25,11 @@ public sealed class DesktopLibraryAdapter : IDesktopLibrary
     private LocalShelfReader? _shelf;
     private QueryRouter? _query;
     private PublicCatalogReader? _catalog;
+    public async Task<IReadOnlyList<CatalogProducerChoice>> CatalogProducersAsync(string query, bool cacheOnly, CancellationToken ct)
+    {
+        try { return await (_catalog ?? throw new InvalidOperationException("请先加载设置。")).ProducersAsync(query, cacheOnly, ct); }
+        catch (CatalogCacheMissException) { throw new OfflineCacheMissException(); }
+    }
     public LocalLibrary Catalog { get; private set; } = new([], []);
     public void Bind(LocalShelfReader shelf, QueryRouter query, PublicCatalogReader? catalog = null) { _shelf = shelf; _query = query; _catalog = catalog; }
     public async Task<PublicCatalogPage> BrowseCatalogAsync(PublicCatalogQuery query, bool cacheOnly, CancellationToken ct)

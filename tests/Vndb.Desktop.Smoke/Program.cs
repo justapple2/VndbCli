@@ -59,7 +59,7 @@ public static class Program
             var shelf = window.GetVisualDescendants().OfType<ShelfView>().First(s => s.IsEffectivelyVisible);
             var menu = shelf.CreateBookMenu((BookViewModel)card.DataContext!); menu.Open(card); await Render(window);
             var actions = menu.Items.OfType<MenuItem>().ToArray();
-            Check(actions.Length == 8 && ReferenceEquals(actions[0].Command, vm.DirectBookCommand) && ReferenceEquals(actions[1].Command, vm.LocaleBookCommand) && ReferenceEquals(actions[2].Command, vm.EditBookPlayCommand), "book context actions use explicit book parameters");
+            Check(actions.Length == 9 && ReferenceEquals(actions[0].Command, vm.DirectBookCommand) && ReferenceEquals(actions[1].Command, vm.LocaleBookCommand) && ReferenceEquals(actions[2].Command, vm.EditBookPlayCommand), "book context actions use explicit book parameters and a launch reason");
             var archiveBook = (BookViewModel)card.DataContext!;
             var archiveOnly = new BookViewModel(archiveBook.Item, archiveBook.Metadata); archiveOnly.SetOwnership(false, ["Synthetic/game.zip"]);
             var archiveActions = shelf.CreateBookMenu(archiveOnly).Items.OfType<MenuItem>().ToArray();
@@ -120,6 +120,11 @@ public static class Program
             Check(list.GetRealizedContainers().Count() < vm.Shelf.Books.Count, "list virtualized");
             list.SelectedIndex = 1; Check(vm.SelectedBook == vm.Shelf.Books[1], "compiled list selection binding");
             list.ScrollIntoView(vm.Shelf.Books[^1]); await Render(window); Check(list.GetRealizedContainers().Count() < vm.Shelf.Books.Count, "scroll recycles");
+            var originalOffset = list.GetVisualDescendants().OfType<ScrollViewer>().First().Offset.Y;
+            Check(originalOffset > 0, "K2 scroll fixture actually moved beyond the first row");
+            vm.Section = 1; await Render(window); vm.Section = 0; await Render(window);
+            var restoredList = window.GetVisualDescendants().OfType<ListBox>().Single(l => l.Name == "BookList");
+            Check(Math.Abs(restoredList.GetVisualDescendants().OfType<ScrollViewer>().First().Offset.Y - originalOffset) < 2, "K2 returning from played view restores the home list position");
             window.Width = 1320; window.Height = 880; vm.Section = 1; vm.Shelf.ListMode = true; await Render(window); Save(window, output, "played-list.png");
             Check(vm.Shelf.Books.Count > 0 && vm.Shelf.Books.All(b => b.HasPlayed && b.Plays.All(p => p.ItemId == b.Id)), "played list uses exact stable associations");
             vm.Shelf.ListMode = false; await Render(window); Save(window, output, "played-cards.png");
@@ -361,6 +366,11 @@ public static class Program
             Check(library.QueryCalls == beforeCatalog && library.CatalogCalls == 0, "public catalogue navigation never automatically queries or mutates a personal shelf");
             Check(!vm.PublicCatalog.PreviousCommand.CanExecute(null) && !vm.PublicCatalog.NextCommand.CanExecute(null) && !vm.PublicCatalog.DetailsCommand.CanExecute(null), "public navigation boundaries disabled before an explicit read");
             vm.PublicCatalog.FiltersExpanded = true; await Render(window);
+            vm.PublicCatalog.ProducerQuery = "合成会社";
+            Check(library.ProducerCalls == 0, "K2 typing a company name does not query");
+            await vm.PublicCatalog.FindProducersCommand.ExecuteAsync(null); await Render(window);
+            vm.PublicCatalog.Producer = vm.PublicCatalog.Producers[0];
+            Check(vm.PublicCatalog.ProducerId == "p1" && library.ProducerCalls == 1 && library.CatalogCalls == 0 && library.QueryCalls == beforeCatalog, "K2 named company selection edits the draft without upstream or catalog browsing");
             var catalogQuery = window.GetVisualDescendants().OfType<TextBox>().First(b => Avalonia.Automation.AutomationProperties.GetName(b) == "公共目录关键词");
             catalogQuery.Focus(); window.KeyPress(Key.Enter, RawInputModifiers.Control, PhysicalKey.Enter, null); window.KeyRelease(Key.Enter, RawInputModifiers.Control, PhysicalKey.Enter, null); await Render(window);
             Check(library.CatalogCalls == 1, "public catalogue Ctrl+Enter applies an explicit read from the filter input");
@@ -387,6 +397,13 @@ public static class Program
                 }
             }
             Check(library.CatalogCalls == 1 && library.QueryCalls == beforeCatalog, "layout and theme changes do not refetch public catalogue or alter query results");
+            vm.Section = 2; window.Width = 1320; window.Height = 880; await Render(window);
+            vm.Discovery.History.Entries = ["合成の履歴"]; vm.Discovery.History.Selected = "合成の履歴";
+            window.GetVisualDescendants().OfType<Expander>().First(e => Equals(e.Header, "最近搜索（仅本机）")).IsExpanded = true; await Render(window);
+            var recall = window.GetVisualDescendants().OfType<Button>().First(b => ReferenceEquals(b.Command, vm.Discovery.History.RecallCommand));
+            recall.Focus(); window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null); window.KeyRelease(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null); await Render(window);
+            Check(vm.Discovery.Query == "合成の履歴" && library.QueryCalls == beforeCatalog, "K2 keyboard history recall fills without querying");
+            Save(window, output, "k2-query-history.png");
             library.Summary = true; vm.Section = 0; vm.Shelf.Filter = ""; vm.Shelf.CompanyFilter = "全部会社"; vm.Shelf.ShelfState = "全部状态"; vm.Shelf.LocalOnly = false; vm.Shelf.SelectedBook = null;
             await vm.RefreshCommand.ExecuteAsync(null); await Render(window);
             var summaryBook = vm.Shelf.Books.First(b => b.HasPlayed); vm.SelectedBook = summaryBook;
@@ -396,6 +413,15 @@ public static class Program
             await vm.DetailCommand.ExecuteAsync(null); await Render(window);
             Check(!summaryBook.PlaysPending && !summaryBook.DetailsPending && summaryBook.HasPlayed && summaryBook.BookNotes.Count == 1, "lazy detail loads notes and exact play records without losing played state");
             Save(window, output, "k1-lazy-detail.png");
+            Check(window.GetVisualDescendants().OfType<ComboBox>().Any(c => ReferenceEquals(c.ItemsSource, vm.Shelf.ResourceFilters)), "K2 resource filter compiled binding");
+            vm.Shelf.QuickView = "未记录"; await Render(window);
+            Check(vm.Shelf.Books.All(b => b.IsUnrecorded) && vm.Shelf.Conditions.Any(c => c.Key == "progress"), "K2 quick view and removable condition chips share predicates");
+            vm.Shelf.ResetFiltersCommand.Execute(null); vm.Shelf.SelectedBook = null; vm.Shelf.ListMode = false; await Render(window);
+            Check(window.GetVisualDescendants().OfType<TextBlock>().Any(t => t.IsEffectivelyVisible && t.Text?.StartsWith("本机：", StringComparison.Ordinal) == true), "K2 cards display independent local resource status");
+            var stateCard = window.GetVisualDescendants().OfType<Button>().First(b => b.Classes.Contains("card") && b.IsEffectivelyVisible);
+            Check(stateCard.GetVisualDescendants().OfType<TextBlock>().All(t => t.TranslatePoint(default, stateCard) is { } p && p.Y >= 0 && p.Y + t.Bounds.Height <= stateCard.Bounds.Height), "K2 state card has enough height for all independent labels");
+            Save(window, output, "k2-state-cards.png");
+            vm.Shelf.ListMode = true; await Render(window); Save(window, output, "k2-state-list.png");
             var chromeFocus = window.FindControl<Button>("ThemeButton")!;
             chromeFocus.Focus(NavigationMethod.Tab); await Render(window);
             Check(chromeFocus.IsFocused && chromeFocus.BorderThickness.Left == 2, "custom chrome keyboard focus has an explicit visible border");
@@ -440,6 +466,9 @@ public static class Program
             CatalogCalls++;
             return Task.FromResult(new PublicCatalogPage(Enumerable.Range(1, 24).Select(n => new PublicCatalogEntry(Metadata(n) with { Provenance = "vndb_dump", Completeness = "partial_text" }, new(3, 1, 1, 1, 0, n % 2 == 0), true)).ToArray(), q.Page, q.PageSize, 67459, true, new(67459, new(2026, 10, 27, 0, 0, 0, TimeSpan.Zero), "paused", 10, 100), DateTimeOffset.UtcNow));
         }
+        public int ProducerCalls;
+        public Task<IReadOnlyList<CatalogProducerChoice>> CatalogProducersAsync(string text, bool cacheOnly, CancellationToken ct)
+        { ProducerCalls++; return Task.FromResult<IReadOnlyList<CatalogProducerChoice>>([new("p1", "Synthetic Studio", "合成会社", 24)]); }
         private static MetadataSnapshot Metadata(int n) => new("v" + n, "星の彼方で、もう一度あなたと " + n, "vn",
             new() { Id = "v" + n, Title = "星の彼方で、もう一度あなたと " + n, Released = "2026-10-23", Description = "合成展示资料。\n\nこれはテスト用の架空の作品です。真实个人资料不在测试中。",
                 Languages = ["ja"], ReleaseCatalog = new([new NovelRelease { Id = "r" + n, Title = "合成发行版", Released = "2099-12", Official = false, Patch = true,

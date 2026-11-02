@@ -112,6 +112,7 @@ public sealed class M5Tests
     public async Task ViewModelShowsQueryFailureCancellationAndPendingSource()
     {
         using var dir = new TestDirectory(); var library = new Library(); var vm = new MainViewModel(library, new(dir.Path), new Dialogs());
+        vm.Discovery.Query = "Synthetic query";
         await vm.Discovery.SearchCommand.ExecuteAsync(null); Assert.Contains("本机没有", vm.Status); Assert.False(vm.Busy);
         library.Search = async ct => { await Task.Delay(Timeout.InfiniteTimeSpan, ct); throw new InvalidOperationException(); };
         var search = vm.Discovery.SearchCommand.ExecuteAsync(null); Assert.True(vm.Busy); vm.CancelCommand.Execute(null); await search;
@@ -131,6 +132,7 @@ public sealed class M5Tests
         var profile = await launcher.SaveAsync("合成游戏", fake, ["--receipt", receipt], dir.Path, ct: Ct);
         var library = new Library { Search = async ct => { await Task.Delay(Timeout.InfiniteTimeSpan, ct); throw new InvalidOperationException(); } };
         var vm = new MainViewModel(library, launcher, new Dialogs()) { SelectedProfile = profile };
+        vm.Discovery.Query = "Synthetic query";
         var search = vm.Discovery.SearchCommand.ExecuteAsync(null); Assert.True(vm.Busy);
         await vm.LaunchCommand.ExecuteAsync(null); Assert.Contains("已启动", vm.Status); Assert.False(search.IsCompleted);
         vm.CancelCommand.Execute(null); await search;

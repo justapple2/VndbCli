@@ -208,7 +208,7 @@ public sealed class OwnedPackageTests
     public void OwnershipPresentationNeverPromisesLaunchForAnArchiveAndSelectionInvalidatesApproval()
     {
         var book = new BookViewModel(null, Choice.Metadata); book.SetOwnership(false, ["会社/game.zip"]);
-        Assert.True(book.IsLocal); Assert.False(book.HasInstallation); Assert.Contains("未登记安装", book.LocalLabel);
+        Assert.True(book.IsLocal); Assert.False(book.HasInstallation); Assert.Contains("安装包", book.LocalLabel); Assert.False(book.CanQuickLaunch); Assert.Contains("仅有安装包", book.ResourceLabel);
         var status = ""; var query = "";
         var vm = new PackagesFeatureViewModel(() => throw new InvalidOperationException(), () => null, action => action(Ct), text => status = text, text => query = text, _ => Task.CompletedTask);
         vm.Selected = new(Path.GetTempPath(), "game.zip", "suggested", "压缩包", 1); vm.QuerySelectedCommand.Execute(null); Assert.Equal("suggested", query);

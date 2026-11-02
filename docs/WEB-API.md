@@ -80,6 +80,8 @@ MetadataResponse字段：`items`、`source`（library／query_cache／vndb）、
 
 `/shelf` 返回 `format="vn-shelf-summary"`、`format_version=1`、items／page／page_size／total／more。items 沿用 LibraryItemView 的身份和展示字段，但不含书架长备注、作品简介、发行目录、关系及别名；`state.progress` 是完整状态聚合，`state.latest_status` 是最近记录状态，`play_count` 是记录数量。摘要缺少这些重字段不代表资料库没有它们，**摘要不可作为完整编辑、元数据导入或备份请求**。重玩不会抹去已玩标记。`/item-heads` 同样返回分页包，items 为 `{id, revision, deleted}`。
 
+Web快捷视图直接组合这些谓词，例如已有且未玩为 `progress=unplayed&is_local=true`，游玩中为 `status=playing`。status匹配任一有效关联经历，progress使用整个条目的互斥聚合分类；两者和存在布尔值可同时指定。没有安装、压缩包路径或启动就绪的Web筛选参数，这些信息仅归本机客户端管理。
+
 每个MetadataSnapshot含`vndb_id`、`title`、`kind`（vn／producer）、`novel`、全部`developers`、可选`producer`、`cover`、`fetched_at`、`provenance`、`completeness`。cover含status、Web可访问url、content_type、sha256，不包含NAS文件位置。不同公司角色不等价于唯一主会社，未知发行日期不强制转完整日期。
 
 ### 最小查询示例

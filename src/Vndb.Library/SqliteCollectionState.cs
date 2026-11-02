@@ -42,7 +42,6 @@ public sealed partial class SqliteLibraryStore
             states.Count(s => s.State.IsLocal));
     }
     private static bool Matches(ItemState state, string? progress, string? status, bool? isLocal) =>
-        (string.IsNullOrEmpty(progress) || state.Progress.State == progress) &&
-        (string.IsNullOrEmpty(status) || state.Progress.Statuses.Contains(status)) &&
+        state.Progress.Matches(progress, status) &&
         (isLocal is null || state.IsLocal == isLocal);
 }

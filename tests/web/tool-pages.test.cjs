@@ -23,7 +23,7 @@ function page(name,route,tab='imports'){
  context.Option=function(text,value){const e=new Element('option');e.textContent=text;e.value=value;return e;};context.window=context;context.VnPersonal={create:()=>({open(){}})};context.VnView={element:(tag,cls,text)=>{const e=new Element(tag);e.className=cls;e.textContent=text;return e;},storage:()=>({get:()=>null,set(){}}),store:(_id,defaults)=>({read:()=>({...defaults}),save(){}}),latest:()=>({cancel(){},begin(){return {current:()=>true};}}),appearance(){},select(){},failure:e=>e.message,restoreScroll(){}};
  vm.createContext(context);
  const adapter=context.VnView;vm.runInContext(fs.readFileSync(path.join(root,'library-view.js'),'utf8'),context,{filename:'library-view.js'});
- context.VnView={...adapter,card:context.VnView.card,itemBadges:context.VnView.itemBadges,progressLabel:context.VnView.progressLabel};
+ context.VnView={...adapter,card:context.VnView.card,itemBadges:context.VnView.itemBadges,progressLabel:context.VnView.progressLabel,historyControl:context.VnView.historyControl,shelfQuickViews:context.VnView.shelfQuickViews};
  for(const file of ['tool-feedback.js','import-input.js',name+'.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context,{filename:file});
  return {elements,tabs,calls,intervals,context,buttons:id=>elements[id].querySelectorAll('button'),text:id=>elements[id].textContent};
 }
@@ -47,6 +47,21 @@ test('personal shelf handlers display server state and send filters before pagin
  assert.ok(p.calls.every(c=>c.method==='GET'));
  p.elements['clear-filters'].onclick();await drain();
  assert.equal(new URL(p.calls.at(-1).url,'https://example.test').searchParams.get('is_local'),null);
+});
+test('actual quick view and history controls preserve the explicit submit boundary',async()=>{
+ const p=page('manage',async c=>{
+  if(c.url.includes('/shelf?'))return {format:'vn-shelf-summary',format_version:1,items:[],total:0,more:false};throw Error(c.url);
+ },'shelf');await drain();
+ p.elements['item-quick'].value='owned_unplayed';p.elements['item-quick'].onchange();await drain();
+ let query=new URL(p.calls.at(-1).url,'https://example.test').searchParams;
+ assert.equal(query.get('progress'),'unplayed');assert.equal(query.get('is_local'),'true');
+ p.elements['item-status'].value='playing';p.elements['item-status'].onchange();await drain();
+ query=new URL(p.calls.at(-1).url,'https://example.test').searchParams;assert.equal(query.get('status'),'playing');
+ p.elements['item-query'].value='Synthetic history';p.elements['item-search'].onsubmit({preventDefault(){}});await drain();
+ const before=p.calls.length;p.elements['item-query'].value='New draft';
+ p.buttons('item-history').find(b=>b.textContent==='回填，不查询').onclick();await drain();
+ assert.equal(p.elements['item-query'].value,'Synthetic history');assert.equal(p.calls.length,before);
+ p.buttons('item-history').find(b=>b.textContent==='清空历史').onclick();assert.ok(p.calls.every(c=>c.method==='GET'));
 });
 
 test('opening summary cards fetches full item before editing and preserves long notes',async()=>{

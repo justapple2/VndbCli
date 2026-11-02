@@ -45,6 +45,8 @@
 **/item-details
 **/observation-settings.json
 **/local-observations.json
+**/search-history-*.json
+**/catalog-producers.json
 **/local-resource-intents
 **/launch-profiles.json
 **/credential.*

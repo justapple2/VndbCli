@@ -1,5 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:Vndb.Desktop.ViewModels" xmlns:c="using:Vndb.Desktop.Controls"
-             x:Class="Vndb.Desktop.Views.PublicCatalogView" x:DataType="vm:PublicCatalogViewModel" SizeChanged="OnResize">
+             xmlns:contracts="using:Vndb.Contracts" x:Class="Vndb.Desktop.Views.PublicCatalogView" x:DataType="vm:PublicCatalogViewModel" SizeChanged="OnResize">
   <UserControl.KeyBindings><KeyBinding Gesture="Ctrl+Enter" Command="{Binding BrowseCommand}" /></UserControl.KeyBindings>
   <UserControl.Resources>
     <DataTemplate x:Key="CatalogChoice" x:DataType="vm:CatalogChoice"><TextBlock Text="{Binding Label}" /></DataTemplate>
@@ -14,8 +14,12 @@
     </DataTemplate>
   </UserControl.Resources>
   <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="10">
-    <ScrollViewer MaxHeight="220"><Expander Header="全库搜索与发行版本筛选" IsExpanded="{Binding FiltersExpanded}" HorizontalContentAlignment="Stretch">
+    <ScrollViewer MaxHeight="300"><Expander Header="全库搜索与发行版本筛选" IsExpanded="{Binding FiltersExpanded}" HorizontalContentAlignment="Stretch">
       <StackPanel Classes="compact">
+        <WrapPanel Classes="filters"><TextBox Classes="shelf-filter" Text="{Binding ProducerQuery}" PlaceholderText="按会社名称或ID查找Web已收录选项" AutomationProperties.Name="公共目录会社名称" /><Button Content="查找会社" Command="{Binding FindProducersCommand}" />
+          <ComboBox Classes="company-filter" ItemsSource="{Binding Producers}" SelectedItem="{Binding Producer}" AutomationProperties.Name="公共目录会社名称选择"><ComboBox.ItemTemplate><DataTemplate x:DataType="contracts:CatalogProducerChoice"><TextBlock Text="{Binding Label}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+        </WrapPanel>
+        <ContentControl Content="{Binding History}" />
         <WrapPanel Classes="filters">
           <StackPanel Classes="compact"><TextBlock Text="关键词" Classes="caption" /><TextBox Classes="shelf-filter" Text="{Binding Query}" PlaceholderText="标题、原文、别名或v编号" AutomationProperties.Name="公共目录关键词" /></StackPanel>
           <StackPanel Classes="compact"><TextBlock Text="会社编号" Classes="caption" /><TextBox Classes="short-filter" Text="{Binding ProducerId}" PlaceholderText="会社ID（如p1）" AutomationProperties.Name="公共目录会社ID" /></StackPanel>

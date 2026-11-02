@@ -53,3 +53,23 @@ test('errors retain distinct permission, conflict, size and transport explanatio
   assert.match(view.failure({status:413}),/限额/);assert.match(view.failure({status:429}),/频繁/);
   assert.match(view.failure(new TypeError('network')),/保留/);assert.equal(view.failure(Error('协议不兼容')),'协议不兼容');
 });
+test('explicit history is bounded, isolated by same-origin scope, clearable and safe with blocked storage',()=>{
+  const values=new Map(),env={localStorage:{getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v)}};
+  const history=view.searchHistory('lookup',env);for(let n=0;n<25;n++)history.record('Query '+n);
+  assert.equal(history.read().length,20);history.record(' query 5 ');assert.equal(history.read()[0],'query 5');
+  assert.equal(view.searchHistory('catalog',env).read().length,0);
+  assert.equal(view.searchHistory('lookup',{localStorage:{getItem:()=>null,setItem(){}}}).read().length,0);
+  history.remove('query 5');assert.equal(history.read().length,19);history.remove(null);assert.deepEqual(history.read(),[]);
+  history.record('bad\nquery');assert.deepEqual(history.read(),[]);
+  const blocked=view.searchHistory('lookup',{});blocked.record('合成');assert.deepEqual(blocked.read(),['合成']);
+});
+test('history accepts only bounded text even when browser storage is malformed',()=>{
+  let raw=JSON.stringify(['valid',{private:'ignored'},'\ncontrol','x'.repeat(201)]);
+  const history=view.searchHistory('shelf',{localStorage:{getItem:()=>raw,setItem:(_,v)=>raw=v}});
+  assert.deepEqual(history.read(),['valid']);history.record('Another');assert.deepEqual(history.read(),['Another','valid']);
+});
+test('quick shelf views use ordinary server filter predicates and never encode client paths or launch claims',()=>{
+  assert.deepEqual(view.shelfQuickViews.owned_unplayed,{progress:'unplayed',presence:'true',statusFilter:''});
+  assert.deepEqual(view.shelfQuickViews.playing,{progress:'',presence:'',statusFilter:'playing'});
+  assert.ok(Object.values(view.shelfQuickViews).every(p=>Object.keys(p).sort().join(',')==='presence,progress,statusFilter'));
+});

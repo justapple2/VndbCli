@@ -58,7 +58,7 @@ public partial class MainViewModel : ObservableObject
     public MainViewModel(IDesktopLibrary library, LocalLauncher launcher, IDesktopDialogs dialogs, DesktopServices? services = null, IQuickPlayService? quickPlayService = null)
     {
         _library = library; _launcher = launcher; _dialogs = dialogs; _services = services;
-        Profiles.CollectionChanged += (_, _) => UpdateBookDetails();
+        Profiles.CollectionChanged += (_, _) => { if (!_loadingProfiles) { foreach (var book in _books.Concat(_queryBooks)) UpdateOwnership(book); UpdateBookDetails(); } };
         _quickPlayService = quickPlayService ?? (services is null ? null : new QuickPlayService(services.PersonalEdits, () => services.Settings.Server, () => services.Web, library.PlaysAsync));
         Shelf = new(preferences => GuardAsync(async ct =>
         {
@@ -66,9 +66,9 @@ public partial class MainViewModel : ObservableObject
             Status = "已记住本机书架偏好；其他页面浏览状态独立保留在本次会话。";
         }));
         Shelf.SelectionChanged += book => SelectedBook = book;
-        Discovery = new(library, dialogs, GuardAsync, text => Status = text);
+        Discovery = new(library, dialogs, GuardAsync, text => Status = text, () => _services?.QueryScope);
         Discovery.Completed += PresentQuery;
-        PublicCatalog = new(library, GuardAsync, text => Status = text, PresentQuery);
+        PublicCatalog = new(library, GuardAsync, text => Status = text, PresentQuery, () => _services?.QueryScope);
         Organization = new(() => Services().OrganizationWorkspace(), () => SelectedInstallation, () => _installations, dialogs, GuardAsync, text => Status = text);
         Registration = new(() => new(Services().LocalLibrary, Services().Identity ?? throw new InvalidOperationException("请先加载本机身份。")),
             () => _services?.Settings.Server, () => new(Services().LocalLibrary), dialogs, GuardAsync, text => Status = text, RegistrationSavedAsync);
@@ -117,6 +117,7 @@ public partial class MainViewModel : ObservableObject
         }
         await LoadProfilesAsync(ct);
         await LoadShelfPreferencesAsync(ct);
+        await Discovery.History.ReloadAsync(ct); await PublicCatalog.History.ReloadAsync(ct);
         Status = "本机配置已加载。刷新书架或查询资料；本机启动独立于Web。";
     }
 
@@ -190,6 +191,7 @@ public partial class MainViewModel : ObservableObject
     private IEnumerable<LocalInstallationComponent> BookComponents(LocalInstallationView installation, BookViewModel book) => installation.Components.Where(c => book.Item is { } item ? c.Details.ItemId == item.Item.Id :
         book.Metadata?.VndbId is { } id && _services?.LocalCatalog.Items.Any(i => i.Item.Id == c.Details.ItemId && i.Item.Details.NovelId == id) == true);
     private bool MatchesBook(LocalInstallationView installation, BookViewModel book) => BookComponents(installation, book).Any();
+    partial void OnSectionChanging(int value) { Shelf.CaptureViewport(); PublicCatalog.CaptureViewport(); }
     partial void OnSectionChanged(int value) { Shelf.Activate(value); OnPropertyChanged(nameof(SelectedNavigation)); }
     partial void OnSelectedInstallationChanged(LocalInstallationView? value)
     {
@@ -248,6 +250,7 @@ public partial class MainViewModel : ObservableObject
         ManagementKey = ""; StateLocation = services.QueryDirectory;
         _books = []; _queryBooks = []; _installations = []; _packages = []; Discovery.Clear(); PublicCatalog.Clear(); Installations.Clear(); SelectedBook = null;
         SelectedInstallation = null; Organization.Invalidate(); Organization.RunDirectory = ""; Shelf.Clear();
+        await Discovery.History.ReloadAsync(ct); await PublicCatalog.History.ReloadAsync(ct);
         UpdateBookDetails(); Shelf.Refresh();
         Status = "设置已保存；书架快照按服务地址隔离，请刷新。";
     });
@@ -299,7 +302,14 @@ public partial class MainViewModel : ObservableObject
         try { await LaunchProfileAsync(SelectedProfile ?? throw new ArgumentException("请先选择已保存的本机配置。"), LaunchMode == "LE 默认配置" ? LaunchMethod.GlobalLocale : LaunchMethod.Direct); }
         catch (Exception e) when (Recoverable(e)) { Status = "启动失败：" + e.Message; }
     }
-    private async Task LoadProfilesAsync(CancellationToken ct) { Profiles.Clear(); foreach (var p in await _launcher.ReadAsync(ct)) Profiles.Add(p); OnPropertyChanged(nameof(FilteredProfiles)); }
+    private bool _loadingProfiles;
+    private async Task LoadProfilesAsync(CancellationToken ct)
+    {
+        var profiles = await _launcher.ReadAsync(ct); _loadingProfiles = true;
+        try { Profiles.Clear(); foreach (var p in profiles) Profiles.Add(p); } finally { _loadingProfiles = false; }
+        foreach (var book in _books.Concat(_queryBooks)) UpdateOwnership(book);
+        OnPropertyChanged(nameof(FilteredProfiles)); UpdateBookDetails();
+    }
     [RelayCommand] private Task SyncAsync() => GuardAsync(async ct =>
     {
         var result = await Services().SyncService().SyncAsync(ct);

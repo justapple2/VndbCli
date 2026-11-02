@@ -17,12 +17,36 @@ public sealed partial class BookViewModel(LibraryItemView? item, MetadataSnapsho
     public bool HasInstallation { get; private set; }
     public string LocalObservation { get; private set; } = "";
     public bool CanLaunchObserved { get; private set; } = true;
+    public bool HasInstallationRecord { get; private set; }
+    public bool HasMissingResource { get; private set; }
+    public bool HasUnknownResource { get; private set; }
+    public bool LaunchConfigured { get; private set; }
+    private bool _observedReady;
+    private bool _observationProblem;
+    public bool CanQuickLaunch => HasInstallation && LaunchConfigured && CanLaunchObserved;
+    public bool HasLocalProblem => HasMissingResource || HasUnknownResource || _observationProblem;
+    public string ResourceLabel => HasInstallation ? HasLocalProblem ? "本机：有安装 · 部分资源待核对" : "本机：已登记安装" :
+        PackagePaths.Count > 0 ? HasInstallationRecord ? "本机：有安装包 · 安装缺失／待核对" : "本机：仅有安装包" :
+        HasUnknownResource ? "本机：资源未知／待核对" : HasMissingResource ? "本机：登记资源缺失" : "本机：未登记资源";
+    public string ReportedPresence => Item?.State is { } state ? state.IsLocal ? "Web上报：已有" : "Web上报：未标记已有" : "Web上报：未读取";
+    public string LaunchLabel => !HasInstallation ? "启动：无可用安装" : !LaunchConfigured ? "启动：未配置入口" :
+        !CanLaunchObserved ? "启动：待核对（" + LocalObservation + "）" : _observedReady ? "启动：可复核启动" : "启动：已配置，使用前复核";
+    public void SetResourceState(bool registered, bool missing, bool unknown, bool configured)
+    { HasInstallationRecord = registered; HasMissingResource = missing; HasUnknownResource = unknown; LaunchConfigured = configured; ResourceChanged(); }
+    private void ResourceChanged()
+    {
+        foreach (var name in new[] { nameof(HasInstallationRecord), nameof(HasMissingResource), nameof(HasUnknownResource), nameof(LaunchConfigured),
+            nameof(HasLocalProblem), nameof(ResourceLabel), nameof(ReportedPresence), nameof(LaunchLabel), nameof(CanQuickLaunch) }) OnPropertyChanged(name);
+    }
     public void SetObservation(IReadOnlyList<LocalInstallationObservation> rows, IReadOnlyList<LaunchProfile>? profiles = null)
     {
         LocalObservation = string.Join(" / ", rows.Select(r => ObservationText.Reason(r.Reason)).Distinct());
         CanLaunchObserved = rows.Count == 0 || rows.Any(r => r.Status == "present" && (r.LaunchState == "not_configured" ||
             (profiles is null || r.ReadyProfiles is null ? r.LaunchState == "ready" : profiles.Any(p => r.ReadyProfiles.Contains(p.Id)))));
+        _observedReady = rows.Any(r => r.Status == "present" && r.LaunchState == "ready") && CanLaunchObserved;
+        _observationProblem = rows.Any(r => r.Reason != "present");
         OnPropertyChanged(nameof(LocalObservation)); OnPropertyChanged(nameof(CanLaunchObserved));
+        ResourceChanged();
     }
     public IReadOnlyList<string> PackagePaths { get; private set; } = [];
     public IReadOnlyList<string> PackageRecords { get; private set; } = [];
@@ -31,15 +55,18 @@ public sealed partial class BookViewModel(LibraryItemView? item, MetadataSnapsho
     {
         HasInstallation = installed; PackagePaths = packages; PackageRecords = records ?? packages; IsLocal = installed || packages.Count > 0;
         foreach (var name in new[] { nameof(HasInstallation), nameof(PackagePaths), nameof(PackageRecords), nameof(PackageLocations), nameof(IsLocal), nameof(LocalLabel) }) OnPropertyChanged(name);
+        ResourceChanged();
     }
     public DateTimeOffset? LastOpenedAt { get; set; }
     public DateTimeOffset? AddedAt => Item?.Item.CreatedAt;
     public string? Released => Metadata?.Novel?.Released;
     public string LastOpenedLabel => LastOpenedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "尚未从本客户端打开";
-    public IReadOnlyList<string> Companies => Metadata?.Developers.Count > 0 ? Metadata.Developers.Select(p => p.Original ?? p.Name).ToArray() : [Company];
+    public IReadOnlyList<string> Companies => new[] { Item?.Item.Details.CompanyOverride }.OfType<string>()
+        .Concat(Metadata?.Developers.Count > 0 ? Metadata.Developers.Select(p => p.Original ?? p.Name) : [Company])
+        .Where(c => !string.IsNullOrWhiteSpace(c)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     public string ShelfState => NeedsPlayReview ? "关联待核对" : _summaryPlays ? Item?.State?.LatestStatus is { } latest ? Status(latest) : Progress.HasRecord ? string.Join(" / ", Progress.Statuses.Select(Status)) : "未记录" : Plays.Count > 0 ? Status(Plays.OrderByDescending(p => p.UpdatedAt).First().Details.Status) : "未记录";
     public string CollectionLabel => Item is null ? "公共资料 · 未加入书架" : "个人书架";
-    public string LocalLabel => HasInstallation ? PackagePaths.Count > 0 ? "▣ 已安装 · 有安装包" : "▣ 已安装" : PackagePaths.Count > 0 ? "▣ 本地已有安装包 · 未登记安装" : PackageRecords.Count > 0 ? "安装包记录：缺失／待核对" : IsLocal ? "本机有副本" : "";
+    public string LocalLabel => HasInstallation ? PackagePaths.Count > 0 ? "▣ 本机安装 · 有安装包" : "▣ 本机安装" : PackagePaths.Count > 0 ? "▣ 本机有安装包" : PackageRecords.Count > 0 ? "安装包记录：缺失／待核对" : IsLocal ? "本机有副本" : "";
     public LibraryItemView? Item { get; private set; } = item;
     public MetadataSnapshot? Metadata { get; private set; } = metadata;
     public IReadOnlyList<PersonalPlayView> Plays => _plays;
@@ -66,7 +93,7 @@ public sealed partial class BookViewModel(LibraryItemView? item, MetadataSnapsho
         if (Item is null || value.Item.Id != Item.Item.Id || value.Item.DeletedAt is not null || value.Item.Details.NovelId != Item.Item.Details.NovelId || value.Item.Revision < Item.Item.Revision)
             throw new InvalidDataException("详情关联或修订已变化，请刷新书架。");
         Item = _summaryPlays && value.State is null ? value with { State = Item.State } : value; Metadata = value.Metadata; DetailsPending = false;
-        foreach (var name in new[] { nameof(Item), nameof(Metadata), nameof(DetailsPending), nameof(Title), nameof(Company), nameof(Companies), nameof(GroupCompany), nameof(Released), nameof(Subtitle), nameof(Description), nameof(BookNotes) }) OnPropertyChanged(name);
+        foreach (var name in new[] { nameof(Item), nameof(Metadata), nameof(DetailsPending), nameof(Title), nameof(Company), nameof(Companies), nameof(GroupCompany), nameof(Released), nameof(Subtitle), nameof(Description), nameof(BookNotes), nameof(ReportedPresence) }) OnPropertyChanged(name);
     }
     public string Subtitle => string.Join(" · ", new[] { Metadata?.VndbId, Metadata?.Novel?.Released,
         Item is not null && LocalInstallationRegistration.IsPending(Item.Item.Id) ? "本机登记待同步" : null }.Where(s => !string.IsNullOrEmpty(s)));

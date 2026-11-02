@@ -4,11 +4,14 @@
     <DataTemplate x:Key="BookCardTemplate" x:DataType="vm:BookViewModel">
       <Grid ContextRequested="OnBookContextRequested" DoubleTapped="OnBookDoubleTapped">
         <Button Classes="card" Classes.chosen="{Binding Selected}" Click="OnCardClick" AutomationProperties.Name="{Binding Title}">
-          <Grid RowDefinitions="216,Auto,Auto,Auto" RowSpacing="6">
+          <Grid RowDefinitions="216,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
             <Grid><c:CoverView Metadata="{Binding Metadata}" Background="{DynamicResource CoverBrush}" /><Border Classes="badge" IsVisible="{Binding IsLocal}" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="6"><TextBlock Text="{Binding LocalLabel}" /></Border></Grid>
             <TextBlock Grid.Row="1" Text="{Binding Title}" Classes="book-title" ToolTip.Tip="{Binding Title}" />
             <TextBlock Grid.Row="2" Text="{Binding Company}" Classes="caption ellipsis" ToolTip.Tip="{Binding Company}" />
             <TextBlock Grid.Row="3" Text="{Binding PlaySummary}" Classes="caption ellipsis" ToolTip.Tip="{Binding PlayAssociationNotice}" />
+            <TextBlock Grid.Row="4" Text="{Binding ResourceLabel}" Classes="caption ellipsis" ToolTip.Tip="{Binding LocalObservation}" />
+            <TextBlock Grid.Row="5" Text="{Binding LaunchLabel}" Classes="caption ellipsis" ToolTip.Tip="{Binding ReportedPresence}" />
+            <TextBlock Grid.Row="6" Text="{Binding ReportedPresence}" Classes="caption ellipsis" />
           </Grid>
         </Button>
         <Button Classes="book-more icon" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="14" Click="OnMoreClick" AutomationProperties.Name="作品更多操作" ToolTip.Tip="更多操作（也可右键或按菜单键）"><c:AppIcon Kind="More" /></Button>
@@ -17,7 +20,7 @@
     <DataTemplate x:Key="BookListTemplate" x:DataType="vm:BookViewModel">
       <Grid Classes="book-row" ColumnDefinitions="72,*,36" ContextRequested="OnBookContextRequested" DoubleTapped="OnBookDoubleTapped">
         <c:CoverView Metadata="{Binding Metadata}" Background="{DynamicResource CoverBrush}" />
-        <StackPanel Grid.Column="1" Classes="compact" VerticalAlignment="Center"><TextBlock Text="{Binding Title}" Classes="strong ellipsis" ToolTip.Tip="{Binding Title}" /><TextBlock Text="{Binding Company}" Classes="caption ellipsis" ToolTip.Tip="{Binding Company}" /><TextBlock Text="{Binding PlaySummary}" Classes="caption" ToolTip.Tip="{Binding PlayAssociationNotice}" /><TextBlock Text="{Binding LastOpenedLabel}" Classes="caption" /></StackPanel>
+        <StackPanel Grid.Column="1" Classes="compact" VerticalAlignment="Center"><TextBlock Text="{Binding Title}" Classes="strong ellipsis" ToolTip.Tip="{Binding Title}" /><TextBlock Text="{Binding Company}" Classes="caption ellipsis" ToolTip.Tip="{Binding Company}" /><TextBlock Text="{Binding PlaySummary}" Classes="caption" ToolTip.Tip="{Binding PlayAssociationNotice}" /><TextBlock Text="{Binding ResourceLabel}" Classes="caption wrap" ToolTip.Tip="{Binding LocalObservation}" /><TextBlock Text="{Binding LaunchLabel}" Classes="caption ellipsis" ToolTip.Tip="{Binding LaunchLabel}" /><TextBlock Text="{Binding ReportedPresence}" Classes="caption" /><TextBlock Text="{Binding LastOpenedLabel}" Classes="caption" /></StackPanel>
         <Button Grid.Column="2" Classes="book-more icon" VerticalAlignment="Top" Click="OnMoreClick" AutomationProperties.Name="作品更多操作" ToolTip.Tip="更多操作"><c:AppIcon Kind="More" /></Button>
       </Grid>
     </DataTemplate>
@@ -33,11 +36,13 @@
       </StackPanel>
     </Grid>
     <StackPanel x:Name="ShelfFilters" Grid.Row="1" Classes="compact">
+      <WrapPanel Classes="filters"><TextBlock Text="快捷视图" Classes="caption" VerticalAlignment="Center" /><ComboBox Classes="company-filter" ItemsSource="{Binding Shelf.QuickViews}" SelectedItem="{Binding Shelf.QuickView}" AutomationProperties.Name="书架快捷视图" /><TextBlock Text="本机资源与Web上报分开；未记录不等于未玩" Classes="caption" VerticalAlignment="Center" /></WrapPanel>
       <Expander Classes="shelf-filters" Header="{Binding Shelf.FilterHeading}" IsExpanded="{Binding Shelf.FiltersExpanded}" HorizontalContentAlignment="Stretch">
         <WrapPanel Classes="filters">
           <TextBox x:Name="ShelfFilter" Classes="shelf-filter" Text="{Binding Shelf.Filter}" PlaceholderText="{Binding Shelf.FilterPlaceholder}" AutomationProperties.Name="筛选当前书架结果" />
           <ComboBox Classes="company-filter" ItemsSource="{Binding Shelf.CompanyFilters}" SelectedItem="{Binding Shelf.CompanyFilter}" AutomationProperties.Name="会社筛选" />
           <ComboBox Classes="short-filter" ItemsSource="{Binding Shelf.ShelfStates}" SelectedItem="{Binding Shelf.ShelfState}" AutomationProperties.Name="游玩状态筛选" />
+          <ComboBox Classes="short-filter" ItemsSource="{Binding Shelf.ResourceFilters}" SelectedItem="{Binding Shelf.ResourceFilter}" AutomationProperties.Name="本机资源筛选" />
           <ComboBox Classes="short-filter" ItemsSource="{Binding Shelf.ShelfSorts}" SelectedItem="{Binding Shelf.ShelfSort}" AutomationProperties.Name="书架排序" />
           <CheckBox Content="降序" IsChecked="{Binding Shelf.SortDescending}" /><CheckBox Content="本机有副本" IsChecked="{Binding Shelf.LocalOnly}" />
           <Button Classes="quiet icon" Command="{Binding Shelf.ResetFiltersCommand}" ToolTip.Tip="清除当前视图筛选" AutomationProperties.Name="重置筛选"><c:AppIcon Kind="Filter" /></Button>
@@ -45,6 +50,9 @@
         </WrapPanel>
       </Expander>
       <TextBlock Text="{Binding Shelf.FilterSummary}" IsVisible="{Binding Shelf.HasFilters}" Classes="caption wrap" AutomationProperties.Name="生效的书架筛选" />
+      <ItemsControl ItemsSource="{Binding Shelf.Conditions}" IsVisible="{Binding Shelf.HasFilters}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:ShelfFilterChip"><Button Classes="quiet" Command="{Binding $parent[views:ShelfView].((vm:MainViewModel)DataContext).Shelf.RemoveFilterCommand}" CommandParameter="{Binding Key}" ToolTip.Tip="移除此条件"><StackPanel Classes="inline"><TextBlock Text="{Binding Label}" /><TextBlock Text="×" /></StackPanel></Button></DataTemplate></ItemsControl.ItemTemplate>
+      </ItemsControl>
     </StackPanel>
     <Grid Grid.Row="2" x:Name="ContentArea">
       <Grid ColumnDefinitions="*,0" ColumnSpacing="0" x:Name="ShelfColumns">

@@ -4,6 +4,8 @@ namespace Vndb.Core;
 public sealed record PersonalProgress(bool HasRecord, bool HasPlayed, bool NeedsReview, IReadOnlyList<string> Statuses)
 {
     public string State => NeedsReview ? "review" : !HasRecord ? "unrecorded" : HasPlayed ? "played" : "unplayed";
+    public bool Matches(string? state = null, string? status = null) =>
+        (string.IsNullOrEmpty(state) || State == state) && (string.IsNullOrEmpty(status) || Statuses.Contains(status));
     public static PersonalProgress FromStatuses(IEnumerable<string> statuses, bool needsReview = false)
     {
         var values = statuses.Distinct(StringComparer.Ordinal).ToArray();

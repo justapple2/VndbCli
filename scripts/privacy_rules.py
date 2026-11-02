@@ -9,6 +9,8 @@ BLOCKED_PARTS.update({'play-activity', 'local-checks', 'presence-receipts', 'pre
 BLOCKED_NAMES.update({'local-library.json', 'credential.json', 'presence-pending.json', 'local-presence-seed.json', 'launch-selection-needed.json', 'legacy-migration.json', 'local-data-migration.json', 'local-data-verification.json', 'local-mapping-corrections.json'})
 BLOCKED_PARTS.add('registry-repairs')
 BLOCKED_NAMES.update({'shelf-preferences.json', 'launch-history.json'})
+BLOCKED_NAMES.update({'search-history-lookup.json', 'search-history-catalog.json'})
+BLOCKED_NAMES.add('catalog-producers.json')
 BLOCKED_PARTS.add('personal-edits')
 BLOCKED_PARTS.add('local-registrations')
 BLOCKED_PARTS.update({'presence-operations', 'presence-conflicts', 'presence-recovery', 'presence-recovered', 'presence-rejected'})

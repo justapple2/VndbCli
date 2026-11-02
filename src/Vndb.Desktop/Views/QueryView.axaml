@@ -9,6 +9,7 @@
       <Button Grid.Column="3" Command="{Binding Discovery.ExportCommand}" ToolTip.Tip="导出本次查询JSON" AutomationProperties.Name="导出查询JSON"><c:AppIcon Kind="Download" /></Button>
     </Grid>
     <StackPanel Grid.Row="1" Spacing="4">
+      <ContentControl Content="{Binding Discovery.History}" />
       <StackPanel Classes="inline"><Button Content="按作品ID查询发行版本" Command="{Binding Discovery.ReleasesCommand}" IsEnabled="{Binding !Busy}" /><CheckBox Content="刷新已缓存版本" IsChecked="{Binding Discovery.RefreshReleases}" /></StackPanel>
       <TextBlock Text="发行版本查询需填写 v 开头ID；版本包含试玩、补丁和未来发行，不代表本机安装语言。下方筛选仅影响本次返回结果。" Classes="caption wrap" />
     </StackPanel>
