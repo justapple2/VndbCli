@@ -36,6 +36,8 @@ public static class ShelfSummaries
             var progress = row.State.Progress;
             if (progress.HasRecord != (row.PlayCount > 0) || progress.HasPlayed != progress.Statuses.Any(PersonalRules.IsPlayed) ||
                 !progress.Statuses.SequenceEqual(PersonalRules.States.Where(progress.Statuses.Contains)) ||
+                progress.Statuses.Count > row.PlayCount || progress.HasRecord && progress.Statuses.Count == 0 && !progress.NeedsReview ||
+                row.State.LatestStatus is { } latest && !progress.Statuses.Contains(latest) && !(progress.NeedsReview && !PersonalRules.States.Contains(latest)) ||
                 row.PlayCount == 0 && row.State.LatestStatus is not null || row.PlayCount > 0 && row.State.LatestStatus is null)
                 throw new InvalidDataException("书架摘要个人状态不一致。");
         }

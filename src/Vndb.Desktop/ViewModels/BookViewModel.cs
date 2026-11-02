@@ -23,6 +23,7 @@ public sealed partial class BookViewModel(LibraryItemView? item, MetadataSnapsho
     private IReadOnlyList<PersonalPlayView> _plays = plays?.Where(p => p.DeletedAt is null).ToArray() ?? [];
     private bool _needsPlayReview = associationNeedsReview || !summaryOnly && plays is null && item?.PlayCount > 0;
     private bool _summaryPlays = summaryOnly;
+    private PersonalProgress? _progress;
     public bool PlaysPending => _summaryPlays;
     public bool DetailsPending { get; private set; } = summaryOnly;
     [ObservableProperty] private bool _selected;
@@ -70,7 +71,7 @@ public sealed partial class BookViewModel(LibraryItemView? item, MetadataSnapsho
         foreach (var name in new[] { nameof(HasInstallation), nameof(PackagePaths), nameof(PackageRecords), nameof(PackageLocations), nameof(IsLocal), nameof(LocalLabel) }) OnPropertyChanged(name);
         ResourceChanged();
     }
-    public DateTimeOffset? LastOpenedAt { get; set; }
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(LastOpenedLabel))] private DateTimeOffset? _lastOpenedAt;
     public DateTimeOffset? AddedAt => Item?.Item.CreatedAt;
     public string? Released => Metadata?.Novel?.Released;
     public string LastOpenedLabel => LastOpenedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "尚未从本客户端打开";
@@ -84,20 +85,24 @@ public sealed partial class BookViewModel(LibraryItemView? item, MetadataSnapsho
     public MetadataSnapshot? Metadata { get; private set; } = metadata;
     public IReadOnlyList<PersonalPlayView> Plays => _plays;
     public bool NeedsPlayReview => _needsPlayReview || _summaryPlays && Item?.State?.Progress.NeedsReview == true || Plays.Any(p => !PersonalRules.States.Contains(p.Details.Status));
-    public PersonalProgress Progress => _summaryPlays && Item?.State is { } state ? state.Progress : PersonalProgress.FromStatuses(Plays.Select(p => p.Details.Status), NeedsPlayReview);
+    public PersonalProgress Progress => _progress ??= _summaryPlays && Item?.State is { } state ? state.Progress : PersonalProgress.FromStatuses(Plays.Select(p => p.Details.Status), NeedsPlayReview);
     public bool IsUnplayed => Progress.State == "unplayed";
     public bool IsUnrecorded => Progress.State == "unrecorded";
     public string PlayAssociationNotice => NeedsPlayReview ? "关联待核对：请联网刷新或读取此条目的记录；未将不明记录归入本作品。" : "";
     public void ApplyPlays(IReadOnlyList<PersonalPlayView> values, bool needsReview = false)
     {
         _plays = values.Where(p => p.DeletedAt is null).ToArray(); _needsPlayReview = needsReview; _summaryPlays = false;
+        PlayStateChanged();
+    }
+    private void PlayStateChanged()
+    {
+        _progress = null;
         foreach (var name in new[] { nameof(Plays), nameof(PlaysPending), nameof(HasPlayed), nameof(IsUnplayed), nameof(IsUnrecorded), nameof(Progress), nameof(NeedsPlayReview), nameof(ShelfState), nameof(PlaySummary), nameof(PlayAssociationNotice) }) OnPropertyChanged(name);
     }
     public string Id => Item?.Item.Id ?? Metadata?.VndbId ?? "";
     public string Title => _presentation.Title;
-    public string PublicCompany => Metadata?.Developers.Count > 0
+    public string Company => Metadata?.Developers.Count > 0
         ? string.Join(" / ", Metadata.Developers.Select(p => p.Original ?? p.Name)) : Item?.Item.Details.CompanyHint ?? "会社待补全";
-    public string Company => PublicCompany;
     public string GroupCompany => Item?.Item.Details.CompanyOverride ?? Metadata?.Developers.FirstOrDefault()?.Original
         ?? Metadata?.Developers.FirstOrDefault()?.Name ?? Item?.Item.Details.CompanyHint ?? "";
     public bool HasPlayed => Progress.HasPlayed;
@@ -107,6 +112,7 @@ public sealed partial class BookViewModel(LibraryItemView? item, MetadataSnapsho
             throw new InvalidDataException("详情关联或修订已变化，请刷新书架。");
         Item = _summaryPlays && value.State is null ? value with { State = Item.State } : value; Metadata = value.Metadata; DetailsPending = false;
         UpdateTitle();
+        PlayStateChanged();
         foreach (var name in new[] { nameof(Item), nameof(Metadata), nameof(DetailsPending), nameof(Title), nameof(Company), nameof(Companies), nameof(GroupCompany), nameof(Released), nameof(Subtitle), nameof(Description), nameof(BookNotes), nameof(ReportedPresence) }) OnPropertyChanged(name);
     }
     public string Subtitle => string.Join(" · ", new[] { Metadata?.VndbId, Metadata?.Novel?.Released,

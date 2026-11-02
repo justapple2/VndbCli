@@ -20,10 +20,13 @@ public partial class MainViewModel
     }
     private void ApplyHistory()
     {
+        IndexResources();
+        var lastOpened = _history.Where(h => h.ComponentId is not null).GroupBy(h => h.ComponentId!, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Max(h => h.OpenedAt), StringComparer.Ordinal);
         foreach (var book in _books)
         {
-            var components = _installations.SelectMany(i => BookComponents(i, book)).Select(c => c.Id).ToHashSet();
-            book.LastOpenedAt = _history.Where(h => h.ComponentId is not null && components.Contains(h.ComponentId)).Select(h => (DateTimeOffset?)h.OpenedAt).Max();
+            var installations = book.Item is { } item ? _resourceInstallations![item.Item.Id] : [];
+            book.LastOpenedAt = installations.SelectMany(i => BookComponents(i, book)).Select(c => lastOpened.TryGetValue(c.Id, out var at) ? (DateTimeOffset?)at : null).Max();
         }
     }
     private LaunchProfile? ResolveBookProfile(BookViewModel book)
@@ -38,8 +41,8 @@ public partial class MainViewModel
         var components = BookComponents(installation, book).Select(c => c.Id).ToHashSet();
         var choices = Profiles.Where(p => p.InstallationId == installation.Installation.Id && p.ComponentId is not null && components.Contains(p.ComponentId)).ToArray();
         // Old direct/LE pairs are the same command. Distinct EXEs/arguments/working dirs require selection.
-        var groups = choices.GroupBy(p => System.Text.Json.JsonSerializer.Serialize(new { p.Executable, p.Arguments, p.WorkingDirectory, p.TrackedExecutable })).ToArray();
-        if (groups.Length == 1) { SelectedProfile = groups[0].First(); return SelectedProfile; }
+        var commands = LaunchConfiguration.CommandChoices(choices);
+        if (commands.Count == 1) { SelectedProfile = commands[0]; return SelectedProfile; }
         ConfigureBook(book);
         Status = choices.Length == 0 ? "请为此作品配置自定义EXE、参数与工作目录。" : "此作品有多个不同启动命令，请在本机启动页明确选择。";
         return null;

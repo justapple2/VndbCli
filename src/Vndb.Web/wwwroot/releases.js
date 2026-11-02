@@ -16,9 +16,23 @@ globalThis.VnReleases = (() => {
     const more=node('button','secondary');more.type='button';let shown=20,current;
     filter.oninput=()=>{shown=20;render(current);};more.onclick=()=>{shown+=20;render(current);};
     root.append(node('h3','','已收录发行版本'),node('p','caption','包含试玩、补丁和未来发行；不代表本机安装版本或当前可购买状态。'),filterLabel,content,more,button,status);
+    function requireCatalog(catalog){
+      const ids=new Set();
+      if(!catalog||!Array.isArray(catalog.items)||catalog.items.length>1000||!Number.isFinite(Date.parse(catalog.fetched_at)))
+        throw new Error('发行目录格式或作品关联无效，原始资料保留；请显式刷新。');
+      for(const release of catalog.items){
+        if(!/^r[1-9][0-9]*$/.test(release?.id)||ids.has(release.id)||typeof release.title!=='string'||!release.title.trim()||
+          !Array.isArray(release.languages)||release.languages.some(l=>!l||typeof l.lang!=='string')||!Array.isArray(release.platforms)||
+          !Array.isArray(release.vns)||!release.vns.some(v=>v?.id===novel.id&&['trial','partial','complete'].includes(v.rtype)))
+          throw new Error('发行目录格式或作品关联无效，原始资料保留；请显式刷新。');
+        ids.add(release.id);
+      }
+    }
     function render(catalog) {
-      current=catalog;content.replaceChildren();filterLabel.hidden=!catalog;more.hidden=true;
+      current=undefined;content.replaceChildren();filterLabel.hidden=!catalog;more.hidden=true;
       if(!catalog){content.append(node('p','','尚未查询发行目录。'));return;}
+      try{requireCatalog(catalog);}catch(error){filterLabel.hidden=true;content.append(node('p','notice error',error.message));return;}
+      current=catalog;
       const keyword=filter.value.trim().toLocaleLowerCase(),items=catalog.items.filter(r=>`${r.id} ${r.title} ${r.alttitle||''} ${summary(r,novel.id)}`.toLocaleLowerCase().includes(keyword));
       content.append(node('p','caption',`${catalog.items.length} 项 · 匹配 ${items.length} 项 · 显示 ${Math.min(shown,items.length)} 项 · 资料时间 ${new Date(catalog.fetched_at).toLocaleString('zh-CN')}`));
       if(!catalog.items.length)content.append(node('p','','本次查询没有返回发行记录。'));
@@ -32,8 +46,9 @@ globalThis.VnReleases = (() => {
       try{
         const result=await api(`/api/v1/vns/${novel.id}/releases/${novel.release_catalog?'refresh':'resolve'}`,{post:true});
         if(!isCurrent())return;
-        const updated=result.items?.find(i=>i.vndb_id===novel.id)?.novel?.release_catalog;
-        if(!updated||!Array.isArray(updated.items))throw new Error('返回的发行目录无效，原资料保留。');
+        const matches=Array.isArray(result.items)?result.items.filter(i=>i?.vndb_id===novel.id):[];
+        if(matches.length!==1||matches[0].novel?.id!==novel.id)throw new Error('发行回复作品身份不符，原资料保留。');
+        const updated=matches[0].novel.release_catalog;requireCatalog(updated);
         novel.release_catalog=updated;render(updated);button.textContent='刷新发行目录';status.textContent='发行目录已保存，可离线查看。';
       }catch(error){if(isCurrent())status.textContent=VnView.failure(error);}finally{button.disabled=false;}
     };

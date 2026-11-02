@@ -36,3 +36,11 @@ test('late release success after detail navigation cannot mutate prior metadata'
  const pending=button.onclick();active=false;resolve({items:[{vndb_id:'v17',novel:{release_catalog:{items:[],fetched_at:'2099-12'}}}]});await pending;
  assert.equal(n.release_catalog,original);assert.equal(button.disabled,false);
 });
+test('blank titles and malformed relation/catalog data do not masquerade as known empty results',()=>{
+ const {details,releases}=load();assert.equal(details.title({title:' ',alttitle:' '},'Fallback').title,'Fallback');
+ for(const relations of [{},[{id:'v18',relation:'seq'}],[{id:'v18',relation:'\n',official:true}]]){
+  const root=details.relations({...novel,relations},()=>{throw Error('No navigation');});assert.match(root.textContent,/关联字段无效/);assert.equal(root.children[2].children.length,0);
+ }
+ const bad=releases.section({...novel,release_catalog:{items:{},fetched_at:'2026-11-02'}},()=>{throw Error('No implicit query');});
+ assert.match(bad.textContent,/无效/);assert.doesNotMatch(bad.textContent,/没有返回发行记录/);
+});

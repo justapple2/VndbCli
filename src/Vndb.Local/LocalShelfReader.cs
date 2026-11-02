@@ -76,12 +76,12 @@ public sealed partial class LocalShelfReader(LocalLibraryStore local, string dir
                 {
                     if (await new LocalRegistrationSync(local).MappedItemAsync(item.Item.Id, origin, ct, item) is { } mapped &&
                         Catalog.Items.SingleOrDefault(i => i.Item.Id == mapped) is { } current)
-                    { refreshed.Add(current); mappings.Add(item.Item.Id, mapped); continue; }
+                    { refreshed.Add(cached.SummaryOnly ? LocalSummary(current) : current); mappings.Add(item.Item.Id, mapped); continue; }
                 }
                 catch (Exception e) when (e is InvalidDataException or IOException or JsonException or ClientApiException or ArgumentException or InvalidOperationException or UnauthorizedAccessException) { }
                 RegistrationReviewNeeded = true;
             }
-            refreshed.Add(item);
+            refreshed.Add(cached.SummaryOnly ? LocalSummary(item) : item);
         }
         var known = refreshed.Select(i => i.Item.Id).ToHashSet(StringComparer.Ordinal);
         // Newly registered offline works have no Web tombstone; older Web removals remain authoritative.

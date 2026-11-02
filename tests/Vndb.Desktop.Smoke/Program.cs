@@ -89,7 +89,7 @@ public static class Program
             Check(library.QueryCalls == 0, "Ctrl+Enter outside the query page never starts a query");
             window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null); window.KeyRelease(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null); await Render(window);
             Check(vm.Shelf.DetailsOpen && shelf.FindControl<Border>("DetailPanel")!.IsVisible && !shelf.FindControl<Grid>("BookArea")!.IsEnabled, "Enter opens the compact read-only detail pane");
-            Check(vm.BookDetails.Releases.Any(r => r.Value.Contains("机翻")) && vm.BookDetails.Releases.Any(r => r.Value.Contains("2099-12")), "release catalogue retains translation flags and future partial dates in desktop details");
+            Check(vm.BookDetails.ReleaseBrowser.Rows.Any(r => r.Summary.Contains("机翻")) && vm.BookDetails.ReleaseBrowser.Rows.Any(r => r.Summary.Contains("2099-12")), "release catalogue retains translation flags and future partial dates in desktop details");
             Check(shelf.GetVisualDescendants().OfType<TextBlock>().Any(t => t.Text?.Contains("机翻") == true), "release metadata compiled template renders in the detail pane");
             Check(ReferenceEquals(window.FocusManager!.GetFocusedElement(), shelf.FindControl<Button>("CloseDetails")), "detail pane receives keyboard focus");
             Save(window, output, "u3-detail-800-dark.png");

@@ -8,7 +8,8 @@ let producers = [], lastData = new Map(), displayedPages = new Map(), metadataTo
 const node = VnView.element;
 const searchHistory = VnView.historyControl($('search-history'),$('query'),'lookup');
 const title = n => VnDetails.title(n,n.title).title;
-let activeDetail=null,detailHistory=[];
+let activeDetail=null,detailHistory=[],detailVersion=0;
+function resetDetail(){detailRead.cancel();detailVersion++;activeDetail=null;detailHistory=[];}
 VnDetails.preferencesControl($('title-preferences'),()=>{const cached=lastData.get(state.mode);if(cached&&state.mode!=='plays')renderBooks(cached);if(activeDetail)renderDetail(activeDetail);});
 const company = p => p.original || p.name;
 const date = value => new Date(value).toLocaleDateString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit'});
@@ -37,6 +38,7 @@ function controls(){
 function change(patch,explicit=false){remember();Object.assign(state,patch,{scroll:0});viewStores[state.mode].save(state,{push:true,url:'/?view='+state.mode});controls();load(true,explicit);}
 function selectBook(id){state.selected=id;remember();VnView.select($('content'),id);}
 async function mode(value,{push=true,rememberOld=true,patch,read=true}={}){
+ resetDetail();if($('detail-dialog').open)$('detail-dialog').close();
  if(rememberOld)remember();browseRead.cancel();$('retry-browse').hidden=true;state.mode=value;Object.assign(state,viewStores[value].read(),patch);
  viewStores[value].save(state,{push,url:'/?view='+value});controls();updateTabs();
  const cached=lastData.get(value);$('content').replaceChildren();if(cached){if(value==='plays')window.playJournal.render(cached.data,cached.summary);else renderBooks(cached);}if(read)await load(true);else empty('已回填作品ID','点击搜索后才会查询与补全。');
@@ -111,8 +113,8 @@ async function detail(id,related=false){
  }}
 }
 function renderDetail(entry){
- activeDetail=entry;const n=entry.novel;$('detail-dialog').dataset.novelId=n.id;
- const current=()=>activeDetail===entry&&$('detail-dialog').open;
+ activeDetail=entry;const version=++detailVersion,n=entry.novel;$('detail-dialog').dataset.novelId=n.id;
+ const current=()=>version===detailVersion&&activeDetail===entry&&$('detail-dialog').open;
  const layout=node('div','detail-layout'),left=node('div','detail-cover');left.append(cover(entry));const info=node('div','detail-info');
  if(detailHistory.length){const back=node('button','secondary','返回原详情');back.onclick=()=>{detailRead.cancel();renderDetail(detailHistory.pop());};info.append(back);}
  const presented=VnDetails.title(n,n.title),heading=node('h2','',presented.title);heading.id='detail-title';info.append(node('div','eyebrow','PUBLIC METADATA / '+n.id),heading);
@@ -142,7 +144,7 @@ for(const key of ['language','releaseType','platform','sort'])$('public-'+key).o
 $('clear-filters').onclick=()=>change({query:'',producer:'',year:'',status:'',played:'',unmatched:false,language:'',releaseType:'',platform:'',includeMtl:false,sort:'personal',page:1});
 for(const key of ['layout','density','fit'])$('collection-'+key).onchange=()=>{state[key]=$('collection-'+key).value;remember();VnView.appearance($('content'),state);};
 for(const id of ['settings','settings-top'])$(id).onclick=openSettings;
-$('detail-dialog').addEventListener('close',()=>{detailRead.cancel();activeDetail=null;detailHistory=[];});
+$('detail-dialog').addEventListener('close',resetDetail);
 $('close-settings').onclick=()=>$('settings-dialog').close();$('close-detail').onclick=()=>$('detail-dialog').close();
 $('save-key').onclick=()=>{state.key=$('write-key').value.trim();VnView.storage('sessionStorage').set('library-key',state.key);$('settings-dialog').close();toast('管理密钥已保存到当前会话');};
 $('clear-key').onclick=()=>{state.key='';VnView.storage('sessionStorage').remove('library-key');$('write-key').value='';toast('已清除当前会话密钥');};

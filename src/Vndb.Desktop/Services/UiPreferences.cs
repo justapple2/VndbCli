@@ -18,5 +18,5 @@ public sealed class UiPreferencesStore(string directory)
         var result = JsonSerializer.Deserialize<UiPreferences>(await File.ReadAllTextAsync(FilePath, ct), VndbJson.Options) ?? new();
         return result with { Theme = result.Theme is "Default" or "Light" or "Dark" ? result.Theme : "Default", TitleLanguage = NovelPresentation.ValidPreference(result.TitleLanguage) ? result.TitleLanguage : "japanese" };
     }
-    public Task SaveAsync(UiPreferences preferences, CancellationToken ct = default) => JsonSnapshotStore.AtomicWriteAsync(FilePath, preferences, true, ct);
+    public Task SaveAsync(UiPreferences preferences, CancellationToken ct = default) => JsonSnapshotStore.AtomicWriteAsync(FilePath, preferences, true, ct, maxBytes: 64 * 1024);
 }

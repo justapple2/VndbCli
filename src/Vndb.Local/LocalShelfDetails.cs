@@ -15,8 +15,8 @@ public sealed partial class LocalShelfReader
             snapshot.Plays.Any(p => p?.Details is null) || snapshot.SummaryOnly && snapshot.Items.Any(i => i.State?.Progress?.Statuses is null))
             throw new InvalidDataException("书架快照字段不完整，原件保留。");
     }
-    private static LibraryItemView LocalSummary(LibraryItemView value) => value with
-    { Metadata = ShelfSummaries.Metadata(value.Metadata), State = value.State ?? new(PersonalProgress.FromStatuses([], value.PlayCount > 0), false) };
+    private static LibraryItemView LocalSummary(LibraryItemView value) => ShelfSummaries.Item(value) with
+    { State = value.State ?? new(PersonalProgress.FromStatuses([], value.PlayCount > 0), false) };
     private sealed record SummaryRows(List<LibraryItemView> Active, LibraryItemView[] Removed);
     private static async Task<SummaryRows?> ReadSummariesAsync(Func<int, bool, CancellationToken, Task<ShelfSummaryPage?>> read, CancellationToken ct)
     {

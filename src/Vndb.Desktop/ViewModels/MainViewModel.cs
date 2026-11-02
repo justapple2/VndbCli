@@ -199,8 +199,8 @@ public partial class MainViewModel : ObservableObject
         SelectedInstallation = Installations.Count == 1 ? Installations[0] : null;
         UpdateBookDetails();
     }
-    private IEnumerable<LocalInstallationComponent> BookComponents(LocalInstallationView installation, BookViewModel book) => installation.Components.Where(c => book.Item is { } item ? c.Details.ItemId == item.Item.Id :
-        book.Metadata?.VndbId is { } id && _services?.LocalCatalog.Items.Any(i => i.Item.Id == c.Details.ItemId && i.Item.Details.NovelId == id) == true);
+    private static IEnumerable<LocalInstallationComponent> BookComponents(LocalInstallationView installation, BookViewModel book) =>
+        installation.Components.Where(c => book.Item is { } item && c.Details.ItemId == item.Item.Id);
     private bool MatchesBook(LocalInstallationView installation, BookViewModel book) => BookComponents(installation, book).Any();
     private long _detailReadGeneration;
     partial void OnSectionChanging(int value) { Shelf.CaptureViewport(); PublicCatalog.CaptureViewport(); if (value != Section) { _detailReadGeneration++; ClearRelatedDetails(); UpdateBookDetails(); } }

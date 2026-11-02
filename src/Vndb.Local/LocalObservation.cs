@@ -99,6 +99,15 @@ public sealed class LocalObservation(LocalLibraryStore library, string deviceId,
             packages[package.Id] = row; if (row.Status != package.Status) packageChanges[package.Id] = (package, row.Status);
         }
         var watchPaths = new HashSet<string>(ObservationSettingsStore.Paths); var candidates = prior.Candidates.ToDictionary(c => c.Id, StringComparer.Ordinal);
+        Queue<string>? completedCandidates = null;
+        bool CandidateRoom(string id)
+        {
+            if (candidates.ContainsKey(id) || candidates.Count < 5000) return true;
+            completedCandidates ??= new(candidates.Values.Where(c => c.State is "registered" or "missing").OrderBy(c => c.StableSince).Select(c => c.Id));
+            while (completedCandidates.TryDequeue(out var completed))
+                if (candidates.TryGetValue(completed, out var row) && row.State is "registered" or "missing") { candidates.Remove(completed); return true; }
+            return false; // Pending decisions and explicit ignores are never evicted.
+        }
         var identities = local.Installations.Where(i => i.Installation.Details.DeviceId == deviceId && i.Installation.RemovedAt is null)
             .Select(i => (View: i, Identity: i.Installation.DirectoryIdentity ?? installations.GetValueOrDefault(i.Installation.Id)?.Identity)).Where(p => p.Identity is not null).ToLookup(p => p.Identity!);
         var packageIdentities = (local.Packages ?? []).Where(p => p.DeviceId == deviceId).Select(p => (Package: p, Identity: packages.GetValueOrDefault(p.Id)?.Identity))
@@ -106,19 +115,19 @@ public sealed class LocalObservation(LocalLibraryStore library, string deviceId,
         var incompleteDiscovery = new HashSet<string>(StringComparer.Ordinal);
         if (discover)
         {
+            var knownDirectories = local.Installations.Where(i => i.Installation.Details.DeviceId == deviceId && i.Installation.RemovedAt is null)
+                .Select(i => i.Installation.Details.RootPath).ToHashSet(ObservationSettingsStore.Paths);
+            var knownPackages = (local.Packages ?? []).Where(p => p.DeviceId == deviceId).Select(p => OwnedPackages.FilePath(p.ScanRoot, p.RelativePath)).ToHashSet(ObservationSettingsStore.Paths);
             foreach (var root in activeRoots.Where(r => rootFacts[r.Id] && (dirtyPaths is null || dirtyPaths.Any(p => ObservationSettingsStore.Within(r.Path, p) || ObservationSettingsStore.Within(p, r.Path)))))
             {
                 var seen = new HashSet<string>(StringComparer.Ordinal); var complete = true;
                 var scannedParents = new HashSet<string>(ObservationSettingsStore.Paths);
-                var knownGames = local.Installations.Where(i => i.Installation.Details.DeviceId == deviceId && i.Installation.RemovedAt is null).Select(i => i.Installation.Details.RootPath).ToArray();
-                var knownDirectories = knownGames.ToHashSet(ObservationSettingsStore.Paths);
                 bool UnderKnown(string path)
                 {
                     for (var current = path; current is not null && ObservationSettingsStore.Within(root.Path, current); current = Path.GetDirectoryName(current))
                         if (knownDirectories.Contains(current)) return true;
                     return false;
                 }
-                var knownPackages = (local.Packages ?? []).Where(p => p.DeviceId == deviceId).Select(p => OwnedPackages.FilePath(p.ScanRoot, p.RelativePath)).ToHashSet(ObservationSettingsStore.Paths);
                 void Walk(string parent, int depth)
                 {
                     ct.ThrowIfCancellationRequested();
@@ -151,7 +160,7 @@ public sealed class LocalObservation(LocalLibraryStore library, string deviceId,
                                 packages[movedPackage.Id] = packageLocation with { Status = "unknown", Reason = "location_changed", NegativeSince = null };
                                 if (movedPackage.Status != "unknown") packageChanges[movedPackage.Id] = (movedPackage, "unknown"); else packageChanges.Remove(movedPackage.Id);
                             }
-                            if (!candidates.ContainsKey(id) && candidates.Count == 5000) { complete = false; continue; }
+                            if (!CandidateRoom(id)) { complete = false; continue; }
                             candidates[id] = new(id, root.Id, relative, kind, facts.Identity, facts.Length, facts.LastWriteUtc, since,
                                 same && old!.State == "ignored" ? "ignored" : now - since >= CandidateDelay ? "pending" : "checking", moved?.Installation.Id,
                                 moved?.Installation.Details.RootPath ?? (movedPackage is null ? null : OwnedPackages.FilePath(movedPackage.ScanRoot, movedPackage.RelativePath)), movedPackage?.Id);
@@ -160,12 +169,11 @@ public sealed class LocalObservation(LocalLibraryStore library, string deviceId,
                     catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException) { complete = false; }
                 }
                 Walk(root.Path, 0);
-                if (complete)
-                    foreach (var old in candidates.Values.Where(c => c.RootId == root.Id && !seen.Contains(c.Id) && c.State != "ignored" && scannedParents.Contains(Path.GetDirectoryName(Path.Combine(root.Path, c.RelativePath.Replace('/', Path.DirectorySeparatorChar)))!)).ToArray())
+                foreach (var old in candidates.Values.Where(c => c.RootId == root.Id && !seen.Contains(c.Id) && c.State != "ignored" && scannedParents.Contains(Path.GetDirectoryName(Path.Combine(root.Path, c.RelativePath.Replace('/', Path.DirectorySeparatorChar)))!)).ToArray())
                     {
                         var path = Path.Combine(root.Path, old.RelativePath.Replace('/', Path.DirectorySeparatorChar));
-                        var registered = knownGames.Any(p => ObservationSettingsStore.Paths.Equals(p, path)) || knownPackages.Contains(path);
-                        candidates[old.Id] = old with { State = registered ? "registered" : "missing" };
+                        var registered = knownDirectories.Contains(path) || knownPackages.Contains(path);
+                        if (registered || complete) candidates[old.Id] = old with { State = registered ? "registered" : "missing" };
                     }
                 degraded |= !complete;
                 if (!complete) incompleteDiscovery.Add(root.Id);

@@ -57,17 +57,23 @@ public sealed class ObservationHost(LocalLibraryStore library, string deviceId, 
     }
     public async Task StartAsync(ObservationSettings settings, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         if (_closed || _loop is not null) throw new InvalidOperationException("观测宿主已启动或关闭。");
         new ObservationSettingsStore(library.DirectoryPath).Validate(settings); _settings = settings;
         if (!settings.Enabled || (settings.Roots?.Count ?? 0) == 0) return;
         _owner = LocalFileLease.TryAcquire(library.DirectoryPath, "local-observation-host");
         if (_owner is null) { Status = "同一数据根已有观测实例，本窗口不重复监听。"; return; }
-        foreach (var root in settings.Roots ?? []) TryWatch(root.Path);
-        // Root watchers capture hints while baseline discovers company-level watchers.
-        Status = "正在后台建立浅层观测基线。";
-        _nextSweep = _time.GetUtcNow();
-        _loop = Task.Run(LoopAsync, _stop.Token);
-        await Task.CompletedTask; ct.ThrowIfCancellationRequested();
+        try
+        {
+            foreach (var root in settings.Roots ?? []) TryWatch(root.Path);
+            if (_closed) return;
+            // Root watchers capture hints while baseline discovers company-level watchers.
+            Status = "正在后台建立浅层观测基线。";
+            _nextSweep = _time.GetUtcNow();
+            _loop = Task.Run(LoopAsync, _stop.Token);
+            ct.ThrowIfCancellationRequested();
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { await DisposeAsync(); throw; }
     }
     public void Hint(string? path, bool error = false)
     {
@@ -91,9 +97,14 @@ public sealed class ObservationHost(LocalLibraryStore library, string deviceId, 
     {
         lock (_gate)
         {
-            if (_watchers.ContainsKey(path)) return false;
+            if (_closed || _watchers.ContainsKey(path)) return false;
             if (_watchers.Count >= _settings.WatcherLimit) { _budgetExceeded = true; return false; }
-            try { _watchers.Add(path, _factory.Create(path, (p, error) => Hint(p, error))); return true; }
+            try
+            {
+                var watcher = _factory.Create(path, (p, error) => Hint(p, error));
+                if (_closed) { watcher.Dispose(); return false; }
+                _watchers.Add(path, watcher); return true;
+            }
             catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or PlatformNotSupportedException) { _watchError = true; return false; }
         }
     }
@@ -116,6 +127,7 @@ public sealed class ObservationHost(LocalLibraryStore library, string deviceId, 
         }
         if (reset) foreach (var root in _settings.Roots ?? []) TryWatch(root.Path);
         var result = await _observer.CheckAsync(_settings, await profiles(ct), dirty, discover: onlyPath is null, ct); Passes++;
+        ct.ThrowIfCancellationRequested();
         var healthyPaths = result.WatchPaths.ToHashSet(ObservationSettingsStore.Paths);
         if (onlyPath is null && dirty is null && (_settings.Roots ?? []).Any(r => !healthyPaths.Contains(r.Path))) _watchError = true;
         if (dirty is null)
@@ -132,8 +144,13 @@ public sealed class ObservationHost(LocalLibraryStore library, string deviceId, 
         var next = _time.GetUtcNow().Add(pending ? TimeSpan.FromSeconds(10) : result.Degraded || _watchError ? TimeSpan.FromSeconds(60) : TimeSpan.FromMinutes(_settings.PeriodMinutes));
         _nextSweep = onlyPath is not null && _nextSweep < next ? _nextSweep : next;
         var degraded = result.Degraded || _watchError || _budgetExceeded;
-        Status = $"{(degraded ? "观测降级，周期复核兜底" : "浅层监控已启用")} · {WatcherCount} 个监听器 · {result.Snapshot.Candidates.Count(c => c.State is "pending" or "checking")} 个待匹配候选";
-        Volatile.Write(ref _result, result with { Degraded = degraded }); Changed?.Invoke(Result!); return Result;
+        ct.ThrowIfCancellationRequested();
+        lock (_gate)
+        {
+            if (_closed) return null;
+            Status = $"{(degraded ? "观测降级，周期复核兜底" : "浅层监控已启用")} · {_watchers.Count} 个监听器 · {result.Snapshot.Candidates.Count(c => c.State is "pending" or "checking")} 个待匹配候选";
+            Volatile.Write(ref _result, result with { Degraded = degraded }); Changed?.Invoke(Result!); return Result;
+        }
     }
     private async Task LoopAsync()
     {

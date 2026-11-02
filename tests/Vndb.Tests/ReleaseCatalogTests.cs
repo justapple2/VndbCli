@@ -128,9 +128,9 @@ public sealed class ReleaseCatalogTests
         var model = new BookDetailsViewModel();
         var snapshot = MetadataImports.Snapshot(StorageTests.Entry());
         model.Update(new BookViewModel(null, snapshot), [], [], null);
-        Assert.Contains(model.Releases, row => row.Value.Contains("尚未查询"));
+        Assert.Contains("尚未查询", model.ReleaseBrowser.Summary);
         model.Update(new BookViewModel(null, snapshot with { Novel = snapshot.Novel! with { ReleaseCatalog = new([], DateTimeOffset.UtcNow) } }), [], [], null);
-        Assert.Contains(model.Releases, row => row.Value.Contains("0 项"));
+        Assert.Contains("0 项", model.ReleaseBrowser.Summary);
     }
 
     [Fact]

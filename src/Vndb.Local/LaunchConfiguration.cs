@@ -5,6 +5,9 @@ public sealed record LaunchConfigurationDraft(string Title, string Executable, I
 
 public sealed class LaunchConfiguration(LocalLauncher launcher)
 {
+    // Legacy direct/LE pairs may share one command; hashes and profile IDs are not command identity.
+    public static IReadOnlyList<LaunchProfile> CommandChoices(IEnumerable<LaunchProfile> profiles) => profiles.DistinctBy(p =>
+        System.Text.Json.JsonSerializer.Serialize(new { p.Executable, p.Arguments, p.WorkingDirectory, p.TrackedExecutable })).ToArray();
     public Task<LaunchProfile> SaveAsync(LaunchConfigurationDraft draft, string? deviceId, CancellationToken ct)
     {
         if (draft.Installation is { } installation && installation.Installation.Details.DeviceId != deviceId)

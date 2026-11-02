@@ -107,6 +107,7 @@
             <StackPanel Classes="form" IsVisible="{Binding IsPrimaryDetail}">
             <TextBlock Text="仅本机 · 安装与启动" Classes="strong" />
             <TextBlock Text="{Binding BookDetails.LocalStatus}" Classes="caption wrap" AutomationProperties.Name="本机启动就绪说明" />
+            <ItemsControl ItemsSource="{Binding BookDetails.LocalFields}" ItemTemplate="{StaticResource DetailFieldTemplate}" />
             <ComboBox ItemsSource="{Binding LaunchMethods}" SelectedItem="{Binding LaunchMode}" IsVisible="{Binding BookDetails.LaunchConfigured}" AutomationProperties.Name="书架启动方式" />
             <Button Classes="primary" Command="{Binding QuickLaunchCommand}" Content="按配置启动" IsVisible="{Binding BookDetails.LaunchConfigured}" />
             <Button Content="配置／选择启动入口" Command="{Binding ConfigureBookCommand}" CommandParameter="{Binding SelectedBook}" IsVisible="{Binding BookDetails.HasInstallation}" />
