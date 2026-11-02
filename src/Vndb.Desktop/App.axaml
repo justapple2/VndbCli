@@ -10,6 +10,13 @@
     </ResourceDictionary>
   </Application.Resources>
   <Application.DataTemplates>
+    <DataTemplate DataType="{x:Type vm:ReleaseBrowserViewModel}" x:DataType="vm:ReleaseBrowserViewModel">
+      <Expander Header="发行版本 · 本机版本未知" HorizontalContentAlignment="Stretch"><StackPanel Classes="form">
+        <TextBlock Text="{Binding Summary}" Classes="caption wrap" /><TextBox Text="{Binding Filter}" PlaceholderText="仅筛选已收录版本：标题、语言、平台或release ID" AutomationProperties.Name="筛选已收录发行版本" />
+        <ItemsControl ItemsSource="{Binding Rows}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:ReleaseDetailRow"><StackPanel Classes="compact detail-field"><TextBlock Text="{Binding Title}" Classes="strong wrap" /><SelectableTextBlock Text="{Binding Summary}" Classes="caption wrap" /></StackPanel></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+        <Button Content="再显示20个版本" Command="{Binding MoreCommand}" IsVisible="{Binding HasMore}" />
+      </StackPanel></Expander>
+    </DataTemplate>
     <DataTemplate DataType="{x:Type vm:SearchHistoryViewModel}" x:DataType="vm:SearchHistoryViewModel">
       <Expander Classes="advanced" Header="最近搜索（仅本机）" HorizontalContentAlignment="Stretch"><StackPanel Classes="compact">
         <TextBlock Text="{Binding Notice}" Classes="caption wrap" />

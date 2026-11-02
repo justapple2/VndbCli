@@ -11,10 +11,13 @@ public sealed partial class VndbClient : IDisposable
     public static Uri ApiEndpoint { get; } = new("https://api.vndb.org/kana/");
     private const string NovelFields = "title,alttitle,olang,released,developers{id,name,original}";
     private const string NovelDetailFields = NovelFields +
-        ",titles{lang,title,latin,official,main},aliases,languages,platforms,description,rating,votecount,length_minutes,image{id,url,thumbnail,dims,sexual,violence}";
+        ",titles{lang,title,latin,official,main},aliases,languages,platforms,description,rating,votecount,length_minutes,image{id,url,thumbnail,dims,sexual,violence},relations{id,relation,relation_official}";
     private const string ProducerFields = "name,original,aliases,lang,type";
     private readonly HttpClient _httpClient;
     private readonly VndbClientOptions _options;
+    private readonly JsonSerializerOptions _apiJson = ApiJson();
+    private static JsonSerializerOptions ApiJson()
+    { var options = new JsonSerializerOptions(VndbJson.Options); options.Converters.Add(new NovelRelationApiConverter()); return options; }
     private readonly TimeProvider _time;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private DateTimeOffset _nextRequest;
@@ -188,7 +191,7 @@ public sealed partial class VndbClient : IDisposable
                         // Error bodies may be HTML and might echo input. Do not print them or any headers.
                         throw new VndbApiException(response.StatusCode, ErrorMessage(response.StatusCode));
                     }
-                    return await response.Content.ReadFromJsonAsync<T>(VndbJson.Options, timeout.Token)
+                    return await response.Content.ReadFromJsonAsync<T>(_apiJson, timeout.Token)
                         ?? throw new JsonException("VNDB 返回了空 JSON 响应。");
                 }
                 catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)

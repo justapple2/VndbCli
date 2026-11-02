@@ -20,27 +20,40 @@ public sealed record PlayDetailRow(PersonalPlayView Play)
 /// <summary>Read-only presentation of one exact shelf item. Never probes files or infers launch permission.</summary>
 public sealed partial class BookDetailsViewModel : ObservableObject
 {
-    [ObservableProperty] private BookViewModel? _book;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CoverMetadata)), NotifyPropertyChangedFor(nameof(DetailsPending))] private BookViewModel? _book;
+    public MetadataSnapshot? CoverMetadata => Book?.Metadata;
+    public bool DetailsPending => Book?.DetailsPending == true;
     [ObservableProperty] private IReadOnlyList<DetailField> _metadata = [];
     [ObservableProperty] private IReadOnlyList<DetailField> _releases = [];
     [ObservableProperty] private IReadOnlyList<PlayDetailRow> _plays = [];
     [ObservableProperty] private bool _hasInstallation;
     [ObservableProperty] private bool _launchConfigured;
     [ObservableProperty] private string _localStatus = "没有本机登记";
-    public void Update(BookViewModel? book, IReadOnlyList<LocalInstallationView> installations, IReadOnlyList<LaunchProfile> profiles, LocalInstallationView? chosen)
+    [ObservableProperty] private bool _isPersonal;
+    [ObservableProperty] private IReadOnlyList<DetailField> _personalFields = [];
+    public ReleaseBrowserViewModel ReleaseBrowser { get; } = new();
+    public RelationsViewModel Relations { get; } = new();
+    public void Update(BookViewModel? book, IReadOnlyList<LocalInstallationView> installations, IReadOnlyList<LaunchProfile> profiles, LocalInstallationView? chosen,
+        IEnumerable<MetadataSnapshot>? known = null, string titlePreference = "japanese")
     {
-        Book = book; Plays = book?.Plays.Select(p => new PlayDetailRow(p)).ToArray() ?? [];
+        Book = book; OnPropertyChanged(nameof(CoverMetadata)); OnPropertyChanged(nameof(DetailsPending));
+        Plays = book?.Plays.Select(p => new PlayDetailRow(p)).ToArray() ?? [];
         var novel = book?.Metadata?.Novel;
         Metadata = book is null ? [] : [new("发行日期", novel?.Released ?? "未知"), new("原始语言", novel?.OriginalLanguage ?? "未知"),
             new("作品关联", book.Item?.Item.Details.NovelId ?? book.Metadata?.VndbId ?? "待关联"), new("书架条目", book.Item?.Item.Id ?? "尚未加入个人书架")];
-        if (book is not null) Metadata = Metadata.Concat(new[] { new DetailField("资料范围", book.CollectionLabel), new("个人状态", book.ShelfState) }).ToArray();
+        IsPersonal = book?.Item is not null;
+        if (book is not null) Metadata = Metadata.Concat(new[] { new DetailField("资料范围", book.CollectionLabel), new("VNDB公共评分", NovelPresentation.PublicRating(novel?.Rating, novel?.VoteCount)) }).ToArray();
+        if (novel is not null) Metadata = Metadata.Concat(new[] { new DetailField("公共资料标题", NovelPresentation.Title(novel, novel.Title, "original").Title),
+            new("开发会社（公共资料）", book?.Metadata?.Developers.Count > 0 ? string.Join(" / ", book.Metadata.Developers.Select(p => p.Original ?? p.Name)) : "未知"),
+            new("发行平台", novel.Platforms.Count > 0 ? string.Join(" / ", novel.Platforms) : "未知") }).ToArray();
         if (book?.LocalObservation is { Length: > 0 } observation) Metadata = Metadata.Concat(new[] { new DetailField("本机观测", observation) }).ToArray();
         if (book?.Metadata is { } source) Metadata = Metadata.Concat(new[] { new DetailField("资料来源与观测时间", $"{PublicCatalogRules.SourceLabel(source.Provenance)} · {source.FetchedAt.ToLocalTime():g}"), new("字段覆盖", (source.Completeness == "partial_text" ? "部分文字字段；简介等可能缺失" : "作品文字资料") + "；封面独立缓存，缺图不代表没有作品") }).ToArray();
         if (novel is not null) Metadata = Metadata.Concat(new[] { new DetailField("已收录语言（不含机翻）", string.Join(" / ", novel.Languages.Select(ReleaseRules.Language))) }).ToArray();
-        Releases = novel?.ReleaseCatalog is { } catalog
-            ? new[] { new DetailField("发行目录", $"{catalog.Items.Count} 项 · 更新 {catalog.FetchedAt.ToLocalTime():g}；不代表本机安装版本") }
-                .Concat(catalog.Items.Select(r => new DetailField(r.Id, ReleaseRules.Describe(r, novel.Id)))).ToArray()
-            : [new("发行目录", book?.DetailsPending == true ? "详情尚未加载；读取详情后显示已收录发行版本。" : "尚未查询；请在查询页按作品ID查询发行版本。")];
+        ReleaseBrowser.Set(book); Relations.Set(book, known, titlePreference);
+        Releases = new[] { new DetailField("发行目录", ReleaseBrowser.Summary) }.Concat(ReleaseBrowser.Rows.Select(r => new DetailField(r.Id, r.Summary))).ToArray();
+        PersonalFields = book?.Item is not { } personal ? [] : new[] { new DetailField("书架记录标题", personal.Item.Details.Title),
+            new("个人显示标题覆盖", personal.Item.Details.TitleOverride ?? "未覆盖，使用公共标题偏好"),
+            new("个人会社覆盖", personal.Item.Details.CompanyOverride ?? "未覆盖，使用公共会社／原提示"), new("游玩状态", book.ShelfState) }.Concat(book.BookNotes).ToArray();
         var exact = book?.Item is { } item ? installations.Where(i => i.Installation.RemovedAt is null && i.Components.Any(c => c.Details.ItemId == item.Item.Id)).ToArray() : [];
         HasInstallation = exact.Length > 0;
         var available = exact.Where(i => i.Installation.Status == "present").ToArray();

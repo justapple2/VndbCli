@@ -58,6 +58,7 @@ public partial class MainViewModel : ObservableObject
     public MainViewModel(IDesktopLibrary library, LocalLauncher launcher, IDesktopDialogs dialogs, DesktopServices? services = null, IQuickPlayService? quickPlayService = null)
     {
         _library = library; _launcher = launcher; _dialogs = dialogs; _services = services;
+        BookDetails.Relations.OpenCommand = OpenRelatedCommand;
         Profiles.CollectionChanged += (_, _) => { if (!_loadingProfiles) { foreach (var book in _books.Concat(_queryBooks)) UpdateOwnership(book); UpdateBookDetails(); } };
         _quickPlayService = quickPlayService ?? (services is null ? null : new QuickPlayService(services.PersonalEdits, () => services.Settings.Server, () => services.Web, library.PlaysAsync));
         Shelf = new(preferences => GuardAsync(async ct =>
@@ -82,7 +83,12 @@ public partial class MainViewModel : ObservableObject
     }
 
     public BookDetailsViewModel BookDetails { get; } = new();
-    private void UpdateBookDetails() => BookDetails.Update(SelectedBook, _installations, Profiles.ToArray(), SelectedInstallation);
+    public bool IsPrimaryDetail => _relatedBook is null && SelectedBook is not null;
+    private void UpdateBookDetails()
+    {
+        BookDetails.Update(_relatedBook ?? SelectedBook, _installations, Profiles.ToArray(), SelectedInstallation, _books.Concat(_queryBooks).Select(b => b.Metadata).OfType<MetadataSnapshot>(), TitleChoice.Code);
+        OnPropertyChanged(nameof(IsPrimaryDetail));
+    }
     public ShelfBrowserViewModel Shelf { get; }
     public QueryFeatureViewModel Discovery { get; }
     public PublicCatalogViewModel PublicCatalog { get; }
@@ -114,6 +120,7 @@ public partial class MainViewModel : ObservableObject
             LocaleProfileId = settings.DefaultLocale?.ProfileId ?? "";
             var ui = await new UiPreferencesStore(_services.SettingsStore.DirectoryPath).ReadAsync(ct);
             ThemePreference = ui.Theme; ReducedMotion = ui.ReducedMotion;
+            _uiPreferences = ui; TitleChoice = TitleChoices.First(c => c.Code == ui.TitleLanguage); ShowJapaneseSubtitle = ui.ShowJapaneseSubtitle;
         }
         await LoadProfilesAsync(ct);
         await LoadShelfPreferencesAsync(ct);
@@ -135,7 +142,7 @@ public partial class MainViewModel : ObservableObject
             if (result.Snapshot.SummaryOnly && result.Snapshot.ConfirmedPlayItems?.Contains(i.Item.Item.Id) == true) book.ApplyPlays(i.Plays, i.NeedsReview);
             return book;
         }).ToArray();
-        foreach (var book in _books) UpdateOwnership(book);
+        foreach (var book in _books) { book.SetTitlePreference(TitleChoice.Code, ShowJapaneseSubtitle); UpdateOwnership(book); }
         ApplyHistory(); Shelf.SetLibrary(_books, result.Source);
         Installations.Clear(); foreach (var i in _installations.Where(i => SelectedBook is null || MatchesBook(i, SelectedBook))) Installations.Add(i);
         OnPropertyChanged(nameof(LaunchInstallations));
@@ -145,35 +152,39 @@ public partial class MainViewModel : ObservableObject
     }
     private void PresentQuery(MetadataResponse result)
     {
-        _queryBooks = result.Items.Select(m => { var book = new BookViewModel(null, m); UpdateOwnership(book); return book; }).ToArray();
+        _queryBooks = result.Items.Select(m => { var book = new BookViewModel(null, m); book.SetTitlePreference(TitleChoice.Code, ShowJapaneseSubtitle); UpdateOwnership(book); return book; }).ToArray();
         var source = result.Source + (result.PendingImport ? " · 待同步JSON" : "") + (result.More ? " · 还有更多结果，请缩小查询" : "");
         Shelf.SetQuery(_queryBooks, source); Section = 2;
     }
     [RelayCommand] private Task DetailAsync() => GuardAsync(async ct =>
     {
+        if (_relatedBook is not null) { Status = "当前为只读公共关联资料；返回原作品后读取其个人记录。"; return; }
         var book = SelectedBook ?? throw new ArgumentException("请先选择作品。");
         await LoadBookDetailsAsync(book, ct);
     });
     private async Task LoadBookDetailsAsync(BookViewModel book, CancellationToken ct)
     {
+        var generation = ++_detailReadGeneration;
         IReadOnlyList<PersonalPlayView> plays = book.Plays;
         if (book.Item is not null)
         {
             try
             {
                 if (book.DetailsPending && await _library.ItemAsync(book.Item.Item.Id, ct) is { } detail)
-                { if (SelectedBook != book) return; book.ApplyDetails(detail); }
+                { ct.ThrowIfCancellationRequested(); if (SelectedBook != book || generation != _detailReadGeneration) return; book.ApplyDetails(detail); }
                 plays = await _library.PlaysAsync(book.Item.Item.Id, ct);
             }
             catch (WebUnavailableException) { Status = "Web不可达，详情使用本机已缓存的记录。"; }
         }
-        if (SelectedBook != book) return;
+        ct.ThrowIfCancellationRequested(); if (SelectedBook != book || generation != _detailReadGeneration) return;
         if (!ReferenceEquals(plays, book.Plays)) book.ApplyPlays(plays);
         if (SelectedBook == book) SetSessionPlays(book.Plays);
         UpdateBookDetails(); Shelf.Refresh();
     }
     partial void OnSelectedBookChanged(BookViewModel? value)
     {
+        _detailReadGeneration++;
+        ClearRelatedDetails();
         Shelf.SelectIfVisible(value);
         OnPropertyChanged(nameof(FilteredProfiles));
         if (value is null)
@@ -182,7 +193,7 @@ public partial class MainViewModel : ObservableObject
             SetSessionPlays([]);
             Organization.Company = ""; Organization.JapaneseTitle = ""; UpdateBookDetails(); return;
         }
-        Organization.Company = value.GroupCompany; Organization.JapaneseTitle = value.Title; LaunchTitle = value.Title;
+        Organization.Company = value.GroupCompany; Organization.JapaneseTitle = value.ArchiveTitle; LaunchTitle = value.Title;
         SetSessionPlays(value.Plays);
         Installations.Clear(); foreach (var i in _installations.Where(i => MatchesBook(i, value))) Installations.Add(i);
         SelectedInstallation = Installations.Count == 1 ? Installations[0] : null;
@@ -191,7 +202,8 @@ public partial class MainViewModel : ObservableObject
     private IEnumerable<LocalInstallationComponent> BookComponents(LocalInstallationView installation, BookViewModel book) => installation.Components.Where(c => book.Item is { } item ? c.Details.ItemId == item.Item.Id :
         book.Metadata?.VndbId is { } id && _services?.LocalCatalog.Items.Any(i => i.Item.Id == c.Details.ItemId && i.Item.Details.NovelId == id) == true);
     private bool MatchesBook(LocalInstallationView installation, BookViewModel book) => BookComponents(installation, book).Any();
-    partial void OnSectionChanging(int value) { Shelf.CaptureViewport(); PublicCatalog.CaptureViewport(); }
+    private long _detailReadGeneration;
+    partial void OnSectionChanging(int value) { Shelf.CaptureViewport(); PublicCatalog.CaptureViewport(); if (value != Section) { _detailReadGeneration++; ClearRelatedDetails(); UpdateBookDetails(); } }
     partial void OnSectionChanged(int value) { Shelf.Activate(value); OnPropertyChanged(nameof(SelectedNavigation)); }
     partial void OnSelectedInstallationChanged(LocalInstallationView? value)
     {

@@ -29,6 +29,9 @@
     <WrapPanel Classes="filters"><Button Classes="primary" Content="保存并应用" Command="{Binding SaveSettingsCommand}" /><TextBlock Text="应用连接、全局LE与目录默认值" Classes="caption" VerticalAlignment="Center" /></WrapPanel>
     <Border Classes="panel"><StackPanel Classes="form">
       <TextBlock Text="界面外观" Classes="section-title" /><TextBlock Text="右上角日／月图标切换本应用明暗主题。此组偏好单独保存。" Classes="caption wrap" />
+      <ComboBox ItemsSource="{Binding TitleChoices}" SelectedItem="{Binding TitleChoice}" AutomationProperties.Name="显示标题偏好"><ComboBox.ItemTemplate><DataTemplate x:DataType="vm:TitleChoice"><TextBlock Text="{Binding Label}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+      <CheckBox Content="标题不同时显示日文副标题" IsChecked="{Binding ShowJapaneseSubtitle}" />
+      <TextBlock Text="仅影响卡片与详情；个人标题覆盖优先，不修改物理目录、启动命令或个人记录。" Classes="caption wrap" />
       <CheckBox IsChecked="{Binding ReducedMotion}"><TextBlock Text="减少动画（关闭书架悬浮与页面淡入）" Classes="wrap" /></CheckBox>
       <Button Classes="form-action" Content="保存外观偏好" Command="{Binding SaveAppearanceCommand}" />
     </StackPanel></Border>

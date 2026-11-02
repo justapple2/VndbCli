@@ -30,12 +30,13 @@ public partial class MainViewModel
     {
         if (book is null) throw new ArgumentException("请先选择作品。");
         await RequireBookDetailsAsync(book, ct);
-        Packages.Select(new(book.Title, book.Item, book.Metadata, book.GroupCompany));
+        Packages.Select(new(book.ArchiveTitle, book.Item, book.Metadata, book.GroupCompany));
         Section = 4;
         Status = "作品已选定。请在目录整理页的安装包登记中选择／核对文件，预览后确认。";
     });
     private void UpdateOwnership(BookViewModel book)
     {
+        book.SetTitlePreference(TitleChoice.Code, ShowJapaneseSubtitle);
         IndexResources();
         // A metadata-only result has no exact personal ItemId. Never borrow variant ownership.
         var records = book.Item is { } item ? _resourcePackages![item.Item.Id].ToArray() : [];

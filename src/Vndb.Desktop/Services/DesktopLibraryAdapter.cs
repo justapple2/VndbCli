@@ -10,6 +10,7 @@ public interface IDesktopLibrary
 {
     Task<ShelfResult> ShelfAsync(CancellationToken ct);
     Task<MetadataResponse> QueryAsync(string text, string source, CancellationToken ct);
+    Task<MetadataResponse> LocalNovelAsync(string id, CancellationToken ct) => throw new NotSupportedException("当前资料适配器不支持只读本库导航。");
     Task<IReadOnlyList<CatalogProducerChoice>> CatalogProducersAsync(string query, bool cacheOnly, CancellationToken ct) => throw new NotSupportedException("当前资料适配器不支持会社选择。");
     Task<PublicCatalogPage> BrowseCatalogAsync(PublicCatalogQuery query, bool cacheOnly, CancellationToken ct) =>
         throw new NotSupportedException("当前资料适配器不支持公共目录浏览。");
@@ -22,6 +23,8 @@ public interface IDesktopLibrary
 /// <summary>Read-only presentation adapter; transport and local policies remain injected services.</summary>
 public sealed class DesktopLibraryAdapter : IDesktopLibrary
 {
+    public Task<MetadataResponse> LocalNovelAsync(string id, CancellationToken ct) =>
+        (_query ?? throw new InvalidOperationException("请先加载设置。")).ReadLocalAsync(id, ct);
     private LocalShelfReader? _shelf;
     private QueryRouter? _query;
     private PublicCatalogReader? _catalog;

@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using Vndb.Contracts;
 using Vndb.Desktop.Services;
 using Vndb.Local;
+using Vndb.Core;
 
 namespace Vndb.Desktop.ViewModels;
 
@@ -13,7 +14,12 @@ public sealed partial class CatalogBookViewModel(PublicCatalogEntry entry) : Obs
     [ObservableProperty] private bool _isSelected;
     public MetadataSnapshot Metadata => Entry.Metadata;
     public string Id => Metadata.VndbId;
-    public string Title => Metadata.Novel?.Titles.FirstOrDefault(t => t.Lang == "ja" && t.Main)?.Title ?? Metadata.Novel?.AltTitle ?? Metadata.Title;
+    private PresentedTitle _title = NovelPresentation.Title(entry.Metadata.Novel, entry.Metadata.Title);
+    public string Title => _title.Title;
+    public string JapaneseSubtitle => _title.JapaneseSubtitle;
+    public bool HasJapaneseSubtitle => JapaneseSubtitle.Length > 0;
+    public void SetTitlePreference(string value, bool showJapanese)
+    { _title = NovelPresentation.Title(Metadata.Novel, Metadata.Title, value, showJapanese); OnPropertyChanged(nameof(Title)); OnPropertyChanged(nameof(JapaneseSubtitle)); OnPropertyChanged(nameof(HasJapaneseSubtitle)); }
     public string Company => Metadata.Developers.Count == 0 ? "会社待补全" : string.Join(" / ", Metadata.Developers.Select(p => p.Original ?? p.Name));
     public string Personal => Entry.Personal.Label;
     public string Presence => Entry.Personal.IsLocal ? "▣ 本地已有（客户端上报）" : "本地存在：未上报";
@@ -25,6 +31,10 @@ public sealed record CatalogRow(IReadOnlyList<CatalogBookViewModel> Books, int C
 public sealed partial class PublicCatalogViewModel(IDesktopLibrary library,
     Func<Func<CancellationToken, Task>, Task> run, Action<string> status, Action<MetadataResponse> showDetails, Func<LocalQueryScope?>? historyScope = null) : ObservableObject
 {
+    private string _titlePreference = "japanese";
+    private bool _japaneseSubtitle = true;
+    public void SetTitlePreference(string value, bool showJapanese)
+    { _titlePreference = value; _japaneseSubtitle = showJapanese; foreach (var book in Books) book.SetTitlePreference(value, showJapanese); }
     private SearchHistoryViewModel? _history;
     public SearchHistoryViewModel History => _history ??= new(historyScope ?? (() => null), "catalog", text => Query = text, run);
     [ObservableProperty] private string _producerQuery = "";
@@ -148,7 +158,7 @@ public sealed partial class PublicCatalogViewModel(IDesktopLibrary library,
             DisplayChanging?.Invoke();
             _applied = query; _more = page.More;
             var selectedId = Selected?.Id;
-            Books = page.Items.Select(i => new CatalogBookViewModel(i)).ToArray(); RebuildRows();
+            Books = page.Items.Select(i => { var book = new CatalogBookViewModel(i); book.SetTitlePreference(_titlePreference, _japaneseSubtitle); return book; }).ToArray(); RebuildRows();
             Selected = Books.FirstOrDefault(b => b.Id == selectedId);
             Summary = $"{(page.Source == "client_catalog_cache" ? "本机历史页JSON" : "Web已收录目录")} · {page.Total} 部 · 第 {page.Page} 页 · 读取 {page.ObservedAt.ToLocalTime():g}";
             Coverage = PublicCatalogRules.CoverageLabel(page.Coverage);

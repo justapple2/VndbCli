@@ -15,7 +15,7 @@ public partial class MainViewModel
         if (book is null) throw new ArgumentException("请先选择作品。");
         await RequireBookDetailsAsync(book, ct);
         SelectedBook = book;
-        Registration.Select(new(book.Title, book.Item, book.Metadata, book.GroupCompany));
+        Registration.Select(new(book.ArchiveTitle, book.Item, book.Metadata, book.GroupCompany));
         Section = 7;
     });
     [RelayCommand] private Task RegisterCandidateAsync() => GuardAsync(async ct =>
@@ -23,7 +23,7 @@ public partial class MainViewModel
         if (Organization.SelectedCandidate is not { } candidate) throw new ArgumentException("请先选择扫描候选。");
         var book = SelectedBook; if (book is not null) await RequireBookDetailsAsync(book, ct);
         Registration.RootPath = candidate.Path;
-        if (book is not null) Registration.Select(new(book.Title, book.Item, book.Metadata, book.GroupCompany));
+        if (book is not null) Registration.Select(new(book.ArchiveTitle, book.Item, book.Metadata, book.GroupCompany));
         if (_installations.SingleOrDefault(i => i.Installation.Id == candidate.InstallationId) is { } known)
         { Registration.ContainerTitle = known.Installation.Details.Title; Registration.Company = known.Installation.Details.CompanyGroup ?? ""; }
         Section = 7;

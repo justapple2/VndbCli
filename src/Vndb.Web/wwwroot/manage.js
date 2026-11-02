@@ -3,6 +3,7 @@
  const $=id=>document.getElementById(id),node=(tag,text,cls)=>VnView.element(tag,cls,text);
  const stored=VnView.store('shelf',{query:'',page:1,layout:VnView.storage('localStorage').get('vndb-manager-view')==='list'?'list':'grid',density:'comfortable',fit:'contain',selected:'',scroll:0,unmatched:false,progress:'',presence:'',statusFilter:'',tab:'shelf'});
  const searchHistory=VnView.historyControl($('item-history'),$('item-query'),'shelf');
+ VnDetails.preferencesControl($('title-preferences'),()=>{if(lastBooks)renderBooks(lastBooks);if(book)structuredDetails(book);});
  let display=stored.read(),key=VnView.storage('sessionStorage').get('library-key')||'',tab='shelf',page=display.page,book=null,limits=null,lastBooks=null;
  let itemAttempt=null,itemInitial='';
  const reads=VnView.latest(),keys=new Map();
@@ -45,8 +46,8 @@
  function renderBooks(data){
   $('items').replaceChildren();VnView.appearance($('items'),display);
   for(const view of data.items){const item=view.item,d=item.details;
-   const title=d.title_override||view.metadata?.novel?.titles?.find(t=>t.lang==='ja')?.title||d.title;
-   const card=VnView.card({id:item.id,title,company:d.company_override||d.company_hint||view.metadata?.developers?.map(p=>p.original||p.name).join(' / ')||'会社待补全',subtitle:(d.novel_id||'待关联 VNDB')+' · '+view.play_count+' 条游玩记录',url:d.novel_id&&view.metadata?.cover?.status!=='none'?'/api/v1/vns/'+encodeURIComponent(d.novel_id)+'/cover':null,
+   const presented=VnDetails.title(view.metadata?.novel,view.metadata?.title||d.title,d.title_override),title=presented.title;
+   const card=VnView.card({id:item.id,title,secondaryTitle:presented.japanese,company:d.company_override||d.company_hint||view.metadata?.developers?.map(p=>p.original||p.name).join(' / ')||'会社待补全',subtitle:(d.novel_id||'待关联 VNDB')+' · '+view.play_count+' 条游玩记录',url:d.novel_id&&view.metadata?.cover?.status!=='none'?'/api/v1/vns/'+encodeURIComponent(d.novel_id)+'/cover':null,
     badges:VnView.itemBadges(view.state),open:()=>openItem(item),actions:[{label:'编辑／游玩',run:()=>openItem(item)}]});
    const bar=card.querySelector('.vn-actions');action(bar,'移除',async()=>{if(confirm('移除此书架条目？可恢复，游玩记录和游戏文件保留。')){await api('/items/'+item.id+'?expected_revision='+item.revision,'DELETE');await loadBooks();}},'plain');$('items').append(card);
   }
@@ -67,12 +68,14 @@
   function structuredDetails(item){
     const parent=$('managed-details');parent.replaceChildren();if(!item)return;
     const view=detailView?.item.id===item.id?detailView:lastBooks?.items.find(v=>v.item.id===item.id),metadata=view?.metadata,novel=metadata?.novel;
-    parent.append(node('h2',item.details.title_override||novel?.titles?.find(t=>t.lang==='ja'&&t.main)?.title||novel?.titles?.find(t=>t.lang==='ja')?.title||metadata?.title||item.details.title));
+    const presented=VnDetails.title(novel,metadata?.title||item.details.title,item.details.title_override);parent.append(node('h2',presented.title));if(presented.japanese)parent.append(node('p',presented.japanese,'small'));
     const layout=node('div',undefined,'managed-detail-header');
     if(metadata?.cover?.status!=='none'&&item.details.novel_id){const image=node('img');image.src='/api/v1/vns/'+encodeURIComponent(item.details.novel_id)+'/cover';image.alt='作品封面';image.onerror=()=>image.replaceWith(node('span','暂无封面','small'));layout.append(image);}
     const info=node('div');info.append(node('p',VnView.progressLabel(view?.state),'personal-context'));info.append(node('p',item.details.company_override||metadata?.developers?.map(p=>p.original||p.name).join(' / ')||item.details.company_hint||'会社待补全'),node('p','发行：'+(novel?.released||'未知'),'small'),node('p','条目 '+item.id+' · 修订 '+item.revision,'personal-context'));
+    if(novel){const owner=itemRead;info.append(VnDetails.publicSection(novel,metadata?.provenance,metadata?.fetched_at,metadata?.developers||[],metadata?.completeness),VnReleases.section(novel,(path,options)=>api(path.replace('/api/v1',''),options?.post?'POST':'GET',options?.body,options?.signal),()=>itemRead===owner&&book?.id===item.id&&$('item-dialog').open),VnDetails.relations(novel,null,{links:true}));}
     if(novel?.description){const description=node('details');description.append(node('summary','作品简介'),node('p',novel.description,'personal-review'));info.append(description);}
     if(item.details.novel_id){const link=node('a','完整作品资料 ↗','plain');link.href='/?vn='+encodeURIComponent(item.details.novel_id);info.append(link);}
+    info.append(node('h3','个人覆盖与记录'),node('p','个人标题覆盖：'+(item.details.title_override||'未覆盖'),'small'),node('p','个人会社覆盖：'+(item.details.company_override||'未覆盖'),'small'));
     info.append(node('p','存在状态来自客户端同步，具体位置与启动配置仅在本机客户端。','small'));layout.append(info);parent.append(layout);
   }
   function itemDraft(){return Object.fromEntries(['item-title','item-company','item-title-override','item-company-override','item-notes','item-extra'].map(id=>[id,$(id).value]));}

@@ -51,7 +51,7 @@ test('actual public page handlers stay read-only, filter globally, preserve erro
   fetch:async(url,options)=>{calls.push({url,method:options.method});if(failed)return {ok:false,status:503,json:async()=>({title:'synthetic failure'})};const index=Number(new URL(url,'https://example.test').searchParams.get('page')||1);return {ok:true,json:async()=>url.includes('/api/v1/catalog?')?index===2?{...page,page:2,items:page.items.slice(0,1),more:false}:page:url.includes('/catalog/producers?')?[]:{novels:67459,producers:100,covers:0,cover_failures:0}};}
  };
  context.Option=function(text,value){const n=new Node();n.textContent=text;n.value=value;return n;};context.window=context;
- vm.createContext(context);for(const file of ['library-view.js','public-catalog.js','app.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context);
+ vm.createContext(context);for(const file of ['library-view.js','vn-details.js','public-catalog.js','app.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context);
  events.DOMContentLoaded();const drain=async()=>{for(let i=0;i<12;i++)await new Promise(resolve=>setImmediate(resolve));};await drain();
  assert.equal(nodes.content.children.length,24);assert.match(nodes['catalog-coverage'].textContent,/尚无完整导入凭证/);assert.equal(presenceCalls,0);
  nodes['public-language'].value='ja';nodes['public-language'].onchange();await drain();

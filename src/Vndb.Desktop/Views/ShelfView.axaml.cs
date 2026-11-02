@@ -136,7 +136,12 @@ public partial class ShelfView : UserControl
     private void OnBookKeyDown(object? sender, KeyEventArgs e)
     {
         if (_browser is null || e.Handled) return;
-        if (e.Key == Key.Escape && _overlay) { _browser.CloseDetailsCommand.Execute(null); e.Handled = true; return; }
+        if (e.Key == Key.Escape && _overlay)
+        {
+            if (DataContext is MainViewModel { CanBackRelated: true } navigation) navigation.BackRelatedCommand.Execute(null);
+            else _browser.CloseDetailsCommand.Execute(null);
+            e.Handled = true; return;
+        }
         if (_overlay) return;
         var source = e.Source as Control;
         var owner = source is null ? null : source.GetVisualAncestors().OfType<Control>().Prepend(source).FirstOrDefault(c => c.DataContext is BookViewModel);

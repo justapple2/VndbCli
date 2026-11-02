@@ -6,6 +6,24 @@ public sealed class ClientCatalogQuery(ICatalogSource upstream, ICatalogSnapshot
 {
     private readonly TimeProvider _time = time ?? TimeProvider.System;
     private DateTimeOffset _unavailableUntil;
+    /// <summary>Read existing Web/cache information only; never invokes the upstream source.</summary>
+    public async Task<CatalogResult> ReadLocalAsync(CatalogQuery input, CancellationToken ct = default)
+    {
+        var query = input.Validate() with { Mode = "local_first" }; ct.ThrowIfCancellationRequested();
+        CatalogResult? missing = null;
+        if (remote is not null && _time.GetUtcNow() >= _unavailableUntil)
+        {
+            try
+            {
+                var result = await remote.QueryAsync(query with { Mode = "local_only" }, ct);
+                ct.ThrowIfCancellationRequested();
+                if (result.Items.Count > 0) { await snapshots.SaveAsync(query, result, ct); return result; }
+                missing = result;
+            }
+            catch (CatalogUnavailableException) { _unavailableUntil = _time.GetUtcNow().AddSeconds(30); }
+        }
+        return await snapshots.ReadAsync(query, ct) ?? missing ?? throw new CatalogCacheMissException();
+    }
     public async Task<CatalogResult> QueryAsync(CatalogQuery input, string source = "auto", CancellationToken ct = default)
     {
         var query = input.Validate();

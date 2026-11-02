@@ -7,6 +7,19 @@ namespace Vndb.Desktop.ViewModels;
 
 public sealed partial class BookViewModel(LibraryItemView? item, MetadataSnapshot? metadata, IReadOnlyList<PersonalPlayView>? plays = null, bool associationNeedsReview = false, bool summaryOnly = false) : ObservableObject
 {
+    private string _titlePreference = "japanese";
+    private bool _japaneseSubtitle = true;
+    private PresentedTitle _presentation = NovelPresentation.Title(metadata?.Novel, metadata?.Title ?? item?.Item.Details.Title, titleOverride: item?.Item.Details.TitleOverride);
+    public string JapaneseSubtitle => _presentation.JapaneseSubtitle;
+    public bool HasJapaneseSubtitle => JapaneseSubtitle.Length > 0;
+    public string ArchiveTitle => NovelPresentation.Title(Metadata?.Novel, Metadata?.Title ?? Item?.Item.Details.Title, titleOverride: Item?.Item.Details.TitleOverride).Title;
+    public void SetTitlePreference(string preference, bool japaneseSubtitle)
+    { if (_titlePreference == preference && _japaneseSubtitle == japaneseSubtitle) return; _titlePreference = preference; _japaneseSubtitle = japaneseSubtitle; UpdateTitle(); }
+    private void UpdateTitle()
+    {
+        _presentation = NovelPresentation.Title(Metadata?.Novel, Metadata?.Title ?? Item?.Item.Details.Title, _titlePreference, _japaneseSubtitle, Item?.Item.Details.TitleOverride);
+        OnPropertyChanged(nameof(Title)); OnPropertyChanged(nameof(JapaneseSubtitle)); OnPropertyChanged(nameof(HasJapaneseSubtitle));
+    }
     private IReadOnlyList<PersonalPlayView> _plays = plays?.Where(p => p.DeletedAt is null).ToArray() ?? [];
     private bool _needsPlayReview = associationNeedsReview || !summaryOnly && plays is null && item?.PlayCount > 0;
     private bool _summaryPlays = summaryOnly;
@@ -81,10 +94,10 @@ public sealed partial class BookViewModel(LibraryItemView? item, MetadataSnapsho
         foreach (var name in new[] { nameof(Plays), nameof(PlaysPending), nameof(HasPlayed), nameof(IsUnplayed), nameof(IsUnrecorded), nameof(Progress), nameof(NeedsPlayReview), nameof(ShelfState), nameof(PlaySummary), nameof(PlayAssociationNotice) }) OnPropertyChanged(name);
     }
     public string Id => Item?.Item.Id ?? Metadata?.VndbId ?? "";
-    public string Title => Item?.Item.Details.TitleOverride ?? Metadata?.Novel?.Titles.FirstOrDefault(t => t.Lang == "ja" && t.Main)?.Title
-        ?? Metadata?.Novel?.Titles.FirstOrDefault(t => t.Lang == "ja")?.Title ?? Metadata?.Novel?.AltTitle ?? Metadata?.Title ?? Item?.Item.Details.Title ?? "未命名";
-    public string Company => Metadata?.Developers.Count > 0
+    public string Title => _presentation.Title;
+    public string PublicCompany => Metadata?.Developers.Count > 0
         ? string.Join(" / ", Metadata.Developers.Select(p => p.Original ?? p.Name)) : Item?.Item.Details.CompanyHint ?? "会社待补全";
+    public string Company => PublicCompany;
     public string GroupCompany => Item?.Item.Details.CompanyOverride ?? Metadata?.Developers.FirstOrDefault()?.Original
         ?? Metadata?.Developers.FirstOrDefault()?.Name ?? Item?.Item.Details.CompanyHint ?? "";
     public bool HasPlayed => Progress.HasPlayed;
@@ -93,6 +106,7 @@ public sealed partial class BookViewModel(LibraryItemView? item, MetadataSnapsho
         if (Item is null || value.Item.Id != Item.Item.Id || value.Item.DeletedAt is not null || value.Item.Details.NovelId != Item.Item.Details.NovelId || value.Item.Revision < Item.Item.Revision)
             throw new InvalidDataException("详情关联或修订已变化，请刷新书架。");
         Item = _summaryPlays && value.State is null ? value with { State = Item.State } : value; Metadata = value.Metadata; DetailsPending = false;
+        UpdateTitle();
         foreach (var name in new[] { nameof(Item), nameof(Metadata), nameof(DetailsPending), nameof(Title), nameof(Company), nameof(Companies), nameof(GroupCompany), nameof(Released), nameof(Subtitle), nameof(Description), nameof(BookNotes), nameof(ReportedPresence) }) OnPropertyChanged(name);
     }
     public string Subtitle => string.Join(" · ", new[] { Metadata?.VndbId, Metadata?.Novel?.Released,

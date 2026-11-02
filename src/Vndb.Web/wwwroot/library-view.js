@@ -87,11 +87,12 @@ globalThis.VnView = (() => {
     }
     return frame;
   }
-  function card({id, title, company, subtitle, url, open, badges = [], extra, actions = []}) {
+  function card({id, title, secondaryTitle, company, subtitle, url, open, badges = [], extra, actions = []}) {
     const article = element('article', 'vn-card'); article.dataset.itemId = id;
     const body = element('div', 'vn-card-body'), heading = element('h3', 'vn-title');
     const button = element('button', '', title); button.type = 'button'; button.title = title; button.onclick = open; heading.append(button);
     body.append(heading);
+    if (secondaryTitle) { const secondary=element('p','vn-subtitle',secondaryTitle);secondary.title=secondaryTitle;body.append(secondary); }
     if (company) { const p = element('p', 'vn-company', company); p.title = company; body.append(p); }
     if (subtitle) body.append(element('p', 'vn-subtitle', subtitle));
     const flags = element('div', 'vn-badges'); flags.append(...badges.filter(Boolean)); body.append(flags);

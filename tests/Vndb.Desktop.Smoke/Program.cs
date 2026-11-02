@@ -422,6 +422,25 @@ public static class Program
             Check(stateCard.GetVisualDescendants().OfType<TextBlock>().All(t => t.TranslatePoint(default, stateCard) is { } p && p.Y >= 0 && p.Y + t.Bounds.Height <= stateCard.Bounds.Height), "K2 state card has enough height for all independent labels");
             Save(window, output, "k2-state-cards.png");
             vm.Shelf.ListMode = true; await Render(window); Save(window, output, "k2-state-list.png");
+            vm.SelectedBook = summaryBook; vm.Shelf.OpenDetailsCommand.Execute(null); await Render(window);
+            var k3parent = vm.SelectedBook;
+            Check(vm.BookDetails.Relations.Rows.Count == 1 && library.LocalReads == 0, "K3 opening details never prefetches relation targets");
+            var relationButton = window.GetVisualDescendants().OfType<Button>().First(b => ReferenceEquals(b.Command, vm.OpenRelatedCommand));
+            await vm.OpenRelatedCommand.ExecuteAsync(relationButton.CommandParameter); await Render(window);
+            Check(library.LocalReads == 1 && ReferenceEquals(vm.SelectedBook, k3parent) && !vm.BookDetails.IsPersonal && vm.BookDetails.Book?.Metadata?.VndbId == "v2", "K3 relation input opens read-only public metadata without selecting a personal variant");
+            Check(!window.GetVisualDescendants().OfType<Button>().Any(b => b.IsEffectivelyVisible && ReferenceEquals(b.Command, vm.EditBookPlayCommand)), "K3 related public detail hides personal record mutation controls");
+            Save(window, output, "k3-related-details.png");
+            vm.BackRelatedCommand.Execute(null); await Render(window);
+            Check(ReferenceEquals(vm.BookDetails.Book, k3parent) && library.LocalReads == 1, "K3 back returns cached original detail without transport");
+            vm.TitleChoice = vm.TitleChoices.Single(c => c.Code == "latin"); await Render(window);
+            Check(summaryBook.JapaneseSubtitle.Length > 0 && summaryBook.ArchiveTitle.StartsWith("星の", StringComparison.Ordinal), "K3 title preference adds Japanese subtitle and leaves archive title Japanese");
+            vm.Shelf.ListMode = false; vm.Shelf.CloseDetailsCommand.Execute(null); await Render(window);
+            var bilingual = window.GetVisualDescendants().OfType<Button>().First(b => b.Classes.Contains("card") && b.IsEffectivelyVisible);
+            Check(bilingual.Classes.Contains("bilingual") && bilingual.GetVisualDescendants().OfType<TextBlock>().All(t => t.TranslatePoint(default, bilingual) is { } p && p.Y >= 0 && p.Y + t.Bounds.Height <= bilingual.Bounds.Height), "K3 bilingual cards keep all labels inside the card bounds");
+            Save(window, output, "k3-bilingual-cards.png");
+            vm.Section = 5; await Render(window);
+            Check(window.GetVisualDescendants().OfType<ComboBox>().Any(c => ReferenceEquals(c.ItemsSource, vm.TitleChoices)), "K3 title language preference compiled binding resolves in settings");
+            vm.Section = 0; vm.TitleChoice = vm.TitleChoices[0]; await Render(window);
             var chromeFocus = window.FindControl<Button>("ThemeButton")!;
             chromeFocus.Focus(NavigationMethod.Tab); await Render(window);
             Check(chromeFocus.IsFocused && chromeFocus.BorderThickness.Left == 2, "custom chrome keyboard focus has an explicit visible border");
@@ -467,11 +486,15 @@ public static class Program
             return Task.FromResult(new PublicCatalogPage(Enumerable.Range(1, 24).Select(n => new PublicCatalogEntry(Metadata(n) with { Provenance = "vndb_dump", Completeness = "partial_text" }, new(3, 1, 1, 1, 0, n % 2 == 0), true)).ToArray(), q.Page, q.PageSize, 67459, true, new(67459, new(2026, 10, 27, 0, 0, 0, TimeSpan.Zero), "paused", 10, 100), DateTimeOffset.UtcNow));
         }
         public int ProducerCalls;
+        public int LocalReads;
+        public Task<MetadataResponse> LocalNovelAsync(string id, CancellationToken ct)
+        { LocalReads++; return Task.FromResult(new MetadataResponse([Metadata(int.Parse(id.AsSpan(1)))], "web_local", DateTimeOffset.UtcNow, 1, 10, 1, false)); }
         public Task<IReadOnlyList<CatalogProducerChoice>> CatalogProducersAsync(string text, bool cacheOnly, CancellationToken ct)
         { ProducerCalls++; return Task.FromResult<IReadOnlyList<CatalogProducerChoice>>([new("p1", "Synthetic Studio", "合成会社", 24)]); }
         private static MetadataSnapshot Metadata(int n) => new("v" + n, "星の彼方で、もう一度あなたと " + n, "vn",
             new() { Id = "v" + n, Title = "星の彼方で、もう一度あなたと " + n, Released = "2026-10-23", Description = "合成展示资料。\n\nこれはテスト用の架空の作品です。真实个人资料不在测试中。",
-                Languages = ["ja"], ReleaseCatalog = new([new NovelRelease { Id = "r" + n, Title = "合成发行版", Released = "2099-12", Official = false, Patch = true,
+                Languages = ["ja"], OriginalLanguage = "ja", Titles = [new() { Lang = "ja", Title = "星の彼方で、もう一度あなたと " + n, Latin = "Synthetic Latin " + n, Main = true }], Relations = [new("v2", "seq", true)],
+                ReleaseCatalog = new([new NovelRelease { Id = "r" + n, Title = "合成发行版", Released = "2099-12", Official = false, Patch = true,
                     Languages = [new("zh-Hans", null, null, true, true)], Platforms = ["win"], Vns = [new("v" + n, "partial")] }], DateTimeOffset.UtcNow),
                 Image = new() { Id = "cv" + n, Url = "https://t.vndb.org/cv/" + n + ".png" } },
             [new() { Id = "p1", Name = "Demo Studio", Original = "星空ソフト" }, new() { Id = "p2", Name = "第二制作室" }], null, new("not_downloaded"), DateTimeOffset.UtcNow, "test");

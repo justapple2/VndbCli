@@ -7,7 +7,7 @@ globalThis.VnReleases = (() => {
       (release.platforms || []).join(' / '), release.official?'官方':'非官方', release.patch?'补丁':'',
       {trial:'试玩',partial:'部分',complete:'完整'}[kind] || '未知类型', '发行日期：'+(release.released || '未知')].filter(Boolean).join(' · ');
   }
-  function section(novel, api) {
+  function section(novel, api, isCurrent=()=>true) {
     const node=VnView.element, root=node('section','release-catalog'), content=node('div');
     const button=node('button','secondary',novel.release_catalog?'刷新发行目录':'查询发行版本与语言');button.type='button';
     const status=node('p','caption');status.setAttribute('role','status');
@@ -31,10 +31,11 @@ globalThis.VnReleases = (() => {
       button.disabled=true;status.textContent='正在查询发行目录，原资料保留…';
       try{
         const result=await api(`/api/v1/vns/${novel.id}/releases/${novel.release_catalog?'refresh':'resolve'}`,{post:true});
+        if(!isCurrent())return;
         const updated=result.items?.find(i=>i.vndb_id===novel.id)?.novel?.release_catalog;
         if(!updated||!Array.isArray(updated.items))throw new Error('返回的发行目录无效，原资料保留。');
         novel.release_catalog=updated;render(updated);button.textContent='刷新发行目录';status.textContent='发行目录已保存，可离线查看。';
-      }catch(error){status.textContent=VnView.failure(error);}finally{button.disabled=false;}
+      }catch(error){if(isCurrent())status.textContent=VnView.failure(error);}finally{button.disabled=false;}
     };
     return root;
   }

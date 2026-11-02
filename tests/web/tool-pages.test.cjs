@@ -24,7 +24,7 @@ function page(name,route,tab='imports'){
  vm.createContext(context);
  const adapter=context.VnView;vm.runInContext(fs.readFileSync(path.join(root,'library-view.js'),'utf8'),context,{filename:'library-view.js'});
  context.VnView={...adapter,card:context.VnView.card,itemBadges:context.VnView.itemBadges,progressLabel:context.VnView.progressLabel,historyControl:context.VnView.historyControl,shelfQuickViews:context.VnView.shelfQuickViews};
- for(const file of ['tool-feedback.js','import-input.js',name+'.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context,{filename:file});
+ for(const file of ['tool-feedback.js','import-input.js','vn-details.js','releases.js',name+'.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context,{filename:file});
  return {elements,tabs,calls,intervals,context,buttons:id=>elements[id].querySelectorAll('button'),text:id=>elements[id].textContent};
 }
 const info={import_limits:{maximum_bytes:1048576,maximum_items:500}};

@@ -7,7 +7,9 @@ const browseRead = VnView.latest(), detailRead = VnView.latest();
 let producers = [], lastData = new Map(), displayedPages = new Map(), metadataTotals;
 const node = VnView.element;
 const searchHistory = VnView.historyControl($('search-history'),$('query'),'lookup');
-const title = n => n.titles?.find(t=>t.lang==='ja'&&t.main)?.title || n.titles?.find(t=>t.lang==='ja')?.title || n.alttitle || n.title;
+const title = n => VnDetails.title(n,n.title).title;
+let activeDetail=null,detailHistory=[];
+VnDetails.preferencesControl($('title-preferences'),()=>{const cached=lastData.get(state.mode);if(cached&&state.mode!=='plays')renderBooks(cached);if(activeDetail)renderDetail(activeDetail);});
 const company = p => p.original || p.name;
 const date = value => new Date(value).toLocaleDateString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit'});
 function notify(message,error=false){$('notice').textContent=message;$('notice').className='notice'+(error?' error':'');$('notice').hidden=!message;const d=$('detail-status');if(d){d.textContent=message;d.className='notice'+(error?' error':'');d.hidden=!message;}}
@@ -34,10 +36,10 @@ function controls(){
 }
 function change(patch,explicit=false){remember();Object.assign(state,patch,{scroll:0});viewStores[state.mode].save(state,{push:true,url:'/?view='+state.mode});controls();load(true,explicit);}
 function selectBook(id){state.selected=id;remember();VnView.select($('content'),id);}
-async function mode(value,{push=true,rememberOld=true,patch}={}){
+async function mode(value,{push=true,rememberOld=true,patch,read=true}={}){
  if(rememberOld)remember();browseRead.cancel();$('retry-browse').hidden=true;state.mode=value;Object.assign(state,viewStores[value].read(),patch);
  viewStores[value].save(state,{push,url:'/?view='+value});controls();updateTabs();
- const cached=lastData.get(value);$('content').replaceChildren();if(cached){if(value==='plays')window.playJournal.render(cached.data,cached.summary);else renderBooks(cached);}await load(true);
+ const cached=lastData.get(value);$('content').replaceChildren();if(cached){if(value==='plays')window.playJournal.render(cached.data,cached.summary);else renderBooks(cached);}if(read)await load(true);else empty('已回填作品ID','点击搜索后才会查询与补全。');
 }
 const producerRead=VnView.latest();let producerTimer;
 async function producerOptions(){
@@ -66,7 +68,7 @@ function empty(heading,copy){const wrap=node('div','empty');wrap.append(node('h3
 function renderBooks(data){
  $('content').replaceChildren();VnView.appearance($('content'),state);
  for(const entry of data.results){const n=entry.novel;const badges=[node('span','','资料已收录')];if(entry.catalog_personal){badges.push(node('span','',VnPublicCatalog.personal(entry.catalog_personal)));if(entry.catalog_personal.is_local)badges.push(node('span','local-presence','▣ 本地已有（客户端上报）'));badges.push(node('span','',VnPublicCatalog.source(entry.provenance)+' · 观测 '+entry.updated_at.slice(0,10)+(entry.completeness==='partial_text'?' · 文字部分覆盖':'')+(entry.releases_known?' · 有发行目录':' · 发行目录未知')));}else badges.push(window.localPresence.badge(n.id));if(n.rating)badges.push(node('span','','VNDB '+(n.rating/10).toFixed(1)));
-  $('content').append(VnView.card({id:n.id,title:title(n),company:entry.producers.map(company).join(' / ')||'会社待补全',subtitle:n.id+' · '+(n.released||'发售日期未知'),url:entry.cover?'/api/library/'+n.id+'/cover?v='+encodeURIComponent(entry.updated_at):null,badges,open:()=>{selectBook(n.id);detail(n.id);}}));
+  $('content').append(VnView.card({id:n.id,title:title(n),secondaryTitle:VnDetails.title(n,n.title).japanese,company:entry.producers.map(company).join(' / ')||'会社待补全',subtitle:n.id+' · '+(n.released||'发售日期未知'),url:entry.cover?'/api/library/'+n.id+'/cover?v='+encodeURIComponent(entry.updated_at):null,badges,open:()=>{selectBook(n.id);detail(n.id);}}));
  }
  if(data.coverage)$('catalog-coverage').textContent=VnPublicCatalog.coverage(data.coverage);
  VnView.select($('content'),state.selected);
@@ -93,8 +95,41 @@ async function load(restore=false,explicit=false){
  finally{if(ticket.current()){$('content').setAttribute('aria-busy','false');$('previous').disabled=!succeeded||state.page===1;$('next').disabled=!succeeded||!state.more;$('page-label').textContent=succeeded?'第 '+state.page+' 页':displayedPages.has(view)?'上次成功结果 · 第 '+displayedPages.get(view)+' 页':'尚未取得结果';}}
 }
 async function importNovel(id,button,refresh=false){if(state.importing)return;state.importing=true;button.disabled=true;const old=button.textContent;button.textContent=refresh?'正在刷新…':'正在收录…';notify('正在获取完整资料、开发会社与封面，请稍候…');try{const entry=await api(`/api/imports/${id}?refresh=${refresh}`,{post:true});notify(entry.cover_status==='failed'?'文字资料已保存；封面下载失败，可在详情中刷新重试。':'');toast(`${title(entry.novel)} 已${refresh?'更新':'保存'}到资料库`);button.textContent='已收录 ✓';await stats();if(refresh&&$('detail-dialog').open&&$('detail-dialog').dataset.novelId===id){renderDetail(entry);notify(entry.cover_status==='failed'?'资料已更新，封面仍待重试。':'资料与封面已更新。');}}catch(error){notify(error.message,true);button.textContent=old;}finally{state.importing=false;button.disabled=false;}}
-async function detail(id){const ticket=detailRead.begin();try{const entry=await api('/api/library/'+id,{signal:ticket.signal});if(!ticket.current())return;renderDetail(entry);if(!$('detail-dialog').open)$('detail-dialog').showModal();}catch(error){if(ticket.current())notify(VnView.failure(error),true);}}
-function renderDetail(entry){const n=entry.novel;$('detail-dialog').dataset.novelId=n.id;const layout=node('div','detail-layout');const left=node('div','detail-cover');left.append(cover(entry));const info=node('div','detail-info');const heading=node('h2','',title(n));heading.id='detail-title';info.append(node('div','eyebrow','LOCAL ARCHIVE / '+n.id),heading,node('div','latin-title',n.title));const chips=node('div','chips');for(const p of entry.producers){const b=node('button','chip',company(p));b.title=p.name+' / '+p.id;b.onclick=()=>{$('detail-dialog').close();filter(p.id);};chips.append(b);}const feedback=node('div','notice');feedback.id='detail-status';feedback.hidden=true;info.append(chips,feedback);const meta=node('dl','metadata');for(const [label,value] of [['发行日期',n.released||'未知'],['原始语言',n.olang||'未知'],['平台',n.platforms.join(' · ')||'未知'],['已收录语言（不含机翻）',n.languages.map(VnReleases.language).join(' · ')||'未知'],['VNDB 评分',n.rating?(n.rating/10).toFixed(2)+' / 10':'暂无评分'],['封面状态',{ready:'已保存到本地',failed:'下载待重试',none:'VNDB 暂无封面'}[entry.cover_status]]]){const item=node('div');item.append(node('dt','',label),node('dd','',value));meta.append(item);}info.append(meta,VnReleases.section(n,api));if(n.description)info.append(node('h3','','作品简介'),node('div','description',n.description));if(n.titles.length){info.append(node('h3','','其他语言标题'));const list=node('ul','titles-list');for(const t of n.titles)list.append(node('li','',`${t.lang} / ${t.title}${t.main?' · 原始标题':''}`));info.append(list);}if(n.aliases.length)info.append(node('h3','','别名'),node('div','description',n.aliases.join(' / ')));const actions=node('div','detail-actions');const refresh=node('button','primary','从 VNDB 刷新');refresh.onclick=()=>importNovel(n.id,refresh,true);const download=node('a','secondary','导出 JSON');download.href='/api/library/'+n.id+'/export';download.download=n.id+'.json';const original=node('a','plain','在 VNDB 查看 ↗');original.href='https://vndb.org/'+n.id;original.target='_blank';original.rel='noopener noreferrer';actions.append(refresh,download,original);info.append(actions,node('div','detail-update',`首次收录 ${date(entry.created_at)} · 最近更新 ${date(entry.updated_at)} · 资料来源 ${VnPublicCatalog.source(entry.provenance)} · ${entry.completeness==='partial_text'?'文字部分覆盖，缺失字段可按需刷新':'文字资料'} · 封面独立缓存`));layout.append(left,info);$('detail-content').replaceChildren(layout);const presence=window.localPresence.badge(n.id);if(presence)info.append(presence);window.playJournal?.forNovel(n,info);}
+async function detail(id,related=false){
+ if(!/^v[1-9][0-9]*$/.test(id))return;
+ if(related&&detailHistory.length>=8){notify('关联导航最多8层，请先返回。',true);return;}
+ const parent=activeDetail,ticket=detailRead.begin();
+ try{
+  const entry=await api('/api/library/'+id,{signal:ticket.signal});if(!ticket.current())return;
+  if(entry?.novel?.id!==id)throw new Error('关联回复身份不符，原详情保留。');
+  if(related&&parent)detailHistory.push(parent);else detailHistory=[];
+  renderDetail(entry);if(!$('detail-dialog').open)$('detail-dialog').showModal();
+ }catch(error){if(ticket.current()){
+  notify(VnView.failure(error),true);
+  const target=$('detail-status')||$('notice'),fill=node('button','secondary','回填 '+id+' 到查询，不执行');fill.type='button';
+  fill.onclick=()=>{$('detail-dialog').close();mode('remote',{patch:{query:id,page:1,scroll:0},read:false});};target.append(fill);
+ }}
+}
+function renderDetail(entry){
+ activeDetail=entry;const n=entry.novel;$('detail-dialog').dataset.novelId=n.id;
+ const current=()=>activeDetail===entry&&$('detail-dialog').open;
+ const layout=node('div','detail-layout'),left=node('div','detail-cover');left.append(cover(entry));const info=node('div','detail-info');
+ if(detailHistory.length){const back=node('button','secondary','返回原详情');back.onclick=()=>{detailRead.cancel();renderDetail(detailHistory.pop());};info.append(back);}
+ const presented=VnDetails.title(n,n.title),heading=node('h2','',presented.title);heading.id='detail-title';info.append(node('div','eyebrow','PUBLIC METADATA / '+n.id),heading);
+ if(presented.japanese)info.append(node('div','latin-title',presented.japanese));
+ const chips=node('div','chips');for(const p of entry.producers||[]){const b=node('button','chip',company(p));b.title=p.name+' / '+p.id;b.onclick=()=>{$('detail-dialog').close();filter(p.id);};chips.append(b);}
+ const feedback=node('div','notice');feedback.id='detail-status';feedback.hidden=true;info.append(chips,feedback);
+ info.append(VnDetails.publicSection(n,VnPublicCatalog.source(entry.provenance),entry.updated_at,entry.producers||[],entry.completeness),VnReleases.section(n,api,current));
+ if(n.description)info.append(node('h3','','公共作品简介'),node('div','description',n.description));
+ info.append(VnDetails.relations(n,id=>detail(id,true),{known:id=>[...lastData.values()].flatMap(p=>p.results||[]).find(r=>r.novel?.id===id)?.novel}));
+ if(n.titles?.length){info.append(node('h3','','其他语言标题'));const list=node('ul','titles-list');for(const t of n.titles.slice(0,30))list.append(node('li','',`${t.lang} / ${t.title}${t.main?' · 原始标题':''}`));info.append(list);}
+ if(n.aliases?.length)info.append(node('h3','','别名'),node('div','description',n.aliases.slice(0,100).join(' / ')));
+ const actions=node('div','detail-actions'),refresh=node('button','primary','从 VNDB 刷新');refresh.onclick=()=>importNovel(n.id,refresh,true);
+ const download=node('a','secondary','导出 JSON');download.href='/api/library/'+n.id+'/export';download.download=n.id+'.json';
+ const original=node('a','plain','在 VNDB 查看 ↗');original.href='https://vndb.org/'+n.id;original.target='_blank';original.rel='noopener noreferrer';
+ actions.append(refresh,download,original);info.append(actions,node('div','detail-update',`首次收录 ${date(entry.created_at)} · 最近更新 ${date(entry.updated_at)} · ${entry.completeness==='partial_text'?'文字部分覆盖；缺失可显式刷新':'作品文字资料'} · 封面独立缓存`));
+ layout.append(left,info);$('detail-content').replaceChildren(layout);const presence=window.localPresence.badge(n.id);if(presence)info.append(presence);window.playJournal?.forNovel(n,info);
+}
 function openSettings(){$('write-key').value=state.key;if(!$('settings-dialog').open)$('settings-dialog').showModal();}
 
 $('search-form').onsubmit=event=>{event.preventDefault();searchHistory.record($('query').value);change({query:$('query').value.trim(),page:1},true);};
@@ -107,7 +142,7 @@ for(const key of ['language','releaseType','platform','sort'])$('public-'+key).o
 $('clear-filters').onclick=()=>change({query:'',producer:'',year:'',status:'',played:'',unmatched:false,language:'',releaseType:'',platform:'',includeMtl:false,sort:'personal',page:1});
 for(const key of ['layout','density','fit'])$('collection-'+key).onchange=()=>{state[key]=$('collection-'+key).value;remember();VnView.appearance($('content'),state);};
 for(const id of ['settings','settings-top'])$(id).onclick=openSettings;
-$('detail-dialog').addEventListener('close',()=>detailRead.cancel());
+$('detail-dialog').addEventListener('close',()=>{detailRead.cancel();activeDetail=null;detailHistory=[];});
 $('close-settings').onclick=()=>$('settings-dialog').close();$('close-detail').onclick=()=>$('detail-dialog').close();
 $('save-key').onclick=()=>{state.key=$('write-key').value.trim();VnView.storage('sessionStorage').set('library-key',state.key);$('settings-dialog').close();toast('管理密钥已保存到当前会话');};
 $('clear-key').onclick=()=>{state.key='';VnView.storage('sessionStorage').remove('library-key');$('write-key').value='';toast('已清除当前会话密钥');};
