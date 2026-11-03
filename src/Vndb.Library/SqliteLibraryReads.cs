@@ -31,15 +31,15 @@ public sealed partial class SqliteLibraryStore
         { _tx.Dispose(); _db.Dispose(); Duration.Record(_watch.Elapsed.TotalMilliseconds, new KeyValuePair<string, object?>("operation", _operation)); }
     }
 
-    public ItemPage ReadItems(string? query = null, bool deleted = false, bool unmatched = false, int page = 1, int pageSize = 24, string? progress = null, string? status = null, bool? isLocal = null)
-        => ReadItemsCore(query, deleted, unmatched, page, pageSize, progress, status, isLocal, false);
-    private ItemPage ReadItemsCore(string? query, bool deleted, bool unmatched, int page, int pageSize, string? progress, string? status, bool? isLocal, bool summary)
+    public ItemPage ReadItems(string? query = null, bool deleted = false, bool unmatched = false, int page = 1, int pageSize = 24, string? progress = null, string? status = null, bool? isLocal = null, bool? favorite = null, string? label = null)
+        => ReadItemsCore(query, deleted, unmatched, page, pageSize, progress, status, isLocal, false, favorite, label);
+    private ItemPage ReadItemsCore(string? query, bool deleted, bool unmatched, int page, int pageSize, string? progress, string? status, bool? isLocal, bool summary, bool? favorite = null, string? label = null)
     {
         LibraryRules.ValidatePage(page, pageSize);
         if (!string.IsNullOrEmpty(progress) && progress is not ("played" or "unplayed" or "unrecorded" or "review") ||
             !string.IsNullOrEmpty(status) && !Vndb.Core.PersonalRules.States.Contains(status)) throw new ArgumentException("无效的个人状态筛选。");
         using var read = new LibraryReadScope(this, "items"); var rows = new List<LibraryItem>();
-        if (summary && string.IsNullOrEmpty(query) && string.IsNullOrEmpty(progress) && string.IsNullOrEmpty(status) && isLocal is null)
+        if (summary && favorite is null && string.IsNullOrEmpty(label) && string.IsNullOrEmpty(query) && string.IsNullOrEmpty(progress) && string.IsNullOrEmpty(status) && isLocal is null)
         {
             const string where = " WHERE (json_extract(record_json,'$.deleted_at') IS NOT NULL)=$deleted AND ($unmatched=0 OR novel_id IS NULL)";
             using var count = read.Query("SELECT count(*) FROM library_items" + where, ("$deleted", deleted), ("$unmatched", unmatched));
@@ -57,6 +57,15 @@ public sealed partial class SqliteLibraryStore
                 if ((item.DeletedAt is not null) == deleted && (!unmatched || item.Details.NovelId is null) &&
                     (string.IsNullOrEmpty(query) || string.Join('\n', item.Details.Title, item.Details.TitleOverride, item.Details.CompanyHint, item.Details.Notes).Contains(query, StringComparison.OrdinalIgnoreCase))) rows.Add(item);
             }
+        if (favorite is not null || !string.IsNullOrEmpty(label))
+        {
+            if (!string.IsNullOrEmpty(label) && !Vndb.Core.PersonalOrganizationRules.ValidId(label)) throw new ArgumentException("分类筛选无效。");
+            using var command = read.Query("SELECT record_json FROM personal_organization WHERE id=1");
+            var organization = ReadPersonalOrganization(command);
+            var members = organization.Items.ToDictionary(i => i.ItemId, StringComparer.Ordinal);
+            rows = rows.Where(i => (favorite is null || (members.GetValueOrDefault(i.Id)?.Favorite == true) == favorite) &&
+                (string.IsNullOrEmpty(label) || members.GetValueOrDefault(i.Id)?.LabelIds.Contains(label) == true)).ToList();
+        }
         var states = ReadItemStates(read);
         rows = rows.Where(i => Matches(states[i.Id].State, progress, status, isLocal)).ToList();
         var selected = rows.OrderByDescending(i => i.UpdatedAt).ThenBy(i => i.Id, StringComparer.Ordinal).Skip((page - 1) * pageSize).Take(pageSize).ToArray();

@@ -1,6 +1,6 @@
 # Web API使用与交换契约
 
-适用版本0.5.0／API v1／schema13。**客户端使用`/api/v1`**，机器规范为运行中`/openapi/v1.json`；数据库schema不是客户端协议。示例使用虚构个人资料和`http://nas.local:5187/`，请替换为自己的服务。
+适用版本0.5.0／API v1／schema14。**客户端使用`/api/v1`**，机器规范为运行中`/openapi/v1.json`；数据库schema不是客户端协议。示例使用虚构个人资料和`http://nas.local:5187/`，请替换为自己的服务。
 
 ## 1. 连接、鉴权及公共规则
 
@@ -370,3 +370,14 @@ GET /api/v1/collection/stats返回public_novels、personal_items、played、unpl
 返回`PublicCatalogPage`：`items[].metadata`仅为有界卡片文字摘要，不带大段简介、关系或全部发行版；`personal`是个人汇总，`releases_known`区分未知与已查空目录；`coverage`包含公共作品数、最近完整快照日期和未完成任务进度；`observed_at`为页面读取时间。完整资料、发行版及metadata导出使用明细接口，不能将卡片摘要当作完整导出。
 
 `GET /api/v1/catalog/producers?q=名称或p编号`返回最多60项会社ID、名称、原名及关联作品数。非法参数返回400。语言／类型／平台条件须命中同一发行版，合集类型对应当前作品；默认排除机翻，可明确包含。筛选可能包含未来发行和部分日期，不承诺当前可购买或本机版本语言支持。
+
+
+## 个人收藏、虚拟集合与标签（可选能力）
+
+`GET /info`的`personal_organization`能力声明此功能。`GET /personal-organization`读取轻量个人分类（不含作品详情）：`revision`、`labels[{id,name,kind}]`、`items[{item_id,favorite,label_ids}]`。`kind`为`collection`或`tag`。标签ID稳定；条目使用准确个人书架ID，不能用VN ID替代。
+
+`POST /personal-organization`沿用管理密钥、`X-Library-Request: 1`及`Idempotency-Key`。请求为`{service_instance_id,change:{expected_revision,label?,remove_label?,items?}}`，实例必须与`GET /info`一致。每次只能提供一个`label`（创建／改名）、`remove_label`（解除分类），或1–100项`items`（明确替换这些条目的收藏与分类）。其他条目保持。响应为新分类快照；批次全成或全不成。分类最多200项，名称1–80字，同类型不重名；每条目最多32分类；最多20000条非空分类关系、4MiB。未分类且未收藏的条目不占快照行。
+
+`GET /items`及`GET /shelf`增加可选`favorite=true|false`、`label=<稳定分类ID>`，与原查询组合并在分页前生效。删除分类不移除个人条目、游玩或文件。旧客户端原个人条目CRUD不会清空这些分类。
+
+此小型个人组织使用独立整体修订，两个客户端并发修改不同条目也可能返回409。客户端保留原ID／内容，明确冲突后重读再编辑，不自动覆盖；请求结果不明时原ID重试可取得原回执。分类不改变个人条目修订、关联或游玩状态。本机资源档案无Web接口；路径、EXE、参数、适用本机补丁和手工应用状态仍只在Local JSON。

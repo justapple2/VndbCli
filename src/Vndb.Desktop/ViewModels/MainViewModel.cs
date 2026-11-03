@@ -66,6 +66,9 @@ public partial class MainViewModel : ObservableObject
             await new ShelfPreferencesStore(Services().SettingsStore.DirectoryPath).SaveAsync(preferences, ct);
             Status = "已记住本机书架偏好；其他页面浏览状态独立保留在本次会话。";
         }));
+        PersonalOrganization = new(() => new(Services().QueryDirectory, Services().Settings.Server), () => _services?.Web,
+            () => Shelf.Books.ToArray(), ApplyPersonalOrganization, () => _services?.ActivityHost?.SignalSync());
+        ResourceArchive = new(() => new(Services().LocalLibrary, Services().Identity?.Id ?? throw new InvalidOperationException("本机身份未加载。")), () => _dialogs.FolderAsync("选择资源检索根"));
         Shelf.SelectionChanged += book => SelectedBook = book;
         Discovery = new(library, dialogs, GuardAsync, text => Status = text, () => _services?.QueryScope);
         Discovery.Completed += PresentQuery;
@@ -83,6 +86,14 @@ public partial class MainViewModel : ObservableObject
     }
 
     public BookDetailsViewModel BookDetails { get; } = new();
+    public PersonalOrganizationViewModel PersonalOrganization { get; }
+    public ResourceArchiveViewModel ResourceArchive { get; }
+    private void ApplyPersonalOrganization(PersonalOrganizationState state)
+    {
+        var members = state.Items.ToDictionary(i => i.ItemId, StringComparer.Ordinal);
+        foreach (var book in _books) book.SetPersonalOrganization(members.GetValueOrDefault(book.Id), state.Labels);
+        Shelf.SetPersonalLabels(state.Labels); Shelf.Refresh();
+    }
     public bool IsPrimaryDetail => _relatedBook is null && SelectedBook is not null;
     private void UpdateBookDetails()
     {
@@ -144,6 +155,7 @@ public partial class MainViewModel : ObservableObject
         }).ToArray();
         foreach (var book in _books) { book.SetTitlePreference(TitleChoice.Code, ShowJapaneseSubtitle); UpdateOwnership(book); }
         ApplyHistory(); Shelf.SetLibrary(_books, result.Source);
+        if (_services is not null) await PersonalOrganization.LoadAsync(true, ct);
         Installations.Clear(); foreach (var i in _installations.Where(i => SelectedBook is null || MatchesBook(i, SelectedBook))) Installations.Add(i);
         OnPropertyChanged(nameof(LaunchInstallations));
         UpdateBookDetails();
@@ -183,6 +195,7 @@ public partial class MainViewModel : ObservableObject
     }
     partial void OnSelectedBookChanged(BookViewModel? value)
     {
+        PersonalOrganization.Select(value); ResourceArchive.Select(value);
         _detailReadGeneration++;
         ClearRelatedDetails();
         Shelf.SelectIfVisible(value);
@@ -326,6 +339,7 @@ public partial class MainViewModel : ObservableObject
     {
         var result = await Services().SyncService().SyncAsync(ct);
         await Imports.LoadAsync(ct);
+        await PersonalOrganization.LoadAsync(true, ct);
         Status = $"已核对 {result.MetadataCount + result.PresenceCount} 个批次回执；最终处理结果以Web为准。";
     });
     private DesktopServices Services() => _services ?? throw new InvalidOperationException("此宿主没有配置管理服务。");

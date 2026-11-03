@@ -83,6 +83,8 @@
   <Style Selector="TextBox.technical"><Setter Property="FontFamily" Value="Cascadia Mono, Consolas, monospace" /><Setter Property="FontSize" Value="{StaticResource FontCaption}" /><Setter Property="TextWrapping" Value="Wrap" /></Style>
   <Style Selector="Button.catalog-card"><Setter Property="Height" Value="420" /></Style>
   <Style Selector="Button.card.bilingual"><Setter Property="Height" Value="428" /></Style>
+  <Style Selector="Button.card.organized"><Setter Property="Height" Value="424" /></Style>
+  <Style Selector="Button.card.bilingual.organized"><Setter Property="Height" Value="452" /></Style>
   <Style Selector="Button.catalog-card.bilingual"><Setter Property="Height" Value="448" /></Style>
   <Style Selector="ProgressBar.catalog-progress"><Setter Property="IsIndeterminate" Value="True" /><Setter Property="Height" Value="4" /></Style>
   <Style Selector="Window.no-motion ProgressBar.catalog-progress"><Setter Property="IsIndeterminate" Value="False" /><Setter Property="Value" Value="50" /></Style>

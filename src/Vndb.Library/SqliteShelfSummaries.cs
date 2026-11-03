@@ -5,9 +5,9 @@ namespace Vndb.Library;
 public sealed partial class SqliteLibraryStore
 {
     public ShelfSummaryPage ReadShelfSummary(string? query = null, bool deleted = false, bool unmatched = false,
-        int page = 1, int pageSize = 100, string? progress = null, string? status = null, bool? isLocal = null)
+        int page = 1, int pageSize = 100, string? progress = null, string? status = null, bool? isLocal = null, bool? favorite = null, string? label = null)
     {
-        var result = ReadItemsCore(query, deleted, unmatched, page, pageSize, progress, status, isLocal, true);
+        var result = ReadItemsCore(query, deleted, unmatched, page, pageSize, progress, status, isLocal, true, favorite, label);
         return new(result.Items, result.Page, result.PageSize, result.Total, result.More);
     }
     public ItemHeadPage ReadItemHeads(int page = 1, int pageSize = 100, bool deleted = false)

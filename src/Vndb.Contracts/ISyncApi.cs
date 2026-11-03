@@ -6,6 +6,8 @@ namespace Vndb.Contracts;
 /// <summary>The typed remote protocol consumed by local journals; no filesystem capability.</summary>
 public interface ISyncApi
 {
+    Task<PersonalOrganizationState?> PersonalOrganizationAsync(CancellationToken ct = default) => Task.FromResult<PersonalOrganizationState?>(null);
+    Task<PersonalOrganizationState> SavePersonalOrganizationAsync(PersonalOrganizationChange change, string key, CancellationToken ct = default, string? serviceInstanceId = null) => throw new ClientApiException("unsupported", 404);
     Task<ServiceInfo> OrganizationInfoAsync(CancellationToken ct);
     Task<LibraryItemView> ItemAsync(string id, CancellationToken ct = default);
     Task<ItemPage> ItemsAsync(int page = 1, CancellationToken ct = default);

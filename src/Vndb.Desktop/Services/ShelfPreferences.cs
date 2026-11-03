@@ -5,7 +5,7 @@ using Vndb.Core;
 
 namespace Vndb.Desktop.Services;
 
-public sealed record ShelfPreferences(string Sort = "添加时间", bool Descending = true, string Company = "全部会社", string State = "全部状态", bool LocalOnly = false, bool ListMode = false, string Resource = "全部本机资源");
+public sealed record ShelfPreferences(string Sort = "添加时间", bool Descending = true, string Company = "全部会社", string State = "全部状态", bool LocalOnly = false, bool ListMode = false, string Resource = "全部本机资源", bool FavoritesOnly = false, string LabelId = "");
 public sealed record LaunchHistory(string ProfileId, string? InstallationId, string? ComponentId, DateTimeOffset OpenedAt);
 public sealed class ShelfPreferencesStore(string directory)
 {

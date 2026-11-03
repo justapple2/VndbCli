@@ -14,7 +14,7 @@ class Element {
  querySelector(s){return this.querySelectorAll(s)[0]||null;}
 }
 const drain=async()=>{for(let i=0;i<12;i++)await new Promise(resolve=>setImmediate(resolve));};
-function page(name,route,tab='imports'){
+function page(name,route,tab='imports',personalOrganization=false){
  const html=fs.readFileSync(path.join(root,name+'.html'),'utf8'),elements={};for(const m of html.matchAll(/<(\w+)[^>]*\bid="([^"]+)"/g))elements[m[2]]=new Element(m[1]);
  const tabs=['shelf','imports','review','trash'].map(value=>{const e=new Element('button');e.dataset.tab=value;return e;}),calls=[],intervals=[];
  const document={getElementById:id=>{assert.ok(elements[id],`Actual ${name}.html must declare ${id}`);return elements[id];},createElement:tag=>new Element(tag),createDocumentFragment:()=>new Element('#fragment'),querySelectorAll:s=>s==='[data-tab]'?tabs:[],visibilityState:'visible'};
@@ -24,7 +24,7 @@ function page(name,route,tab='imports'){
  vm.createContext(context);
  const adapter=context.VnView;vm.runInContext(fs.readFileSync(path.join(root,'library-view.js'),'utf8'),context,{filename:'library-view.js'});
  context.VnView={...adapter,card:context.VnView.card,itemBadges:context.VnView.itemBadges,progressLabel:context.VnView.progressLabel,historyControl:context.VnView.historyControl,shelfQuickViews:context.VnView.shelfQuickViews};
- for(const file of ['tool-feedback.js','import-input.js','vn-details.js','releases.js',name+'.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context,{filename:file});
+ for(const file of ['tool-feedback.js','import-input.js','vn-details.js','releases.js',...(personalOrganization?['personal-organization.js']:[]),name+'.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context,{filename:file});
  return {elements,tabs,calls,intervals,context,buttons:id=>elements[id].querySelectorAll('button'),text:id=>elements[id].textContent};
 }
 const info={import_limits:{maximum_bytes:1048576,maximum_items:500}};
@@ -148,4 +148,22 @@ test('quality late read failure cannot replace a newer successful filter summary
  let delayed=false,release;const p=page('quality',async c=>{
   if(c.url.endsWith('/devices'))return [];if(c.url.includes('/quality?')){if(delayed)return new Promise(r=>release=r);return {counts:{company_missing:2},items:[],more:false,total:2};}throw Error(c.url);
  });await drain();delayed=true;const old=p.elements.filters.onsubmit({preventDefault(){}});await drain();delayed=false;p.elements.filters.onsubmit({preventDefault(){}});await drain();release({status:500,data:{title:'late failure'}});await old;await drain();assert.match(p.text('summary'),/会社待补全 2/);assert.doesNotMatch(p.text('notice'),/late failure/);
+});
+
+
+test('actual personal organization controls populate stable labels and filter before paging',async()=>{
+ const item={id:'exact-a',details:{title:'Synthetic A',novel_id:'v17'},revision:1};
+ const state={revision:2,labels:[{id:'label-a',name:'合成想玩',kind:'collection'}],items:[{item_id:'exact-a',favorite:true,label_ids:['label-a']}]};
+ const p=page('manage',async c=>{
+  if(c.url==='/api/v1/info')return {...info,service_instance_id:'synthetic-instance',capabilities:['personal_organization']};
+  if(c.url==='/api/v1/personal-organization')return state;
+  if(c.url.includes('/shelf?'))return {format:'vn-shelf-summary',format_version:1,items:[{item,play_count:0,state:{progress:{state:'unrecorded',statuses:[]},is_local:false}}],total:1,more:false};
+  throw Error(c.url);
+ },'shelf',true);await drain();
+ assert.match(p.text('personal-label-filter'),/合成想玩/);assert.match(p.text('items'),/★ 收藏/);
+ p.elements['personal-label-filter'].value='label-a';p.elements['personal-label-filter'].onchange();await drain();
+ p.elements['favorite-filter'].value='true';p.elements['favorite-filter'].onchange();await drain();
+ const query=new URL(p.calls.at(-1).url,'https://example.test').searchParams;
+ assert.equal(query.get('favorite'),'true');assert.equal(query.get('label'),'label-a');assert.equal(query.get('page'),'1');assert.ok(p.calls.every(c=>c.method==='GET'));
+ p.elements['clear-filters'].onclick();await drain();assert.equal(new URL(p.calls.at(-1).url,'https://example.test').searchParams.get('favorite'),null);
 });

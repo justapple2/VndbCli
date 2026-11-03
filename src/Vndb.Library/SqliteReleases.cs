@@ -5,7 +5,7 @@ namespace Vndb.Library;
 
 public sealed partial class SqliteLibraryStore
 {
-    public const int SchemaVersion = 13;
+    public const int SchemaVersion = 14;
     private static void InitializeReleases(SqliteConnection db, SqliteTransaction tx) => Execute(db, tx, """
         CREATE TABLE IF NOT EXISTS releases (
             id TEXT PRIMARY KEY, metadata_json TEXT NOT NULL CHECK(json_valid(metadata_json)), fetched_at TEXT NOT NULL);

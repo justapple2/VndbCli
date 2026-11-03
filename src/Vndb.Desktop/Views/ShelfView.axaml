@@ -1,9 +1,9 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:Vndb.Desktop.ViewModels" xmlns:c="using:Vndb.Desktop.Controls" xmlns:views="using:Vndb.Desktop.Views"
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:Vndb.Desktop.ViewModels" xmlns:c="using:Vndb.Desktop.Controls" xmlns:views="using:Vndb.Desktop.Views" xmlns:core="clr-namespace:Vndb.Core;assembly=Vndb.Core"
              x:Class="Vndb.Desktop.Views.ShelfView" x:DataType="vm:MainViewModel">
   <UserControl.Resources>
     <DataTemplate x:Key="BookCardTemplate" x:DataType="vm:BookViewModel">
       <Grid ContextRequested="OnBookContextRequested" DoubleTapped="OnBookDoubleTapped">
-        <Button Classes="card" Classes.chosen="{Binding Selected}" Classes.bilingual="{Binding HasJapaneseSubtitle}" Click="OnCardClick" AutomationProperties.Name="{Binding Title}">
+        <Button Classes="card" Classes.chosen="{Binding Selected}" Classes.bilingual="{Binding HasJapaneseSubtitle}" Classes.organized="{Binding HasPersonalLabels}" Click="OnCardClick" AutomationProperties.Name="{Binding Title}">
           <Grid RowDefinitions="216,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
             <Grid><c:CoverView Metadata="{Binding Metadata}" Background="{DynamicResource CoverBrush}" /><Border Classes="badge" IsVisible="{Binding IsLocal}" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="6"><TextBlock Text="{Binding LocalLabel}" /></Border></Grid>
             <StackPanel Grid.Row="1" Classes="compact"><TextBlock Text="{Binding Title}" Classes="book-title" ToolTip.Tip="{Binding Title}" /><TextBlock Text="{Binding JapaneseSubtitle}" IsVisible="{Binding HasJapaneseSubtitle}" Classes="caption ellipsis" ToolTip.Tip="{Binding JapaneseSubtitle}" /></StackPanel>
@@ -11,7 +11,7 @@
             <TextBlock Grid.Row="3" Text="{Binding PlaySummary}" Classes="caption ellipsis" ToolTip.Tip="{Binding PlayAssociationNotice}" />
             <TextBlock Grid.Row="4" Text="{Binding ResourceLabel}" Classes="caption ellipsis" ToolTip.Tip="{Binding LocalObservation}" />
             <TextBlock Grid.Row="5" Text="{Binding LaunchLabel}" Classes="caption ellipsis" ToolTip.Tip="{Binding ReportedPresence}" />
-            <TextBlock Grid.Row="6" Text="{Binding ReportedPresence}" Classes="caption ellipsis" />
+            <StackPanel Grid.Row="6" Classes="compact"><TextBlock Text="{Binding ReportedPresence}" Classes="caption ellipsis" /><TextBlock Text="{Binding PersonalLabels}" IsVisible="{Binding HasPersonalLabels}" Classes="caption ellipsis" /></StackPanel>
           </Grid>
         </Button>
         <Button Classes="book-more icon" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="14" Click="OnMoreClick" AutomationProperties.Name="作品更多操作" ToolTip.Tip="更多操作（也可右键或按菜单键）"><c:AppIcon Kind="More" /></Button>
@@ -20,7 +20,7 @@
     <DataTemplate x:Key="BookListTemplate" x:DataType="vm:BookViewModel">
       <Grid Classes="book-row" ColumnDefinitions="72,*,36" ContextRequested="OnBookContextRequested" DoubleTapped="OnBookDoubleTapped">
         <c:CoverView Metadata="{Binding Metadata}" Background="{DynamicResource CoverBrush}" />
-        <StackPanel Grid.Column="1" Classes="compact" VerticalAlignment="Center"><TextBlock Text="{Binding Title}" Classes="strong ellipsis" ToolTip.Tip="{Binding Title}" /><TextBlock Text="{Binding JapaneseSubtitle}" IsVisible="{Binding HasJapaneseSubtitle}" Classes="caption ellipsis" ToolTip.Tip="{Binding JapaneseSubtitle}" /><TextBlock Text="{Binding Company}" Classes="caption ellipsis" ToolTip.Tip="{Binding Company}" /><TextBlock Text="{Binding PlaySummary}" Classes="caption" ToolTip.Tip="{Binding PlayAssociationNotice}" /><TextBlock Text="{Binding ResourceLabel}" Classes="caption wrap" ToolTip.Tip="{Binding LocalObservation}" /><TextBlock Text="{Binding LaunchLabel}" Classes="caption ellipsis" ToolTip.Tip="{Binding LaunchLabel}" /><TextBlock Text="{Binding ReportedPresence}" Classes="caption" /><TextBlock Text="{Binding LastOpenedLabel}" Classes="caption" /></StackPanel>
+        <StackPanel Grid.Column="1" Classes="compact" VerticalAlignment="Center"><TextBlock Text="{Binding Title}" Classes="strong ellipsis" ToolTip.Tip="{Binding Title}" /><TextBlock Text="{Binding JapaneseSubtitle}" IsVisible="{Binding HasJapaneseSubtitle}" Classes="caption ellipsis" ToolTip.Tip="{Binding JapaneseSubtitle}" /><TextBlock Text="{Binding Company}" Classes="caption ellipsis" ToolTip.Tip="{Binding Company}" /><TextBlock Text="{Binding PlaySummary}" Classes="caption" ToolTip.Tip="{Binding PlayAssociationNotice}" /><TextBlock Text="{Binding ResourceLabel}" Classes="caption wrap" ToolTip.Tip="{Binding LocalObservation}" /><TextBlock Text="{Binding LaunchLabel}" Classes="caption ellipsis" ToolTip.Tip="{Binding LaunchLabel}" /><TextBlock Text="{Binding ReportedPresence}" Classes="caption" /><TextBlock Text="{Binding PersonalLabels}" IsVisible="{Binding HasPersonalLabels}" Classes="caption ellipsis" /><TextBlock Text="{Binding LastOpenedLabel}" Classes="caption" /></StackPanel>
         <Button Grid.Column="2" Classes="book-more icon" VerticalAlignment="Top" Click="OnMoreClick" AutomationProperties.Name="作品更多操作" ToolTip.Tip="更多操作"><c:AppIcon Kind="More" /></Button>
       </Grid>
     </DataTemplate>
@@ -44,6 +44,8 @@
           <ComboBox Classes="short-filter" ItemsSource="{Binding Shelf.ShelfStates}" SelectedItem="{Binding Shelf.ShelfState}" AutomationProperties.Name="游玩状态筛选" />
           <ComboBox Classes="short-filter" ItemsSource="{Binding Shelf.ResourceFilters}" SelectedItem="{Binding Shelf.ResourceFilter}" AutomationProperties.Name="本机资源筛选" />
           <ComboBox Classes="short-filter" ItemsSource="{Binding Shelf.ShelfSorts}" SelectedItem="{Binding Shelf.ShelfSort}" AutomationProperties.Name="书架排序" />
+          <CheckBox Content="★ 仅收藏" IsChecked="{Binding Shelf.FavoritesOnly}" />
+          <ComboBox Classes="company-filter" ItemsSource="{Binding Shelf.LabelFilters}" SelectedItem="{Binding Shelf.SelectedLabelFilter}" AutomationProperties.Name="个人集合标签筛选"><ComboBox.ItemTemplate><DataTemplate x:DataType="core:PersonalLabel"><TextBlock Text="{Binding ., Converter={StaticResource LocalChoiceLabel}}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
           <CheckBox Content="降序" IsChecked="{Binding Shelf.SortDescending}" /><CheckBox Content="本机有副本" IsChecked="{Binding Shelf.LocalOnly}" />
           <Button Classes="quiet icon" Command="{Binding Shelf.ResetFiltersCommand}" ToolTip.Tip="清除当前视图筛选" AutomationProperties.Name="重置筛选"><c:AppIcon Kind="Filter" /></Button>
           <Button Classes="quiet icon" Command="{Binding Shelf.SavePreferencesCommand}" IsVisible="{Binding Shelf.IsHome}" ToolTip.Tip="记住书架偏好，仅保存于本机" AutomationProperties.Name="记住书架偏好"><c:AppIcon Kind="Save" /></Button>
@@ -105,6 +107,8 @@
             <Button Command="{Binding EditBookPlayCommand}" CommandParameter="{Binding SelectedBook}"><StackPanel Classes="inline"><c:AppIcon Kind="Clock" /><TextBlock Text="选择／新建游玩记录" /></StackPanel></Button>
             </StackPanel>
             <StackPanel Classes="form" IsVisible="{Binding IsPrimaryDetail}">
+            <Expander Header="个人收藏、集合与标签" HorizontalContentAlignment="Stretch"><views:PersonalOrganizationView DataContext="{Binding PersonalOrganization}" /></Expander>
+            <Expander Header="本机资源档案" HorizontalContentAlignment="Stretch"><views:ResourceArchiveView DataContext="{Binding ResourceArchive}" /></Expander>
             <TextBlock Text="仅本机 · 安装与启动" Classes="strong" />
             <TextBlock Text="{Binding BookDetails.LocalStatus}" Classes="caption wrap" AutomationProperties.Name="本机启动就绪说明" />
             <ItemsControl ItemsSource="{Binding BookDetails.LocalFields}" ItemTemplate="{StaticResource DetailFieldTemplate}" />

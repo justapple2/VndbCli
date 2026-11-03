@@ -230,3 +230,12 @@ vndb observe status --identity-dir "D:\SyntheticClient" --json
 ```
 
 示例目录必须替换为实际存在、明确管理的本机NTFS目录。kind 为 games／packages；深度1–3，32个管理根上限，不能嵌套、选择盘根或包含客户端数据根。root-add 捕获目录／卷身份，保留桌面的启用开关状态，不在CLI创建后台宿主。check 只保存实际变化；输出含本机候选和观测信息，只能存放在库外私有位置，不能拿来导入Web。没有变动不会重复推进安装修订；Unknown不当作卸载，现有 presence 命令继续负责同步。
+
+
+## 个人分类与本机资源档案
+
+`personal status`读取当前服务作用域的分类快照／离线稿，`personal pull`读取Web，`personal queue --change-json change.json`登记明确变更而不联网，`personal sync`按原操作同步。使用既有`--server`／`--cache-dir`选择与桌面相同作用域；`VN_LIBRARY_KEY`提供Web管理密钥。明确冲突后可用`personal pull --resolve-conflict`保留旧稿并读取Web，结果不明不能放弃原操作。
+
+`change.json`内容为`{"expected_revision":0,"label":{"id":"my-list","name":"想玩","kind":"collection"}}`；状态ID可由`personal status --json`核对。成员修改示例：`{"expected_revision":1,"items":[{"item_id":"item-example","favorite":true,"label_ids":["my-list"]}]}`。只对准确个人条目分类，不使用物理路径或VN ID。
+
+`resources list --identity-dir <本机数据根> [--item <个人条目ID>]`读取本机档案；`resources save --record-json resource.json`保存明确资源，修改时加`--id`与`--expected-revision`。输入包含`item_id`、`kind`、`root_path`、根内`relative_path`，其他版本／来源／核对字段可选；目标条目须已有本机登记。`resources check --id <档案ID>`仅检查元数据，`resources hash --id <档案ID> --expected-revision <修订>`明确计算所选文件SHA256（Ctrl+C可取消）。这些命令不上传位置、不解压、不执行或删除文件；JSON输出含本机资料，应存放库外且不得写回游戏源目录。

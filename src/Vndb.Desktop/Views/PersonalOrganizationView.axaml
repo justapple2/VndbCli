@@ -1,0 +1,25 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:Vndb.Desktop.ViewModels" xmlns:core="clr-namespace:Vndb.Core;assembly=Vndb.Core"
+             x:Class="Vndb.Desktop.Views.PersonalOrganizationView" x:DataType="vm:PersonalOrganizationViewModel">
+  <StackPanel Classes="form" IsEnabled="{Binding !Busy}">
+    <TextBlock Text="{Binding SelectedTitle}" Classes="strong wrap" />
+    <TextBlock Text="{Binding Message}" Classes="caption wrap" AutomationProperties.Name="个人分类同步状态" />
+    <WrapPanel Classes="filters"><Button Content="读取Web分类" Command="{Binding ReloadCommand}" /><Button Content="同步离线修改" Command="{Binding SyncCommand}" /></WrapPanel>
+    <Button Content="保留冲突原稿并读取Web" Command="{Binding ResolveConflictCommand}" IsVisible="{Binding Conflict}" />
+    <StackPanel Classes="compact" IsEnabled="{Binding CanEditMember}">
+      <CheckBox Content="★ 个人收藏" IsChecked="{Binding Favorite}" />
+      <ItemsControl ItemsSource="{Binding MemberLabels}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:PersonalLabelToggle"><CheckBox Content="{Binding Label, Converter={StaticResource LocalChoiceLabel}}" IsChecked="{Binding Selected}" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+      <Button Content="保存此作品的收藏与分类" Command="{Binding SaveMemberCommand}" />
+    </StackPanel>
+    <Expander Header="管理虚拟集合与标签" HorizontalContentAlignment="Stretch"><StackPanel Classes="form">
+      <TextBlock Text="集合与标签都只改变逻辑成员关系，可同时归入多个分类。" Classes="caption wrap" />
+      <ComboBox ItemsSource="{Binding Labels}" SelectedItem="{Binding SelectedLabel}" AutomationProperties.Name="选择个人分类"><ComboBox.ItemTemplate><DataTemplate x:DataType="core:PersonalLabel"><TextBlock Text="{Binding ., Converter={StaticResource LocalChoiceLabel}}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+      <TextBox Text="{Binding Name}" MaxLength="80" PlaceholderText="集合或标签名称" AutomationProperties.Name="个人分类名称" />
+      <ComboBox ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" ItemTemplate="{StaticResource PersonalOptionTemplate}" AutomationProperties.Name="分类类型" />
+      <WrapPanel Classes="filters"><Button Content="新建" Command="{Binding CreateLabelCommand}" /><Button Content="改名" Command="{Binding RenameLabelCommand}" /><Button Content="移除分类" Command="{Binding RemoveLabelCommand}" /></WrapPanel>
+      <TextBlock Text="移除分类仅解除成员关系，不删除作品、记录或文件。" Classes="caption wrap" />
+      <Button Content="预览：将当前页归入所选分类" Command="{Binding PreviewPageCommand}" />
+      <TextBlock Text="{Binding BatchPreview}" Classes="caption wrap" />
+      <Button Content="应用本页归类预览" Command="{Binding ApplyPageCommand}" />
+    </StackPanel></Expander>
+  </StackPanel>
+</UserControl>

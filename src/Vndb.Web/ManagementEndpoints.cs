@@ -11,9 +11,15 @@ public static class ManagementEndpoints
     {
         var group = app.MapGroup("/api/v1").WithTags("Personal library and metadata imports");
         group.MapGet("/items", ListItems);
-        group.MapGet("/shelf", (SqliteLibraryStore store, string? q, bool? deleted, bool? unmatched, int? page, int? page_size, string? progress, string? status, bool? is_local) =>
-            store.ReadShelfSummary(q, deleted ?? false, unmatched ?? false, page ?? 1, page_size ?? 100, progress, status, is_local));
+        group.MapGet("/shelf", (SqliteLibraryStore store, string? q, bool? deleted, bool? unmatched, int? page, int? page_size, string? progress, string? status, bool? is_local, bool? favorite, string? label) =>
+            store.ReadShelfSummary(q, deleted ?? false, unmatched ?? false, page ?? 1, page_size ?? 100, progress, status, is_local, favorite, label));
         group.MapGet("/item-heads", (SqliteLibraryStore store, int? page, int? page_size, bool? deleted) => store.ReadItemHeads(page ?? 1, page_size ?? 100, deleted ?? false));
+        group.MapGet("/personal-organization", (SqliteLibraryStore store) => store.ReadPersonalOrganization());
+        group.MapPost("/personal-organization", (PersonalOrganizationWrite edit, SqliteLibraryStore store, HttpContext ctx) =>
+        {
+            if (edit.ServiceInstanceId != instanceId) throw new PlayConflictException("服务实例不一致，分类原稿保留。");
+            return store.SavePersonalOrganization(edit.Change, Key(ctx));
+        });
         group.MapGet("/collection/stats", (SqliteLibraryStore store) => store.CollectionStatistics());
         group.MapGet("/items/{id}", (string id, SqliteLibraryStore store) => store.ReadItem(id) is { } item ? Results.Ok(item) : Results.NotFound());
         group.MapPost("/items", (ItemWrite edit, SqliteLibraryStore store, HttpContext ctx) => store.SaveItem(edit, null, Key(ctx)));
@@ -43,6 +49,6 @@ public static class ManagementEndpoints
         group.MapGet("/metadata/{id}/provenance", (string id, SqliteLibraryStore store) => store.Provenance(id) is { } source ? Results.Ok(source) : Results.NotFound());
         group.MapGet("/schemas/metadata-batch-v1.json", (IWebHostEnvironment environment) => Results.File(Path.Combine(environment.WebRootPath, "schemas", "metadata-batch-v1.json"), "application/schema+json"));
     }
-    private static ItemPage ListItems(SqliteLibraryStore store, string? q, bool? deleted, bool? unmatched, int? page, int? page_size, string? progress, string? status, bool? is_local)
-        => store.ReadItems(q, deleted ?? false, unmatched ?? false, page ?? 1, page_size ?? 24, progress, status, is_local);
+    private static ItemPage ListItems(SqliteLibraryStore store, string? q, bool? deleted, bool? unmatched, int? page, int? page_size, string? progress, string? status, bool? is_local, bool? favorite, string? label)
+        => store.ReadItems(q, deleted ?? false, unmatched ?? false, page ?? 1, page_size ?? 24, progress, status, is_local, favorite, label);
 }

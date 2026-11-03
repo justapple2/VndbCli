@@ -51,7 +51,7 @@ public static class AcceptanceWorkflow
         void Check(bool condition, string message) { if (!condition) throw new InvalidDataException(message); checks.Add(message); }
         var web = new WebLibraryClient(http, server, key, TimeSpan.FromSeconds(30));
         var info = await web.OrganizationInfoAsync(ct);
-        Check(info.SchemaVersion == 13 && info.Capabilities.Contains("activity_import") && info.Capabilities.Contains("boolean_presence"), "Web v1/schema13 path-free capabilities");
+        Check(info.SchemaVersion == 14 && info.Capabilities.Contains("activity_import") && info.Capabilities.Contains("boolean_presence"), "Web v1/schema14 path-free capabilities");
         var beforePlays = (await web.PlaysAsync(ct: ct)).Select(p => p.Id).Order().ToArray();
         var beforeItems = await ItemIdsAsync(web, ct);
         var localLibrary = new LocalLibraryStore(Path.Combine(run, "client"));

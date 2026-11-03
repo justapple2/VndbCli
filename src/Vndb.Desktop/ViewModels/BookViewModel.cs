@@ -99,6 +99,16 @@ public sealed partial class BookViewModel(LibraryItemView? item, MetadataSnapsho
         _progress = null;
         foreach (var name in new[] { nameof(Plays), nameof(PlaysPending), nameof(HasPlayed), nameof(IsUnplayed), nameof(IsUnrecorded), nameof(Progress), nameof(NeedsPlayReview), nameof(ShelfState), nameof(PlaySummary), nameof(PlayAssociationNotice) }) OnPropertyChanged(name);
     }
+    public bool IsFavorite { get; private set; }
+    public IReadOnlyList<string> PersonalLabelIds { get; private set; } = [];
+    public string PersonalLabels { get; private set; } = "";
+    public bool HasPersonalLabels => PersonalLabels.Length > 0;
+    public void SetPersonalOrganization(PersonalMembership? member, IReadOnlyList<PersonalLabel> labels)
+    {
+        IsFavorite = member?.Favorite == true; PersonalLabelIds = member?.LabelIds ?? [];
+        PersonalLabels = string.Join(" · ", (IsFavorite ? new[] { "★ 收藏" } : []).Concat(labels.Where(l => PersonalLabelIds.Contains(l.Id)).Select(l => l.Name)));
+        OnPropertyChanged(nameof(IsFavorite)); OnPropertyChanged(nameof(PersonalLabelIds)); OnPropertyChanged(nameof(PersonalLabels)); OnPropertyChanged(nameof(HasPersonalLabels));
+    }
     public string Id => Item?.Item.Id ?? Metadata?.VndbId ?? "";
     public string Title => _presentation.Title;
     public string Company => Metadata?.Developers.Count > 0

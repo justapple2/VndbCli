@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:Vndb.Desktop.ViewModels" xmlns:local="clr-namespace:Vndb.Local;assembly=Vndb.Local"
+             x:Class="Vndb.Desktop.Views.ResourceArchiveView" x:DataType="vm:ResourceArchiveViewModel">
+  <StackPanel Classes="form">
+    <TextBlock Text="{Binding SelectedTitle}" Classes="strong wrap" />
+    <TextBlock Text="{Binding Message}" Classes="caption wrap" AutomationProperties.Name="本机资源档案状态" />
+    <WrapPanel Classes="filters"><Button Content="读取此作品资源" Command="{Binding LoadCommand}" /><Button Content="新建资源档案" Command="{Binding NewCommand}" IsEnabled="{Binding !Busy}" /></WrapPanel>
+    <StackPanel Classes="form" IsEnabled="{Binding !Busy}">
+    <ComboBox ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" AutomationProperties.Name="已登记本机资源"><ComboBox.ItemTemplate><DataTemplate x:DataType="local:LocalResource"><StackPanel Classes="compact"><TextBlock Text="{Binding Details.RelativePath}" /><TextBlock Text="{Binding Details.Kind, Converter={StaticResource LocalChoiceLabel}, ConverterParameter=personal}" Classes="caption" /></StackPanel></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+    <TextBlock Text="支持安装包、补丁、存档、特典和说明；不会自动安装或应用。" Classes="caption wrap" />
+    <ComboBox ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" ItemTemplate="{StaticResource PersonalOptionTemplate}" AutomationProperties.Name="资源类型" />
+    <TextBox Text="{Binding RootPath}" PlaceholderText="本机检索根（绝对目录，仅本机保存）" AutomationProperties.Name="资源检索根" />
+    <Button Content="选择资源检索根" Command="{Binding ChooseRootCommand}" />
+    <TextBox Text="{Binding RelativePath}" PlaceholderText="根内相对路径，子目录使用 /" AutomationProperties.Name="资源相对位置" />
+    <TextBox Text="{Binding Language}" PlaceholderText="已确认的语言，未知留空" AutomationProperties.Name="资源语言" />
+    <TextBox Text="{Binding Version}" PlaceholderText="版本说明（不从文件名推断适用性）" AutomationProperties.Name="资源版本说明" />
+    <TextBox Text="{Binding ReleaseId}" PlaceholderText="适用发行ID，例如 r17；未知留空" AutomationProperties.Name="资源适用发行" />
+    <TextBox Text="{Binding SourceUrl}" PlaceholderText="来源 HTTP(S) 链接，可空" AutomationProperties.Name="资源来源" />
+    <TextBlock Text="人工核对适用版本；文件存在不证明适用或已应用。" Classes="caption wrap" />
+    <ComboBox ItemsSource="{Binding Verifications}" SelectedItem="{Binding Verification}" ItemTemplate="{StaticResource PersonalOptionTemplate}" AutomationProperties.Name="人工版本核对" />
+    <CheckBox Content="我已手工应用此资源（不触发执行）" IsChecked="{Binding ManuallyApplied}" />
+    <TextBox Text="{Binding Notes}" AcceptsReturn="True" MaxLength="4000" PlaceholderText="仅本机资源备注" AutomationProperties.Name="本机资源备注" />
+    <Expander Header="可选：准确安装／安装包关联" HorizontalContentAlignment="Stretch"><StackPanel Classes="compact"><TextBox Text="{Binding InstallationId}" PlaceholderText="本机安装ID，可空" AutomationProperties.Name="资源关联安装" /><TextBox Text="{Binding PackageId}" PlaceholderText="已有安装包ID，可空" AutomationProperties.Name="资源关联安装包" /></StackPanel></Expander>
+    <Button Content="保存本机资源档案" Command="{Binding SaveCommand}" />
+    <Button Content="检查所选资源" Command="{Binding CheckCommand}" />
+    </StackPanel>
+    <WrapPanel Classes="filters"><Button Content="按需计算所选文件 SHA256" Command="{Binding HashCommand}" /><Button Content="取消校验" Command="{Binding CancelHashCommand}" IsVisible="{Binding Busy}" /></WrapPanel>
+    <TextBlock Text="目录不递归校验；首分卷存在不证明整套完整。资源档案不参与可启动安装判断，也不单独改变Web已有标记。" Classes="caption wrap" />
+  </StackPanel>
+</UserControl>

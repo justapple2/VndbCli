@@ -15,6 +15,10 @@ public sealed class LocalClientSync(ISyncApi web, string origin, string stateDir
         return (await activities.SyncAsync(web, origin, ct)).All(r => r.Complete);
     }
     async Task<int> IClientSyncLanes.PersonalAsync(CancellationToken ct)
-    { await personal.SyncAsync(web, origin, ct); return (await personal.PendingAsync(origin, ct)).Count; }
+    {
+        await personal.SyncAsync(web, origin, ct);
+        var remaining = await new PersonalOrganizationStore(stateDirectory, origin).SyncAsync(web, ct);
+        return (await personal.PendingAsync(origin, ct)).Count + remaining;
+    }
     Task<int> IClientSyncLanes.PresenceAsync(CancellationToken ct) => deviceId is null ? Task.FromResult(0) : new PresenceSync(local).SubmitAsync(web, origin, deviceId, ct);
 }

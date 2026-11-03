@@ -31,21 +31,24 @@ public sealed partial class OwnedPackages(LocalLibraryStore library, ClientDevic
     [GeneratedRegex(@"^(\[[^\]]{1,80}\]|【[^】]{1,80}】)\s*", RegexOptions.CultureInvariant)]
     private static partial Regex PrefixTag();
     private static StringComparison Paths => OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-    public static string Root(string path)
+    public static string Root(string path) => Root(path, true);
+    private static string Root(string path, bool checkLinks)
     {
         if (!Path.IsPathFullyQualified(path) || path.Any(char.IsControl)) throw new ArgumentException("请明确选择检索根的绝对目录。");
         var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
-        LocalFileLease.RequireOrdinaryAncestors(root);
+        if (checkLinks) LocalFileLease.RequireOrdinaryAncestors(root);
         return root;
     }
-    public static string FilePath(string root, string relative)
+    public static string FilePath(string root, string relative) => FilePath(root, relative, true);
+    // JSON validation does not probe every saved location; actual file operations always use the checked public entry.
+    internal static string FilePath(string root, string relative, bool checkLinks)
     {
-        root = Root(root);
+        root = Root(root, checkLinks);
         if (string.IsNullOrWhiteSpace(relative) || relative.Length > 1024 || relative.Any(char.IsControl) || relative.Contains(':') || relative.Contains('\\') ||
             relative.Split('/').Any(p => p is "" or "." or ".." || p.EndsWith('.') || p.EndsWith(' '))) throw new ArgumentException("安装包必须使用检索根内无上级跳转的相对路径。");
         var path = Path.GetFullPath(Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar)));
         if (!path.StartsWith(Path.EndsInDirectorySeparator(root) ? root : root + Path.DirectorySeparatorChar, Paths)) throw new ArgumentException("安装包必须位于检索根内。");
-        LocalFileLease.RequireOrdinaryAncestors(path);
+        if (checkLinks) LocalFileLease.RequireOrdinaryAncestors(path);
         return path;
     }
     internal static (string Title, string Kind)? Identify(string name)

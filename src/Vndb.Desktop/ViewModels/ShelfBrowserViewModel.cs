@@ -10,7 +10,7 @@ public sealed partial class ShelfBrowserViewModel(Func<ShelfPreferences, Task>? 
 {
     private sealed record State(string Filter = "", string Company = "全部会社", string Status = "全部状态",
         string Sort = "添加时间", bool Descending = true, bool LocalOnly = false, bool List = false,
-        int Page = 1, string? SelectedId = null, bool FiltersExpanded = true, string Resource = "全部本机资源");
+        int Page = 1, string? SelectedId = null, bool FiltersExpanded = true, string Resource = "全部本机资源", bool Favorites = false, string Label = "");
     private readonly Dictionary<int, State> _states = [];
     private IReadOnlyList<BookViewModel> _library = [], _query = [];
     private BookViewModel[] _filtered = [];
@@ -33,6 +33,22 @@ public sealed partial class ShelfBrowserViewModel(Func<ShelfPreferences, Task>? 
     public IReadOnlyList<string> ShelfStates { get; } = ["全部状态", "未记录", "未游玩", "曾玩过", "游玩中", "已游玩", "本次完成", "搁置", "放弃", "关联待核对"];
     public IReadOnlyList<string> ResourceFilters { get; } = ["全部本机资源", "本机已安装", "仅有安装包", "缺失／待核对", "可复核启动"];
     public IReadOnlyList<string> QuickViews { get; } = ["全部作品", "本机已安装", "仅有安装包", "缺失／待核对", "本机已有且未玩", "游玩中", "未记录", "自定义组合"];
+    [ObservableProperty] private bool _favoritesOnly;
+    [ObservableProperty] private string _labelFilter = "";
+    public IReadOnlyList<Vndb.Core.PersonalLabel> LabelFilters { get; private set; } = [new("", "全部集合／标签", "")];
+    public Vndb.Core.PersonalLabel? SelectedLabelFilter
+    {
+        get => LabelFilters.FirstOrDefault(l => l.Id == LabelFilter);
+        set { LabelFilter = value?.Id ?? ""; OnPropertyChanged(); }
+    }
+    public void SetPersonalLabels(IReadOnlyList<Vndb.Core.PersonalLabel> labels)
+    {
+        LabelFilters = new[] { new Vndb.Core.PersonalLabel("", "全部集合／标签", "") }.Concat(labels).ToArray();
+        if (!LabelFilters.Any(l => l.Id == LabelFilter)) LabelFilters = LabelFilters.Append(new(LabelFilter, "已移除的分类", "")).ToArray();
+        OnPropertyChanged(nameof(LabelFilters)); OnPropertyChanged(nameof(SelectedLabelFilter));
+    }
+    partial void OnFavoritesOnlyChanged(bool value) => FilterChanged();
+    partial void OnLabelFilterChanged(string value) { OnPropertyChanged(nameof(SelectedLabelFilter)); FilterChanged(); }
     [ObservableProperty] private string _resourceFilter = "全部本机资源";
     public string QuickView
     {
@@ -87,22 +103,23 @@ public sealed partial class ShelfBrowserViewModel(Func<ShelfPreferences, Task>? 
     public string FilterHeading => IsQuery ? "筛选本次结果（不重新联网）" : "搜索与筛选";
     public string FilterSummary => string.Join(" · ", new[] { !string.IsNullOrEmpty(Filter) ? "搜索：" + Filter : null,
         CompanyFilter != "全部会社" ? CompanyFilter : null, ShelfState != "全部状态" ? ShelfState : null, LocalOnly ? "本机有副本" : null,
-        ResourceFilter != "全部本机资源" ? ResourceFilter : null }.Where(v => v is not null));
+        ResourceFilter != "全部本机资源" ? ResourceFilter : null, FavoritesOnly ? "仅收藏" : null, LabelFilter.Length > 0 ? SelectedLabelFilter?.Name ?? "分类" : null }.Where(v => v is not null));
     public bool HasFilters => FilterSummary.Length > 0;
     public IReadOnlyList<ShelfFilterChip> Conditions => new[]
     {
         new ShelfFilterChip("text", string.IsNullOrWhiteSpace(Filter) ? "" : "搜索：" + Filter),
         new("company", CompanyFilter == "全部会社" ? "" : CompanyFilter), new("progress", ShelfState == "全部状态" ? "" : ShelfState),
+        new("favorite", FavoritesOnly ? "仅收藏" : ""), new("label", LabelFilter.Length > 0 ? SelectedLabelFilter?.Name ?? "分类" : ""),
         new("resource", ResourceFilter == "全部本机资源" ? "" : ResourceFilter), new("owned", LocalOnly ? "本机有副本" : "")
     }.Where(c => c.Label.Length > 0).ToArray();
     [RelayCommand] private void RemoveFilter(string key)
     {
-        switch (key) { case "text": Filter = ""; break; case "company": CompanyFilter = "全部会社"; break;
+        switch (key) { case "favorite": FavoritesOnly = false; break; case "label": LabelFilter = ""; break; case "text": Filter = ""; break; case "company": CompanyFilter = "全部会社"; break;
             case "progress": ShelfState = "全部状态"; break; case "resource": ResourceFilter = "全部本机资源"; break; case "owned": LocalOnly = false; break; }
     }
 
     private State Capture() => new(Filter, CompanyFilter, ShelfState, ShelfSort, SortDescending, LocalOnly,
-        ListMode, Page, SelectedBook?.Id, FiltersExpanded, ResourceFilter);
+        ListMode, Page, SelectedBook?.Id, FiltersExpanded, ResourceFilter, FavoritesOnly, LabelFilter);
     public void Activate(int section)
     {
         if (section is < 0 or > 2) return;
@@ -122,7 +139,7 @@ public sealed partial class ShelfBrowserViewModel(Func<ShelfPreferences, Task>? 
             Filter = state.Filter; CompanyFilter = state.Company; ShelfState = state.Status;
             ShelfSort = state.Sort; SortDescending = state.Descending; LocalOnly = state.LocalOnly;
             ListMode = state.List; Page = state.Page; ResourceFilter = state.Resource;
-            FiltersExpanded = state.FiltersExpanded; DetailsOpen = false;
+            FiltersExpanded = state.FiltersExpanded; DetailsOpen = false; FavoritesOnly = state.Favorites; LabelFilter = state.Label;
         }
         finally { _changing = false; }
         Refresh(state.SelectedId);
@@ -132,7 +149,7 @@ public sealed partial class ShelfBrowserViewModel(Func<ShelfPreferences, Task>? 
         var status = value.State == "已通关" ? "本次完成" : value.State;
         var state = new State(Company: value.Company, Status: ShelfStates.Contains(status) ? status : "全部状态",
             Sort: ShelfSorts.Contains(value.Sort) ? value.Sort : "添加时间", Descending: value.Descending,
-            LocalOnly: value.LocalOnly, List: value.ListMode, Resource: ResourceFilters.Contains(value.Resource) ? value.Resource : "全部本机资源");
+            LocalOnly: value.LocalOnly, List: value.ListMode, Resource: ResourceFilters.Contains(value.Resource) ? value.Resource : "全部本机资源", Favorites: value.FavoritesOnly, Label: Vndb.Core.PersonalOrganizationRules.ValidId(value.LabelId) ? value.LabelId : "");
         _states[0] = state; if (_scope == 0) Restore(state);
     }
     public void SetLibrary(IReadOnlyList<BookViewModel> values, string? source = null)
@@ -142,7 +159,7 @@ public sealed partial class ShelfBrowserViewModel(Func<ShelfPreferences, Task>? 
         _query = values; _querySource = source;
         // A new search must not inherit narrow filters from the preceding result set.
         var previous = IsQuery ? Capture() : _states.GetValueOrDefault(2) ?? new(Sort: "原始结果顺序", FiltersExpanded: false);
-        var next = previous with { Filter = "", Company = "全部会社", Status = "全部状态", LocalOnly = false, Resource = "全部本机资源", Page = 1, SelectedId = null };
+        var next = previous with { Filter = "", Company = "全部会社", Status = "全部状态", LocalOnly = false, Resource = "全部本机资源", Favorites = false, Label = "", Page = 1, SelectedId = null };
         _states[2] = next; if (IsQuery) Restore(next);
     }
     public void Clear()
@@ -167,6 +184,7 @@ public sealed partial class ShelfBrowserViewModel(Func<ShelfPreferences, Task>? 
             if (!CompanyFilters.Contains(company)) CompanyFilters.Add(company);
             CompanyFilter = CompanyFilters.Contains(company) ? company : "全部会社";
             _filtered = Sort(source.Where(b => (_scope != 1 || b.HasPlayed) && (!LocalOnly || b.IsLocal))
+                .Where(b => (!FavoritesOnly || b.IsFavorite) && (LabelFilter.Length == 0 || b.PersonalLabelIds.Contains(LabelFilter)))
                 .Where(b => CompanyFilter == "全部会社" || b.Companies.Contains(CompanyFilter, StringComparer.OrdinalIgnoreCase))
                 .Where(b => ResourceFilter switch { "本机已安装" => b.HasInstallation, "仅有安装包" => !b.HasInstallation && b.PackagePaths.Count > 0,
                     "缺失／待核对" => b.HasLocalProblem, "可复核启动" => b.CanQuickLaunch, _ => true })
@@ -252,13 +270,13 @@ public sealed partial class ShelfBrowserViewModel(Func<ShelfPreferences, Task>? 
     [RelayCommand] private void ResetFilters()
     {
         _changing = true;
-        try { Filter = ""; CompanyFilter = "全部会社"; ShelfState = "全部状态"; LocalOnly = false; ResourceFilter = "全部本机资源"; Page = 1; }
+        try { Filter = ""; CompanyFilter = "全部会社"; ShelfState = "全部状态"; LocalOnly = false; ResourceFilter = "全部本机资源"; FavoritesOnly = false; LabelFilter = ""; Page = 1; }
         finally { _changing = false; }
         Refresh(null);
     }
     private bool CanSavePreferences() => IsHome && savePreferences is not null;
     [RelayCommand(CanExecute = nameof(CanSavePreferences))]
-    private Task SavePreferencesAsync() => savePreferences!(new(ShelfSort, SortDescending, CompanyFilter, ShelfState, LocalOnly, ListMode, ResourceFilter));
+    private Task SavePreferencesAsync() => savePreferences!(new(ShelfSort, SortDescending, CompanyFilter, ShelfState, LocalOnly, ListMode, ResourceFilter, FavoritesOnly, LabelFilter));
 }
 
 public sealed record BookRow(IReadOnlyList<BookViewModel> Books, int Columns);

@@ -59,7 +59,7 @@ public static class Program
             var shelf = window.GetVisualDescendants().OfType<ShelfView>().First(s => s.IsEffectivelyVisible);
             var menu = shelf.CreateBookMenu((BookViewModel)card.DataContext!); menu.Open(card); await Render(window);
             var actions = menu.Items.OfType<MenuItem>().ToArray();
-            Check(actions.Length == 9 && ReferenceEquals(actions[0].Command, vm.DirectBookCommand) && ReferenceEquals(actions[1].Command, vm.LocaleBookCommand) && ReferenceEquals(actions[2].Command, vm.EditBookPlayCommand), "book context actions use explicit book parameters and a launch reason");
+            Check(actions.Length == 11 && ReferenceEquals(actions[0].Command, vm.DirectBookCommand) && ReferenceEquals(actions[1].Command, vm.LocaleBookCommand) && ReferenceEquals(actions[2].Command, vm.EditBookPlayCommand) && ReferenceEquals(actions[7].Command, vm.PersonalOrganization.ToggleFavoriteCommand), "book context actions use explicit book parameters and a launch reason");
             var archiveBook = (BookViewModel)card.DataContext!;
             var archiveOnly = new BookViewModel(archiveBook.Item, archiveBook.Metadata); archiveOnly.SetOwnership(false, ["Synthetic/game.zip"]);
             var archiveActions = shelf.CreateBookMenu(archiveOnly).Items.OfType<MenuItem>().ToArray();
@@ -444,6 +444,29 @@ public static class Program
             var chromeFocus = window.FindControl<Button>("ThemeButton")!;
             chromeFocus.Focus(NavigationMethod.Tab); await Render(window);
             Check(chromeFocus.IsFocused && chromeFocus.BorderThickness.Left == 2, "custom chrome keyboard focus has an explicit visible border");
+            var personalStore = new PersonalOrganizationStore(Path.Combine(output, "personal-fixture"), "http://synthetic.test/");
+            var personalVm = new PersonalOrganizationViewModel(() => personalStore, () => null, () => [summaryBook], state =>
+                summaryBook.SetPersonalOrganization(state.Items.SingleOrDefault(i => i.ItemId == summaryBook.Id), state.Labels), () => { });
+            await personalVm.LoadAsync(false, timeout.Token); personalVm.Select(summaryBook);
+            personalVm.Name = "合成想玩清单"; await personalVm.CreateLabelCommand.ExecuteAsync(null);
+            personalVm.Favorite = true; personalVm.MemberLabels[0].Selected = true; await personalVm.SaveMemberCommand.ExecuteAsync(null);
+            Check(summaryBook.IsFavorite && summaryBook.PersonalLabels.Contains("合成想玩清单"), "K4 offline favorite and membership update the exact synthetic item");
+            var personalView = new PersonalOrganizationView { DataContext = personalVm };
+            var personalWindow = new Window { Width = 640, Height = 800, Content = new ScrollViewer { Content = personalView } };
+            personalWindow.Show(); await Render(personalWindow);
+            Check(personalView.GetVisualDescendants().OfType<CheckBox>().Any(c => c.Content?.ToString() == "★ 个人收藏" && c.IsChecked == true), "K4 favorite compiled binding renders offline state");
+            Check(personalView.GetVisualDescendants().OfType<Button>().Any(b => ReferenceEquals(b.Command, personalVm.SaveMemberCommand)), "K4 membership save command is bound");
+            Save(personalWindow, output, "k4-personal-organization.png"); personalWindow.Close();
+            var resourceVm = new ResourceArchiveViewModel(() => new(new(output), "synthetic-device"), () => Task.FromResult<string?>(null));
+            resourceVm.Select(summaryBook); resourceVm.RootPath = @"E:\Synthetic\Resources"; resourceVm.RelativePath = "bonus/readme.txt";
+            resourceVm.Version = "未核对的合成资源";
+            var resourceView = new ResourceArchiveView { DataContext = resourceVm };
+            var resourceWindow = new Window { Width = 640, Height = 800, Content = new ScrollViewer { Content = resourceView } };
+            resourceWindow.Show(); await Render(resourceWindow);
+            Check(resourceView.GetVisualDescendants().OfType<TextBox>().Any(t => t.Text == "bonus/readme.txt"), "K5 local relative location compiled binding renders");
+            Check(resourceView.GetVisualDescendants().OfType<Button>().Any(b => ReferenceEquals(b.Command, resourceVm.HashCommand)), "K5 hashing is an explicit command only");
+            Check(!resourceVm.ManuallyApplied && resourceVm.Verification == "unreviewed", "K5 resources never infer patch applicability or application");
+            Save(resourceWindow, output, "k5-local-resource-archive.png"); resourceWindow.Close();
             await File.WriteAllTextAsync(Path.Combine(output, "ui-warnings.json"), JsonSerializer.Serialize(logs.Messages));
             Console.WriteLine("Screens rendered; checking bindings.");
             var bindingsValid = !logs.Messages.Any(m => m.Contains("Binding") || m.Contains("Error"));

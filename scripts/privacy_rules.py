@@ -22,6 +22,8 @@ BLOCKED_NAMES.update({'observation-settings.json', 'local-observations.json'})
 BLOCKED_PARTS.add('local-resource-intents')
 BLOCKED_NAMES.add('query-scope.json')
 BLOCKED_NAMES.add('ui-preferences.json')
+BLOCKED_NAMES.update({'personal-organization.json', 'local-resources.json'})
+BLOCKED_PARTS.update({'personal-organization-receipts', 'personal-organization-conflicts'})
 BLOCKED_SUFFIXES = {'.db', '.sqlite', '.sqlite3', '.xls', '.xlsx', '.binlog', '.trx', '.pem', '.key', '.pfx', '.p12', '.pyc', '.zip', '.7z', '.gz', '.tar', '.reg'}
 PATTERNS = {
     'private-key': re.compile(rb'-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----'),

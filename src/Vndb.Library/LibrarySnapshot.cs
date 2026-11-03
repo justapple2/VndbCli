@@ -202,7 +202,7 @@ public static class LibrarySnapshot
         using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version";
         var schema = Convert.ToInt32(command.ExecuteScalar());
-        if ((schema < 10 || schema > SqliteLibraryStore.SchemaVersion)) throw new InvalidDataException("恢复仅支持schema10–13，不能自动升级或降级。");
+        if ((schema < 10 || schema > SqliteLibraryStore.SchemaVersion)) throw new InvalidDataException("恢复仅支持schema10–14，不能自动升级或降级。");
         command.CommandText = "PRAGMA integrity_check";
         if (!Equals(command.ExecuteScalar(), "ok")) throw new InvalidDataException("数据库完整性检查失败。");
         command.CommandText = "PRAGMA foreign_key_check";

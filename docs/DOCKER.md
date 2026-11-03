@@ -1,6 +1,6 @@
 # Docker／NAS部署与运维
 
-适用版本：0.5.0，API v1，SQLite schema13。推荐在开发机交叉发布，NAS仅构建运行时镜像。Web、资料补全队列和SQLite在一个服务内运行，无需另部署数据库、消息队列或自动化服务。以下目录、域名及代际名均为示例。
+适用版本：0.5.0，API v1，SQLite schema14。推荐在开发机交叉发布，NAS仅构建运行时镜像。Web、资料补全队列和SQLite在一个服务内运行，无需另部署数据库、消息队列或自动化服务。以下目录、域名及代际名均为示例。
 
 ## 1. 部署内容与准备条件
 
@@ -150,7 +150,7 @@ docker compose exec -T --user "$OWNER" library dotnet /app/admin/vndb-admin.dll 
   --key-file /run/secrets/library_write_key --offline-maintenance --json
 ```
 
-restore验证文件集合、SHA、封面登记、schema10–13、SQLite integrity／外键和原实例。密钥不匹配、文件损坏或目标已存在均失败保留原件。演练不自动切换数据卷；真实恢复需停写，单独审核目标挂载／属主／匹配镜像及原密钥，再检查健康和数据。不能生成新service-instance-id来“修复”恢复。
+restore验证文件集合、SHA、封面登记、schema10–14、SQLite integrity／外键和原实例。密钥不匹配、文件损坏或目标已存在均失败保留原件。演练不自动切换数据卷；真实恢复需停写，单独审核目标挂载／属主／匹配镜像及原密钥，再检查健康和数据。不能生成新service-instance-id来“修复”恢复。
 
 Admin的`library backup`只备份DB，不能替代完整snapshot；Admin是受控维护入口，客户端日常走API。旧含位置的数据库会被Web拒绝启动，不能直接放回活动目录或用旧位置接口上线。
 
@@ -164,7 +164,7 @@ Admin的`library backup`只备份DB，不能替代完整snapshot；Admin是受�
 4. 只改Compose的image及build context，保留其余配置；执行`docker compose up -d --no-deps --no-build library`，有界等待Healthy。
 5. 比较info身份、schema、原始行、封面SHA、密钥及属主；核对新程序集／静态文件与封存清单，再用已有ID测API／CLI本地优先查询。区分合法任务推进和原数据丢失，不能只比较总数。
 
-启动／数据保护校验失败时，恢复保留的原Compose和旧镜像，重新检查Healthy。schema或数据已改变时镜像回退不等于数据回退，需完整快照受控恢复。本版schema13；迁移后的镜像回退必须配套旧库快照，不能覆盖活库。验收前保留旧镜像、配置、备份及失败证据，不执行`down -v`、镜像清理或自动删备份。
+启动／数据保护校验失败时，恢复保留的原Compose和旧镜像，重新检查Healthy。schema或数据已改变时镜像回退不等于数据回退，需完整快照受控恢复。本版schema14；迁移后的镜像回退必须配套旧库快照，不能覆盖活库。验收前保留旧镜像、配置、备份及失败证据，不执行`down -v`、镜像清理或自动删备份。
 
 ## 8. 排障与审计
 
@@ -183,7 +183,7 @@ Admin的`library backup`只备份DB，不能替代完整snapshot；Admin是受�
 
 ## 9. 版本兼容与离线恢复
 
-当前运行代码使用schema13。新工具可以读取清单与DB一致的schema10–13快照，恢复本身不升级数据库；旧镜像不能写入较新schema，回退必须配套对应旧快照并保护新增个人数据。旧含客户端位置的数据库不能直接放回活动服务。
+当前运行代码使用schema14。新工具可以读取清单与DB一致的schema10–14快照，恢复本身不升级数据库；旧镜像不能写入较新schema，回退必须配套对应旧快照并保护新增个人数据。旧含客户端位置的数据库不能直接放回活动服务。
 
 完整快照格式为`vn-library-snapshot-v2`，包含数据库、已登记封面、原实例、原镜像ID、可选密钥指纹以及公共目录／任务覆盖摘要。原密钥正文独立保管。新工具继续读取v1，旧工具不能读取v2，应将快照与匹配镜像一起保管。
 
@@ -208,3 +208,8 @@ docker run --rm --network none --user "$OWNER" --read-only \
 `NEW_IMAGE`及`OWNER`应与快照对应，恢复父目录事先允许该数字UID:GID写入；目标`restored`不得存在。验证后将Compose数据挂载指向新恢复目录，保留原实例并只读挂载原密钥，使用已加载镜像启动。首次只读检查可关闭`CatalogJobs__Enabled`，核对健康、info身份、公共目录与已知个人记录后再受控启用写入。
 
 将公共资料复制到另一机器建立独立库时，使用[离线部署与公共导入](OFFLINE-DISTRIBUTION.md)，不用个人快照和原服务身份进行初始化。
+
+
+### 个人分类存储迁移
+
+支持`personal_organization`的本版启动后将schema13增量升级为14，仅新增个人收藏／虚拟集合／标签表；既有作品、个人记录和存在标记保留，数据库仍为原数据卷中的`library.db`。先按本说明创建并验证快照，再切换镜像。旧镜像不能写入schema14，镜像回退必须搭配原备份。新同步功能要求Web与客户端均支持该可选能力；旧客户端的书架／个人条目CRUD仍可使用。客户端本机资源档案不进入Docker数据卷。

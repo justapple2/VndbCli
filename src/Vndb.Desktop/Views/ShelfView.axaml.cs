@@ -50,6 +50,8 @@ public partial class ShelfView : UserControl
             new MenuItem { Header = "检查／修复注册路径…", Command = vm.RegistryBookCommand, CommandParameter = book, IsEnabled = book.Item is not null && book.HasInstallation },
             new MenuItem { Header = "登记安装包…", Command = vm.RegisterPackageBookCommand, CommandParameter = book },
             new Separator(),
+            new MenuItem { Header = book.IsFavorite ? "取消个人收藏" : "加入个人收藏", Command = vm.PersonalOrganization.ToggleFavoriteCommand, CommandParameter = book, IsEnabled = book.Item is not null },
+            new MenuItem { Header = "集合、标签与资源档案…", Command = vm.Shelf.ShowDetailsCommand, CommandParameter = book, IsEnabled = book.Item is not null },
             new MenuItem { Header = "查看详情", Command = vm.Shelf.ShowDetailsCommand, CommandParameter = book },
             new MenuItem { Header = book.LaunchLabel, CommandParameter = book, IsEnabled = false }
         } };

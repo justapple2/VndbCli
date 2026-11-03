@@ -192,7 +192,7 @@ public sealed class M3Tests
         http.DefaultRequestHeaders.Add("X-Library-Request", "1"); http.DefaultRequestHeaders.Add("X-Library-Key", "m3-test-key"); http.DefaultRequestHeaders.Add("Idempotency-Key", "register");
         using var created = await http.PostAsJsonAsync("/api/v1/devices", write, VndbJson.Options, Ct); Assert.Equal(HttpStatusCode.OK, created.StatusCode);
         var repeated = await http.PostAsJsonAsync("/api/v1/devices", write, VndbJson.Options, Ct); Assert.Equal(await created.Content.ReadAsStringAsync(Ct), await repeated.Content.ReadAsStringAsync(Ct));
-        var info = await http.GetFromJsonAsync<ServiceInfo>("/api/v1/info", VndbJson.Options, Ct); Assert.Contains("boolean_presence", info!.Capabilities); Assert.Equal(13, info.SchemaVersion);
+        var info = await http.GetFromJsonAsync<ServiceInfo>("/api/v1/info", VndbJson.Options, Ct); Assert.Contains("boolean_presence", info!.Capabilities); Assert.Equal(14, info.SchemaVersion);
         Assert.Equal(HttpStatusCode.Gone, (await http.GetAsync("/api/v1/installations", Ct)).StatusCode);
         foreach (var path in new[] { "/installations.html", "/installations.js", "/local-presence.js" })
         { using var response = await http.GetAsync(path, Ct); Assert.Equal(HttpStatusCode.OK, response.StatusCode); }

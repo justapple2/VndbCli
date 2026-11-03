@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:contracts="using:Vndb.Contracts" xmlns:local="using:Vndb.Local" xmlns:vm="using:Vndb.Desktop.ViewModels" xmlns:c="using:Vndb.Desktop.Controls" xmlns:conv="using:Vndb.Desktop.Converters" xmlns:sys="using:System">
   <conv:LocalChoiceConverter x:Key="LocalChoiceLabel" />
+  <DataTemplate x:Key="PersonalOptionTemplate" x:DataType="sys:String"><TextBlock Text="{Binding ., Converter={StaticResource LocalChoiceLabel}, ConverterParameter=personal}" /></DataTemplate>
   <DataTemplate x:Key="StateChoiceTemplate" x:DataType="sys:String"><TextBlock Text="{Binding ., Converter={StaticResource LocalChoiceLabel}}" Classes="wrap" /></DataTemplate>
   <DataTemplate x:Key="ComponentKindTemplate" x:DataType="sys:String"><TextBlock Text="{Binding ., Converter={StaticResource LocalChoiceLabel}, ConverterParameter=kind}" /></DataTemplate>
   <DataTemplate x:Key="LaunchComponentTemplate" x:DataType="vm:LaunchComponentChoice"><StackPanel Classes="compact"><TextBlock Text="{Binding Title}" Classes="strong wrap" /><TextBlock Text="{Binding Kind}" Classes="caption" /><TextBlock Text="{Binding RelativePath}" Classes="caption wrap" /></StackPanel></DataTemplate>

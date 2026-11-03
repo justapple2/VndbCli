@@ -2,6 +2,8 @@ using System.Text.Json;
 
 namespace Vndb.Contracts;
 
+public sealed record PersonalOrganizationWrite(string ServiceInstanceId, Vndb.Core.PersonalOrganizationChange Change);
+
 public sealed record LibraryItemData(string Title, string? NovelId = null, string? CompanyHint = null,
     string? TitleOverride = null, string? CompanyOverride = null, string? Notes = null, string? ExtraNotes = null);
 public sealed record LibraryItem(string Id, LibraryItemData Details, long Revision, DateTimeOffset CreatedAt,

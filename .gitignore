@@ -103,3 +103,9 @@ known_hosts*
 *.bak
 *.swp
 *~
+
+# Personal organization drafts and local-only resource archive.
+**/personal-organization.json
+**/personal-organization-receipts/
+**/personal-organization-conflicts/
+**/local-resources.json
