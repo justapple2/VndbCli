@@ -11,7 +11,7 @@
       "vndb.contracts": {
         "type": "Project",
         "dependencies": {
-          "Vndb.Core": "[0.6.0, )"
+          "Vndb.Core": "[0.6.1, )"
         }
       },
       "vndb.core": {

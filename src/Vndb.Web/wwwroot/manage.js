@@ -52,7 +52,7 @@
   $('items').replaceChildren();VnView.appearance($('items'),display);
   for(const view of data.items){const item=view.item,d=item.details;
    const presented=VnDetails.title(view.metadata?.novel,view.metadata?.title||d.title,d.title_override),title=presented.title;
-   const card=VnView.card({id:item.id,title,secondaryTitle:presented.japanese,company:d.company_override||d.company_hint||view.metadata?.developers?.map(p=>p.original||p.name).join(' / ')||'会社待补全',subtitle:(d.novel_id||'待关联 VNDB')+' · '+view.play_count+' 条游玩记录',url:d.novel_id&&view.metadata?.cover?.status!=='none'?'/api/v1/vns/'+encodeURIComponent(d.novel_id)+'/cover':null,
+   const card=VnView.card({id:item.id,title,secondaryTitle:presented.japanese,company:VnView.personalCompany(view),subtitle:(d.novel_id||'待关联 VNDB')+' · '+view.play_count+' 条游玩记录',url:view.metadata?.cover?.url||null,
     badges:[...VnView.itemBadges(view.state),organizer?.badge(item.id)].filter(Boolean),open:()=>openItem(item),actions:[{label:'编辑／游玩',run:()=>openItem(item)}]});
    const bar=card.querySelector('.vn-actions');action(bar,'移除',async()=>{if(confirm('移除此书架条目？可恢复，游玩记录和游戏文件保留。')){await api('/items/'+item.id+'?expected_revision='+item.revision,'DELETE');await loadBooks();}},'plain');$('items').append(card);
   }
@@ -76,8 +76,8 @@
     const view=detailView?.item.id===item.id?detailView:lastBooks?.items.find(v=>v.item.id===item.id),metadata=view?.metadata,novel=metadata?.novel;
     const presented=VnDetails.title(novel,metadata?.title||item.details.title,item.details.title_override);parent.append(node('h2',presented.title));if(presented.japanese)parent.append(node('p',presented.japanese,'small'));
     const layout=node('div',undefined,'managed-detail-header');
-    if(metadata?.cover?.status!=='none'&&item.details.novel_id){const image=node('img');image.src='/api/v1/vns/'+encodeURIComponent(item.details.novel_id)+'/cover';image.alt='作品封面';image.onerror=()=>image.replaceWith(node('span','暂无封面','small'));layout.append(image);}
-    const info=node('div');info.append(node('p',VnView.progressLabel(view?.state),'personal-context'));info.append(node('p',item.details.company_override||metadata?.developers?.map(p=>p.original||p.name).join(' / ')||item.details.company_hint||'会社待补全'),node('p','发行：'+(novel?.released||'未知'),'small'),node('p','条目 '+item.id+' · 修订 '+item.revision,'personal-context'));
+    if(metadata?.cover?.url){const image=node('img');image.src=metadata.cover.url;image.alt='作品封面';image.onerror=()=>image.replaceWith(node('span','暂无封面','small'));layout.append(image);}
+    const info=node('div');info.append(node('p',VnView.progressLabel(view?.state),'personal-context'));info.append(node('p',VnView.personalCompany({item,metadata})),node('p','发行：'+(novel?.released||'未知'),'small'),node('p','条目 '+item.id+' · 修订 '+item.revision,'personal-context'));
     if(novel){const owner=itemRead;info.append(VnDetails.publicSection(novel,metadata?.provenance,metadata?.fetched_at,metadata?.developers||[],metadata?.completeness),VnReleases.section(novel,(path,options)=>api(path.replace('/api/v1',''),options?.post?'POST':'GET',options?.body,options?.signal),()=>itemRead===owner&&book?.id===item.id&&$('item-dialog').open),VnDetails.relations(novel,null,{links:true}));}
     if(novel?.description){const description=node('details');description.append(node('summary','作品简介'),node('p',novel.description,'personal-review'));info.append(description);}
     if(item.details.novel_id){const link=node('a','完整作品资料 ↗','plain');link.href='/?vn='+encodeURIComponent(item.details.novel_id);info.append(link);}

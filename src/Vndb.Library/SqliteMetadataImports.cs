@@ -108,7 +108,7 @@ public sealed partial class SqliteLibraryStore
         using var get = Command(db, tx, "SELECT entry_json FROM novels WHERE id=$id", ("$id", id));
         return get.ExecuteScalar() is string json ? Deserialize(json) : null;
     }
-    private static ImportItemResult ApplyMetadata(SqliteConnection db, SqliteTransaction tx, NormalizedMetadata item, int index, string batch, bool add)
+    private ImportItemResult ApplyMetadata(SqliteConnection db, SqliteTransaction tx, NormalizedMetadata item, int index, string batch, bool add)
     {
         if (item.Error is not null) return new(index, item.OperationId, item.VndbId, item.Title, "error", item.Error);
         string? shelf = null;
@@ -142,10 +142,11 @@ public sealed partial class SqliteLibraryStore
             SaveImportedSnapshot(db, tx, snapshot, batch, null);
             return new(index, item.OperationId, producer.Id, item.Title, "imported");
         }
-        if (item.VndbId is { } id && id.StartsWith('v') && NovelEntry(db, tx, id) is not null)
+        if (item.VndbId is { } id && id.StartsWith('v') && NovelEntry(db, tx, id) is { } existing)
         {
             if (add) shelf = EnsureNovelItem(db, tx, id, item.Title);
-            return new(index, item.OperationId, id, item.Title, "existing", ItemId: shelf);
+            var job = LibraryRules.NeedsCover(existing, DataDirectory) ? QueueMetadataJob(db, tx, id, item.Title, null) : null;
+            return new(index, item.OperationId, id, item.Title, "existing", ItemId: shelf, EnrichmentId: job?.Id);
         }
         if (item.VndbId?.StartsWith('p') == true)
         {

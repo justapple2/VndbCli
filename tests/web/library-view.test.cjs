@@ -2,6 +2,12 @@ const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const view = require('../../src/Vndb.Web/wwwroot/library-view.js');
 const defaults = {query:'', page:1, layout:'grid', density:'comfortable', fit:'contain', selected:'', scroll:0};
+test('personal company display honors overrides without hiding public co-developers or preferring stale hints',()=>{
+ const item={details:{company_override:'Personal',company_hint:'Old hint'}},metadata={developers:[{name:'First',original:'会社'},{name:'Second'}]};
+ assert.equal(view.personalCompany({item,metadata}),'Personal / 会社 / Second');
+ assert.equal(view.personalCompany({item:{details:{company_hint:'Old hint'}},metadata}),'会社 / Second');
+ assert.equal(view.personalCompany({item}), 'Personal / Old hint');
+});
 test('unrecorded, explicit unplayed, replay progress and local presence remain independent',()=>{
   assert.equal(view.progressLabel(null),'状态未读取');
   assert.equal(view.progressLabel({progress:{state:'unrecorded',statuses:[]}}),'未记录');

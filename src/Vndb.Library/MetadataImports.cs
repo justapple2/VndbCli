@@ -54,12 +54,13 @@ public sealed class MetadataImports(SqliteLibraryStore store, VndbClient core, L
                             producers = local.Producers.Select(p => full.FirstOrDefault(f => f.Id == p.Id) ?? p).ToArray();
                         }
                         var asset = local.Cover;
-                        if (local.Novel.Image is { } image && (asset is null || local.CoverStatus != "ready")) asset = await covers.DownloadAsync(image, ct);
+                        if (local.Novel.Image is { } image && LibraryRules.NeedsCover(local, store.DataDirectory)) asset = await covers.DownloadAsync(image, ct);
                         local = local with { Producers = producers, Cover = asset, CoverStatus = asset is null ? "none" : "ready", CoverError = null,
                             Completeness = local.Novel.Developers.All(d => producers.Any(p => p.Id == d.Id)) ? "full_text" : "partial_text" };
                         store.SaveEnrichment(local, revision, originalProducers);
                     }
                     else local = await importer.ImportAsync(job.VndbId, cancellationToken: ct);
+                    if (local?.CoverStatus == "failed") throw new IOException("封面尚未下载，保留资料并按现有队列退避重试。");
                     matches = local is null ? [] : [Snapshot(local)];
                 }
                 else if (job.VndbId?.StartsWith('p') == true)

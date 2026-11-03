@@ -692,26 +692,26 @@
         "type": "Project",
         "dependencies": {
           "System.CommandLine": "[2.0.13, )",
-          "Vndb.Core": "[0.6.0, )",
-          "Vndb.Library": "[0.6.0, )"
+          "Vndb.Core": "[0.6.1, )",
+          "Vndb.Library": "[0.6.1, )"
         }
       },
       "vndb.acceptance": {
         "type": "Project",
         "dependencies": {
-          "VndbCli": "[0.6.0, )"
+          "VndbCli": "[0.6.1, )"
         }
       },
       "vndb.client": {
         "type": "Project",
         "dependencies": {
-          "Vndb.Contracts": "[0.6.0, )"
+          "Vndb.Contracts": "[0.6.1, )"
         }
       },
       "vndb.contracts": {
         "type": "Project",
         "dependencies": {
-          "Vndb.Core": "[0.6.0, )"
+          "Vndb.Core": "[0.6.1, )"
         }
       },
       "vndb.core": {
@@ -723,16 +723,16 @@
           "Avalonia.Desktop": "[12.1.4, )",
           "Avalonia.Themes.Fluent": "[12.1.4, )",
           "CommunityToolkit.Mvvm": "[8.4.2, )",
-          "Vndb.Client": "[0.6.0, )",
-          "Vndb.Local": "[0.6.0, )"
+          "Vndb.Client": "[0.6.1, )",
+          "Vndb.Local": "[0.6.1, )"
         }
       },
       "vndb.library": {
         "type": "Project",
         "dependencies": {
           "Microsoft.Data.Sqlite": "[10.0.13, )",
-          "Vndb.Contracts": "[0.6.0, )",
-          "Vndb.Core": "[0.6.0, )",
+          "Vndb.Contracts": "[0.6.1, )",
+          "Vndb.Core": "[0.6.1, )",
           "ZstdSharp.Port": "[0.8.8, )"
         }
       },
@@ -740,24 +740,24 @@
         "type": "Project",
         "dependencies": {
           "System.Security.Cryptography.ProtectedData": "[10.0.0, )",
-          "Vndb.Contracts": "[0.6.0, )"
+          "Vndb.Contracts": "[0.6.1, )"
         }
       },
       "vndb.web": {
         "type": "Project",
         "dependencies": {
           "Microsoft.AspNetCore.OpenApi": "[10.0.13, )",
-          "Vndb.Contracts": "[0.6.0, )",
-          "Vndb.Library": "[0.6.0, )"
+          "Vndb.Contracts": "[0.6.1, )",
+          "Vndb.Library": "[0.6.1, )"
         }
       },
       "VndbCli": {
         "type": "Project",
         "dependencies": {
           "System.CommandLine": "[2.0.13, )",
-          "Vndb.Client": "[0.6.0, )",
-          "Vndb.Core": "[0.6.0, )",
-          "Vndb.Local": "[0.6.0, )"
+          "Vndb.Client": "[0.6.1, )",
+          "Vndb.Core": "[0.6.1, )",
+          "Vndb.Local": "[0.6.1, )"
         }
       }
     }

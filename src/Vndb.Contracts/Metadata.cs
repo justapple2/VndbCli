@@ -17,6 +17,8 @@ public sealed record ServiceInfo(string ServiceInstanceId, IReadOnlyList<int> Ap
     string BuildVersion, int SchemaVersion, bool WriteKeyRequired, IReadOnlyList<string> Capabilities,
     IReadOnlyList<int> MetadataFormatVersions, bool MetadataImportAvailable, ImportLimits? ImportLimits = null);
 public sealed record LocalStatistics(int Novels, int Producers, int Covers, int CoverFailures, string Scope = "library");
+public sealed record CoverRepairRequest(IReadOnlyList<string> ItemIds);
+public sealed record CoverRepairResult(string ItemId, string? VndbId, string State, string? JobId = null);
 public sealed record ApiProblem(string Code, string Title, int Status, string? TraceId = null);
 public sealed record MetadataBatch(IReadOnlyList<MetadataSnapshot> Items, DateTimeOffset ExportedAt,
     string BatchId, string Format = "vn-library-batch", int FormatVersion = 1, string Kind = "metadata");

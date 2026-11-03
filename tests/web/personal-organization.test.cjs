@@ -40,3 +40,34 @@ test('classification refresh does not adopt another service instance',async()=>{
  let instance='first';const api=async path=>path==='/info'?{service_instance_id:instance,capabilities:['personal_organization']}:initial();
  const client=organization.create({api,writer:tools.writes(api)});await client.refresh();instance='second';await assert.rejects(client.refresh(),/服务实例/);assert.equal(client.state.revision,0);
 });
+
+test('failed conflict reread keeps the pending operation active until a verified refresh succeeds',async()=>{
+ let fail=false;const api=async(path,options)=>{
+  if(path==='/info')return {service_instance_id:'synthetic-instance',capabilities:['personal_organization']};
+  if(options.method==='GET'){if(fail)throw Error('Synthetic unavailable');return initial();}
+  throw Object.assign(Error('Synthetic conflict'),{status:409});
+ };
+ const writer=tools.writes(api),client=organization.create({api,writer});await client.refresh();
+ await assert.rejects(client.write({label:{id:'a',name:'Keep original',kind:'collection'}}));
+ const proof=writer.proof('organization');fail=true;
+ await assert.rejects(client.refresh(true));assert.deepEqual(writer.proof('organization'),proof);assert.equal(writer.archived.length,0);
+});
+
+test('a delayed classification refresh cannot overwrite a later accepted write',async()=>{
+ let delayed=false,finish,opened;const started=new Promise(r=>opened=r);
+ const api=async(path,options)=>{
+  if(path==='/info')return {service_instance_id:'synthetic-instance',capabilities:['personal_organization']};
+  if(options.method==='GET'){if(delayed){opened();return new Promise(r=>finish=r);}return initial();}
+  return {revision:1,labels:[options.body.change.label],items:[]};
+ };
+ const client=organization.create({api,writer:tools.writes(api)});await client.refresh();delayed=true;
+ const stale=client.refresh();await started;await client.write({label:{id:'a',name:'New label',kind:'tag'}});
+ finish(initial());await stale;assert.equal(client.state.revision,1);assert.equal(client.state.labels[0].id,'a');
+});
+
+test('classification refresh refuses a regressive revision and retains its latest snapshot',async()=>{
+ let current={revision:4,labels:[{id:'a',name:'Latest',kind:'tag'}],items:[]};
+ const api=async path=>path==='/info'?{service_instance_id:'synthetic-instance',capabilities:['personal_organization']}:current;
+ const client=organization.create({api,writer:tools.writes(api)});await client.refresh();current=initial();
+ await assert.rejects(client.refresh(),/修订回退/);assert.equal(client.state.revision,4);
+});

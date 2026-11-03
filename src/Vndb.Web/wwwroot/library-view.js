@@ -75,6 +75,10 @@ globalThis.VnView = (() => {
   function element(tag, cls, text) {
     const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e;
   }
+  function personalCompany(view) {
+    const d=view.item.details,developers=view.metadata?.developers;
+    return [...new Set([d.company_override,...(developers?.length?developers.map(p=>p.original||p.name):[d.company_hint])].filter(v=>typeof v==='string'&&v.trim()))].join(' / ')||'会社待补全';
+  }
   function cover(title, url, open) {
     const frame = element('button', 'vn-cover'); frame.type = 'button'; frame.setAttribute('aria-label', '查看：' + title); frame.onclick = open;
     const placeholder = element('span', 'vn-cover-placeholder'); placeholder.append(element('strong', '', 'VN'), element('span', '', url ? '封面加载中' : '暂无封面'));
@@ -150,6 +154,6 @@ globalThis.VnView = (() => {
     bar.append(select,fill,remove,clear);details.append(heading,element('p','small','最多20项；仅显式提交时记录，回填不会联网。'),bar);parent.append(details);render();
     return {record(text){history.record(text);render();}};
   }
-  return {storage, store, latest, failure, element, cover, card, appearance, select, restoreScroll, progressLabel, itemBadges,shelfQuickViews,searchHistory,historyControl};
+  return {storage, store, latest, failure, element, cover, card, appearance, select, restoreScroll, progressLabel, itemBadges,shelfQuickViews,searchHistory,historyControl,personalCompany};
 })();
 if (typeof module !== 'undefined') module.exports = globalThis.VnView;

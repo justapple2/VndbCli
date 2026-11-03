@@ -30,6 +30,7 @@ public sealed partial class ResourceArchiveViewModel(Func<LocalResourceArchive> 
     public void Select(BookViewModel? book) { if (_book?.Id == book?.Id && ReferenceEquals(_book, book)) return; _generation++; _book = book; Items = []; New(); OnPropertyChanged(nameof(SelectedTitle)); }
     partial void OnSelectedChanged(LocalResource? value)
     {
+        _generation++;
         if (value is null) return;
         var d = value.Details; Kind = d.Kind; RootPath = d.RootPath; RelativePath = d.RelativePath; Language = d.Language ?? ""; Version = d.Version ?? "";
         ReleaseId = d.ReleaseId ?? ""; SourceUrl = d.SourceUrl ?? ""; Verification = d.Verification; ManuallyApplied = d.ManuallyApplied; Notes = d.Notes ?? "";
@@ -50,7 +51,7 @@ public sealed partial class ResourceArchiveViewModel(Func<LocalResourceArchive> 
         var facts = await Task.Run(() => LocalResourceArchive.Inspect(row));
         if (generation == _generation && Selected?.Id == row.Id) Message = facts.Message + (row.Sha256 is null ? "" : facts.HashCurrent ? " SHA256与当前元数据对应。" : " SHA256已过期，需按需重算。");
     });
-    [RelayCommand] private Task ChooseRootAsync() => RunAsync(async () => { if (await chooseRoot() is { } root) RootPath = root; });
+    [RelayCommand] private Task ChooseRootAsync() => RunAsync(async () => { var generation = _generation; if (await chooseRoot() is { } root && generation == _generation) RootPath = root; });
     [RelayCommand] private void New() { _generation++; Selected = null; Kind = "patch"; RootPath = ""; RelativePath = ""; Language = ""; Version = ""; ReleaseId = ""; SourceUrl = ""; Verification = "unreviewed"; ManuallyApplied = false; Notes = ""; InstallationId = ""; PackageId = ""; }
     private static string? Optional(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     [RelayCommand] private Task SaveAsync() => RunAsync(async () =>
@@ -68,7 +69,7 @@ public sealed partial class ResourceArchiveViewModel(Func<LocalResourceArchive> 
         var generation = _generation; var row = Selected ?? throw new ArgumentException("请先选择已保存资源。大文件校验可使用取消命令。");
         using var cancel = new CancellationTokenSource(); _hashCancellation = cancel;
         try { var archive = store(); var saved = await Task.Run(() => archive.HashAsync(row.Id, row.Revision, cancel.Token), cancel.Token); var rows = await archive.ReadAsync(row.Details.ItemId); if (generation == _generation) { Items = rows; Selected = Items.Single(r => r.Id == saved.Id); } }
-        catch (OperationCanceledException) { Message = "校验已取消；原档案保留。"; }
+        catch (OperationCanceledException) { if (generation == _generation) Message = "校验已取消；原档案保留。"; }
         finally { _hashCancellation = null; }
     });
     private CancellationTokenSource? _hashCancellation;

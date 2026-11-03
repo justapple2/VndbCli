@@ -12,7 +12,7 @@ public sealed class LibraryImporter(VndbClient client, CoverDownloader covers, I
         try
         {
             var existing = store.Get(id);
-            if (existing is not null && !refresh && existing.CoverStatus != "failed" && (existing.Cover is null || File.Exists(LibraryRules.CoverPath(store.DataDirectory, existing.Cover)))) return existing;
+            if (existing is not null && !refresh && !LibraryRules.NeedsCover(existing, store.DataDirectory)) return existing;
             var novel = await client.GetNovelAsync(id, cancellationToken);
             return novel is null ? null : await SaveCoreAsync(novel, existing, cancellationToken);
         }

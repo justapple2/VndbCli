@@ -76,7 +76,7 @@ public sealed partial class BookViewModel(LibraryItemView? item, MetadataSnapsho
     public string? Released => Metadata?.Novel?.Released;
     public string LastOpenedLabel => LastOpenedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "尚未从本客户端打开";
     public IReadOnlyList<string> Companies => new[] { Item?.Item.Details.CompanyOverride }.OfType<string>()
-        .Concat(Metadata?.Developers.Count > 0 ? Metadata.Developers.Select(p => p.Original ?? p.Name) : [Company])
+        .Concat(Metadata?.Developers.Count > 0 ? Metadata.Developers.Select(p => p.Original ?? p.Name) : [Item?.Item.Details.CompanyHint ?? "会社待补全"])
         .Where(c => !string.IsNullOrWhiteSpace(c)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     public string ShelfState => NeedsPlayReview ? "关联待核对" : _summaryPlays ? Item?.State?.LatestStatus is { } latest ? Status(latest) : Progress.HasRecord ? string.Join(" / ", Progress.Statuses.Select(Status)) : "未记录" : Plays.Count > 0 ? Status(Plays.OrderByDescending(p => p.UpdatedAt).First().Details.Status) : "未记录";
     public string CollectionLabel => Item is null ? "公共资料 · 未加入书架" : "个人书架";
@@ -111,8 +111,7 @@ public sealed partial class BookViewModel(LibraryItemView? item, MetadataSnapsho
     }
     public string Id => Item?.Item.Id ?? Metadata?.VndbId ?? "";
     public string Title => _presentation.Title;
-    public string Company => Metadata?.Developers.Count > 0
-        ? string.Join(" / ", Metadata.Developers.Select(p => p.Original ?? p.Name)) : Item?.Item.Details.CompanyHint ?? "会社待补全";
+    public string Company => string.Join(" / ", Companies);
     public string GroupCompany => Item?.Item.Details.CompanyOverride ?? Metadata?.Developers.FirstOrDefault()?.Original
         ?? Metadata?.Developers.FirstOrDefault()?.Name ?? Item?.Item.Details.CompanyHint ?? "";
     public bool HasPlayed => Progress.HasPlayed;

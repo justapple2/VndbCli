@@ -1,6 +1,8 @@
 # Web API使用与交换契约
 
-适用版本0.6.0／API v1／schema14。**客户端使用`/api/v1`**，机器规范为运行中`/openapi/v1.json`；数据库schema不是客户端协议。示例使用虚构个人资料和`http://nas.local:5187/`，请替换为自己的服务。
+适用版本0.6.1／API v1／schema14。**客户端使用`/api/v1`**，机器规范为运行中`/openapi/v1.json`；数据库schema不是客户端协议。示例使用虚构个人资料和`http://nas.local:5187/`，请替换为自己的服务。0.6.1保持原数据库格式，新增的封面修复能力通过`cover_repair`协商。
+
+封面补全：`POST /api/v1/metadata/covers/repair`，请求`{"item_ids":["item-example"]}`（1–100个唯一且未移除的个人书架ID），沿用管理密钥、`X-Library-Request: 1`与`Idempotency-Key`。返回每项`item_id`、`vndb_id`、`state`和可选`job_id`。已有封面／确认无图／未关联分别为`ready`／`no_cover`／`unlinked`；其余复用原metadata队列，按VN ID去重。明确重试可重新排队已结束的失败任务，已有暂停任务保持暂停；用既有jobs入口查看和控制。请求不改个人关联、修订或游玩数据，也不遍历公共全库。网络补全按既有至少5秒间隔及有限退避执行，返回queued不代表图片已下载。
 
 ## 1. 连接、鉴权及公共规则
 

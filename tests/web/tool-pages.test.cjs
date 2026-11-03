@@ -23,7 +23,7 @@ function page(name,route,tab='imports',personalOrganization=false){
  context.Option=function(text,value){const e=new Element('option');e.textContent=text;e.value=value;return e;};context.window=context;context.VnPersonal={create:()=>({open(){}})};context.VnView={element:(tag,cls,text)=>{const e=new Element(tag);e.className=cls;e.textContent=text;return e;},storage:()=>({get:()=>null,set(){}}),store:(_id,defaults)=>({read:()=>({...defaults}),save(){}}),latest:()=>({cancel(){},begin(){return {current:()=>true};}}),appearance(){},select(){},failure:e=>e.message,restoreScroll(){}};
  vm.createContext(context);
  const adapter=context.VnView;vm.runInContext(fs.readFileSync(path.join(root,'library-view.js'),'utf8'),context,{filename:'library-view.js'});
- context.VnView={...adapter,card:context.VnView.card,itemBadges:context.VnView.itemBadges,progressLabel:context.VnView.progressLabel,historyControl:context.VnView.historyControl,shelfQuickViews:context.VnView.shelfQuickViews};
+ context.VnView={...adapter,card:context.VnView.card,itemBadges:context.VnView.itemBadges,progressLabel:context.VnView.progressLabel,historyControl:context.VnView.historyControl,shelfQuickViews:context.VnView.shelfQuickViews,personalCompany:context.VnView.personalCompany};
  for(const file of ['tool-feedback.js','import-input.js','vn-details.js','releases.js',...(personalOrganization?['personal-organization.js']:[]),name+'.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context,{filename:file});
  return {elements,tabs,calls,intervals,context,buttons:id=>elements[id].querySelectorAll('button'),text:id=>elements[id].textContent};
 }

@@ -56,12 +56,17 @@ public sealed class DesktopServices : IDisposable
 
     public async Task StartSessionsAsync(CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         if (Sessions is not null) return;
         var sessions = new LocalSessionManager(Launcher, Activities, SettingsStore.DirectoryPath);
-        try { await sessions.RecoverAsync(ct); }
-        catch { sessions.Dispose(); throw; }
+        try
+        {
+            await sessions.RecoverAsync(ct);
+            await StartObservationAsync(ct);
+            ct.ThrowIfCancellationRequested();
+        }
+        catch { await StopObservationAsync(); sessions.Dispose(); throw; }
         Sessions = sessions; ActivityHost = new(this); ActivityHost.Start(); ActivityHost.SignalSync();
-        await StartObservationAsync(ct);
     }
     private void Observed(ObservationResult result)
     {

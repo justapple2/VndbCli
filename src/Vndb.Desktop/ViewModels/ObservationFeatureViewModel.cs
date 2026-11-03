@@ -33,7 +33,7 @@ public sealed partial class ObservationFeatureViewModel(Func<DesktopServices> se
     private ObservationSettings _basis = new();
     private ObservationResult? _shown;
     public void Load(ObservationSettings settings)
-    { _basis = settings; Enabled = settings.Enabled; Roots = (settings.Roots ?? []).Select(r => new ObservationRootRow(r)).ToArray(); Approved = false; }
+    { _basis = settings; _shown = null; Candidates = []; SelectedCandidate = null; ResourceMessages = []; Enabled = settings.Enabled; Roots = (settings.Roots ?? []).Select(r => new ObservationRootRow(r)).ToArray(); SelectedRoot = null; Approved = false; }
     public void Poll(ObservationResult? result, string status)
     {
         Summary = status + (result is null ? "" : $"\n最近核对：{result.CheckedAt.ToLocalTime():g} · {result.Metrics.Probes}次元数据检查 · 游戏内容哈希0字节");
@@ -41,7 +41,7 @@ public sealed partial class ObservationFeatureViewModel(Func<DesktopServices> se
         var roots = (_basis.Roots ?? []).ToDictionary(r => r.Id);
         Candidates = result.Snapshot.Candidates.Where(c => c.State is "checking" or "pending" && roots.ContainsKey(c.RootId)).Take(100)
             .Select(c => new ObservationCandidateRow(c, roots[c.RootId])).ToArray();
-        ResourceMessages = result.Snapshot.Installations.Where(i => i.Reason != "present").Take(100).Select(i =>
+        ResourceMessages = result.Snapshot.Installations.Where(i => roots.ContainsKey(i.RootId) && i.Reason != "present").Take(100).Select(i =>
             (result.Catalog?.Installations.FirstOrDefault(v => v.Installation.Id == i.Id)?.Installation.Details.Title ?? i.Id) + "：" + ObservationText.Reason(i.Reason)).ToArray();
     }
     [RelayCommand] private Task ChooseRootAsync() => run(async _ => { if (await dialogs.FolderAsync("选择只读观测管理根（游戏根／安装包根）") is { } path) RootPath = path; });

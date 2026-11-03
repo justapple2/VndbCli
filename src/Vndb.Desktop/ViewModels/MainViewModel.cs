@@ -139,7 +139,7 @@ public partial class MainViewModel : ObservableObject
         }
         return success;
     }
-    private bool CanRetryStartup() => !Busy && Diagnostics.Trace.Failed && _services?.Sessions is null && _startupInitialized is not null;
+    private bool CanRetryStartup() => !Busy && Diagnostics.Trace.Failed && _services?.Sessions is not { Running: true } && _startupInitialized is not null;
     [RelayCommand(CanExecute = nameof(CanRetryStartup))] private Task RetryStartupAsync() => StartAsync(_startupInitialized!);
     private async Task InitializeCoreAsync(CancellationToken ct)
     {
@@ -298,6 +298,7 @@ public partial class MainViewModel : ObservableObject
         ManagementKey = ""; StateLocation = services.QueryDirectory;
         _books = []; _queryBooks = []; _installations = []; _packages = []; Discovery.Clear(); PublicCatalog.Clear(); Installations.Clear(); SelectedBook = null;
         SelectedInstallation = null; Organization.Invalidate(); Organization.RunDirectory = ""; Shelf.Clear();
+        PersonalOrganization.Invalidate();
         await Discovery.History.ReloadAsync(ct); await PublicCatalog.History.ReloadAsync(ct);
         UpdateBookDetails(); Shelf.Refresh();
         Status = "设置已保存；书架快照按服务地址隔离，请刷新。";

@@ -1,6 +1,6 @@
 {
   "format": "vndb-local-third-party-v1",
-  "application_version": "0.6.0",
+  "application_version": "0.6.1",
   "packages": [
     {
       "id": "Avalonia",

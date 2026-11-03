@@ -202,13 +202,13 @@
       "vndb.client": {
         "type": "Project",
         "dependencies": {
-          "Vndb.Contracts": "[0.6.0, )"
+          "Vndb.Contracts": "[0.6.1, )"
         }
       },
       "vndb.contracts": {
         "type": "Project",
         "dependencies": {
-          "Vndb.Core": "[0.6.0, )"
+          "Vndb.Core": "[0.6.1, )"
         }
       },
       "vndb.core": {
@@ -218,7 +218,7 @@
         "type": "Project",
         "dependencies": {
           "System.Security.Cryptography.ProtectedData": "[10.0.0, )",
-          "Vndb.Contracts": "[0.6.0, )"
+          "Vndb.Contracts": "[0.6.1, )"
         }
       }
     }

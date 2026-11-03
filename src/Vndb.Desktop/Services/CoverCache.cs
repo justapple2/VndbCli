@@ -14,12 +14,14 @@ public sealed class CoverCache(HttpClient http, string directory, Uri? server)
         if (server is not null && snapshot.Cover.Url is { } path)
         {
             var uri = new Uri(server, path);
-            if (uri.GetLeftPart(UriPartial.Authority) != server.GetLeftPart(UriPartial.Authority) ||
-                !uri.AbsolutePath.StartsWith("/api/", StringComparison.Ordinal) || !uri.AbsolutePath.EndsWith("/cover", StringComparison.Ordinal) || uri.Query.Length != 0)
-                throw new InvalidDataException("拒绝非本服务封面地址。");
+            if (uri.GetLeftPart(UriPartial.Authority) != server.GetLeftPart(UriPartial.Authority) || snapshot.Kind != "vn" || snapshot.Novel?.Id != snapshot.VndbId ||
+                (uri.AbsolutePath != $"/api/v1/vns/{snapshot.VndbId}/cover" && uri.AbsolutePath != $"/api/library/{snapshot.VndbId}/cover") || uri.Query.Length != 0 || uri.Fragment.Length != 0)
+                throw new InvalidDataException("拒绝非本服务或不属于当前作品的封面地址。");
             return uri;
         }
-        return snapshot.Novel?.Image is { } image ? CoverPolicy.ValidateSource(image.Thumbnail ?? image.Url) : null;
+        // A configured library owns its assets; a missing server cover is not a request to bypass it.
+        var upstream = snapshot.Novel?.Image is { } image ? CoverPolicy.ValidateSource(image.Thumbnail ?? image.Url) : null;
+        return server is null || snapshot.Provenance == "client_vndb" ? upstream : null;
     }
     public async Task<string?> GetAsync(MetadataSnapshot snapshot, CancellationToken ct)
     {

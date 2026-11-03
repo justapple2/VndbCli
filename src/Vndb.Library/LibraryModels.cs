@@ -35,6 +35,8 @@ public interface ILibraryStore
 
 public static class LibraryRules
 {
+    public static bool NeedsCover(LibraryEntry entry, string directory) => entry.CoverStatus == "failed" ||
+        entry.Cover is { } asset && !File.Exists(CoverPath(directory, asset)) || entry.Cover is null && entry.Novel.Image is not null;
     public static void ValidatePage(int page, int limit)
     {
         if (page < 1 || limit is < 1 or > 100) throw new ArgumentException("页码须大于 0，每页数量须为 1–100。");

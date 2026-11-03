@@ -7,7 +7,7 @@ COPY --chown=1654:1654 --chmod=0555 admin/ ./admin/
 COPY --chown=1654:1654 --chmod=0555 cli/ ./cli/
 COPY --chown=1654:1654 --chmod=0444 LICENSE NOTICE THIRD-PARTY-NOTICES.md ./
 COPY --chown=1654:1654 --chmod=0555 licenses/ ./licenses/
-LABEL org.opencontainers.image.version="0.6.0"
+LABEL org.opencontainers.image.version="0.6.1"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 ENV ASPNETCORE_HTTP_PORTS=8080 Library__DataDirectory=/data DOTNET_NOLOGO=1
 EXPOSE 8080

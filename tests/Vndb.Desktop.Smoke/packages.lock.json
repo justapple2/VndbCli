@@ -218,13 +218,13 @@
       "vndb.client": {
         "type": "Project",
         "dependencies": {
-          "Vndb.Contracts": "[0.6.0, )"
+          "Vndb.Contracts": "[0.6.1, )"
         }
       },
       "vndb.contracts": {
         "type": "Project",
         "dependencies": {
-          "Vndb.Core": "[0.6.0, )"
+          "Vndb.Core": "[0.6.1, )"
         }
       },
       "vndb.core": {
@@ -236,15 +236,15 @@
           "Avalonia.Desktop": "[12.1.4, )",
           "Avalonia.Themes.Fluent": "[12.1.4, )",
           "CommunityToolkit.Mvvm": "[8.4.2, )",
-          "Vndb.Client": "[0.6.0, )",
-          "Vndb.Local": "[0.6.0, )"
+          "Vndb.Client": "[0.6.1, )",
+          "Vndb.Local": "[0.6.1, )"
         }
       },
       "vndb.local": {
         "type": "Project",
         "dependencies": {
           "System.Security.Cryptography.ProtectedData": "[10.0.0, )",
-          "Vndb.Contracts": "[0.6.0, )"
+          "Vndb.Contracts": "[0.6.1, )"
         }
       }
     }

@@ -10,7 +10,7 @@ public static class V1Endpoints
     {
         var group = app.MapGroup("/api/v1").WithTags("Library v1");
         group.MapGet("/info", (ImportLimits limits) => new ServiceInfo(instanceId, [1], typeof(Program).Assembly.GetName().Version!.ToString(3),
-            SqliteLibraryStore.SchemaVersion, keyRequired, ["personal_organization", "shelf_summary_v1", "item_heads_v1", "public_catalog", "dataset_import", "collection_state", "release_catalog", "metadata_query", "producer_query", "covers", "local_first", "metadata_import", "personal_items", "recoverable_removal", "devices", "play_sessions", "play_edits", "activity_import", "portable_json_hash", "data_quality", "boolean_presence", "local_locations_only"], [1], true, limits))
+            SqliteLibraryStore.SchemaVersion, keyRequired, ["cover_repair", "personal_organization", "shelf_summary_v1", "item_heads_v1", "public_catalog", "dataset_import", "collection_state", "release_catalog", "metadata_query", "producer_query", "covers", "local_first", "metadata_import", "personal_items", "recoverable_removal", "devices", "play_sessions", "play_edits", "activity_import", "portable_json_hash", "data_quality", "boolean_presence", "local_locations_only"], [1], true, limits))
             .WithSummary("Discover protocol, capabilities and service identity");
         group.MapGet("/stats", (ILibraryStore store) => { var s = store.Statistics(); return new LocalStatistics(s.Novels, store.FindProducers("").Count, s.Covers, s.CoverFailures); });
         group.MapGet("/catalog", (SqliteLibraryStore store, string? q, string? producer_id, string? language,

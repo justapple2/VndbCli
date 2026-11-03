@@ -15,13 +15,13 @@
       "vndb.client": {
         "type": "Project",
         "dependencies": {
-          "Vndb.Contracts": "[0.6.0, )"
+          "Vndb.Contracts": "[0.6.1, )"
         }
       },
       "vndb.contracts": {
         "type": "Project",
         "dependencies": {
-          "Vndb.Core": "[0.6.0, )"
+          "Vndb.Core": "[0.6.1, )"
         }
       },
       "vndb.core": {
@@ -31,16 +31,16 @@
         "type": "Project",
         "dependencies": {
           "System.Security.Cryptography.ProtectedData": "[10.0.0, )",
-          "Vndb.Contracts": "[0.6.0, )"
+          "Vndb.Contracts": "[0.6.1, )"
         }
       },
       "VndbCli": {
         "type": "Project",
         "dependencies": {
           "System.CommandLine": "[2.0.13, )",
-          "Vndb.Client": "[0.6.0, )",
-          "Vndb.Core": "[0.6.0, )",
-          "Vndb.Local": "[0.6.0, )"
+          "Vndb.Client": "[0.6.1, )",
+          "Vndb.Core": "[0.6.1, )",
+          "Vndb.Local": "[0.6.1, )"
         }
       }
     }

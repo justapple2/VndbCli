@@ -13,7 +13,7 @@ public sealed class LocalOrganizationServer(LocalLibraryStore library, LocalLaun
     { if (!Guid.TryParseExact(id, "D", out _)) throw new InvalidDataException("无效本机计划ID。"); return Path.Combine(Root, id + ".json"); }
     private FileStream Lock()
     { Directory.CreateDirectory(Root); return new(Path.Combine(Root, "write.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None); }
-    public Task<ServiceInfo> OrganizationInfoAsync(CancellationToken ct) => Task.FromResult(new ServiceInfo("local-" + deviceId, [1], "0.6.0", 0, false, ["archive_runs", "local_json_only"], [1], false));
+    public Task<ServiceInfo> OrganizationInfoAsync(CancellationToken ct) => Task.FromResult(new ServiceInfo("local-" + deviceId, [1], "0.6.1", 0, false, ["archive_runs", "local_json_only"], [1], false));
     public async Task<LocalArchiveRunView> ArchiveRunAsync(string id, CancellationToken ct) =>
         JsonSerializer.Deserialize<LocalArchiveRunView>(await File.ReadAllTextAsync(RunFile(id), ct), VndbJson.Options) ?? throw new InvalidDataException("本机计划损坏，原件保留。");
     private Task Save(LocalArchiveRunView run, CancellationToken ct) => JsonSnapshotStore.AtomicWriteAsync(RunFile(run.Plan.Id), run, true, ct);

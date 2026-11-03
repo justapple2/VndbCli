@@ -4,6 +4,28 @@ namespace Vndb.Library;
 
 public sealed partial class SqliteLibraryStore
 {
+    public IReadOnlyList<CoverRepairResult> RepairPersonalCovers(CoverRepairRequest request, string key)
+    {
+        if (request.ItemIds is null || request.ItemIds.Count is < 1 or > 100 || request.ItemIds.Any(string.IsNullOrWhiteSpace) || request.ItemIds.Distinct().Count() != request.ItemIds.Count)
+            throw new ArgumentException("请选择1–100个唯一的个人书架条目。");
+        return Mutate("metadata/covers/repair", key, request, (db, tx) => request.ItemIds.Select(id =>
+        {
+            var item = Item(db, tx, id);
+            if (item.DeletedAt is not null) throw new PlayConflictException("条目已移除，请重新读取书架。");
+            if (item.Details.NovelId is not { } vn) return new CoverRepairResult(id, null, "unlinked");
+            var entry = NovelEntry(db, tx, vn);
+            if (entry is not null && !LibraryRules.NeedsCover(entry, DataDirectory)) return new(id, vn, entry.Cover is null ? "no_cover" : "ready");
+            // Reuse the existing VN-scoped queue. Repair cannot rebind personal entries or change their revisions.
+            var job = QueueMetadataJob(db, tx, vn, item.Details.Title, null);
+            if (job.State is "complete" or "error" or "not_found")
+            {
+                var next = job with { State = "queued", Attempts = 0, NextAt = DateTimeOffset.UtcNow, Error = null };
+                Execute(db, tx, "UPDATE metadata_jobs SET record_json=$json WHERE id=$id", ("$json", Json(next)), ("$id", job.Id));
+                Event(db, tx, job.Id, "cover-repair", Json(job), Json(next)); job = next;
+            }
+            return new CoverRepairResult(id, vn, job.State, job.Id);
+        }).ToArray());
+    }
     public IReadOnlyList<MetadataJob> MetadataJobs()
     {
         using var db = Open(); using var command = Command(db, null, "SELECT record_json FROM metadata_jobs ORDER BY id");

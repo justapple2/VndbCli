@@ -45,6 +45,7 @@ public static class ManagementEndpoints
         group.MapPost("/metadata/candidates/{id}/accept", (string id, CandidateDecision decision, SqliteLibraryStore store, HttpContext ctx) => store.DecideCandidate(id, decision, true, Key(ctx)));
         group.MapPost("/metadata/candidates/{id}/reject", (string id, CandidateDecision decision, SqliteLibraryStore store, HttpContext ctx) => store.DecideCandidate(id, decision, false, Key(ctx)));
         group.MapGet("/metadata/jobs", (SqliteLibraryStore store) => store.MetadataJobs());
+        group.MapPost("/metadata/covers/repair", (CoverRepairRequest request, SqliteLibraryStore store, HttpContext ctx) => store.RepairPersonalCovers(request, Key(ctx)));
         group.MapPost("/metadata/jobs/{id}/{action}", (string id, string action, SqliteLibraryStore store, HttpContext ctx) => store.ControlMetadataJob(id, action, Key(ctx)));
         group.MapGet("/metadata/{id}/provenance", (string id, SqliteLibraryStore store) => store.Provenance(id) is { } source ? Results.Ok(source) : Results.NotFound());
         group.MapGet("/schemas/metadata-batch-v1.json", (IWebHostEnvironment environment) => Results.File(Path.Combine(environment.WebRootPath, "schemas", "metadata-batch-v1.json"), "application/schema+json"));
