@@ -5,6 +5,7 @@
     <TextBlock Text="{Binding Message}" Classes="caption wrap" AutomationProperties.Name="个人分类同步状态" />
     <WrapPanel Classes="filters"><Button Content="读取Web分类" Command="{Binding ReloadCommand}" /><Button Content="同步离线修改" Command="{Binding SyncCommand}" /></WrapPanel>
     <Button Content="保留冲突原稿并读取Web" Command="{Binding ResolveConflictCommand}" IsVisible="{Binding Conflict}" />
+    <Expander Header="原操作字段对照" HorizontalContentAlignment="Stretch"><StackPanel Classes="form"><TextBlock Text="{Binding Outcome}" Classes="strong wrap" /><TextBlock Text="{Binding ComparisonSummary}" Classes="caption wrap" /><Button Content="只读当前Web对照" Command="{Binding ReadComparisonCommand}" /><ItemsControl ItemsSource="{Binding Differences}" ItemTemplate="{StaticResource FieldComparisonTemplate}" /></StackPanel></Expander>
     <StackPanel Classes="compact" IsEnabled="{Binding CanEditMember}">
       <CheckBox Content="★ 个人收藏" IsChecked="{Binding Favorite}" />
       <ItemsControl ItemsSource="{Binding MemberLabels}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:PersonalLabelToggle"><CheckBox Content="{Binding Label, Converter={StaticResource LocalChoiceLabel}}" IsChecked="{Binding Selected}" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>

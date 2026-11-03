@@ -12,6 +12,7 @@ public interface IQuickPlayService
     Task<PersonalEditDraft> QueueAsync(QuickPlayBook book, PersonalPlayView? play, PersonalPlayData details, CancellationToken ct);
     Task<PersonalPlayView> SyncAsync(PersonalEditDraft draft, CancellationToken ct);
     Task WithdrawConflictAsync(PersonalEditDraft draft, CancellationToken ct);
+    Task<PersonalEditInspection> InspectAsync(PersonalEditDraft draft, bool refresh, CancellationToken ct) => Task.FromResult(new PersonalEditInspection(draft, PersonalOperationState.Pending));
 }
 public sealed class QuickPlayService(PersonalEditOutbox edits, Func<string?> server, Func<ISyncApi?> remote,
     Func<string, CancellationToken, Task<IReadOnlyList<PersonalPlayView>>> readPlays) : IQuickPlayService
@@ -45,9 +46,10 @@ public sealed class QuickPlayService(PersonalEditOutbox edits, Func<string?> ser
         if (book.Item is { } item && LocalInstallationRegistration.IsPending(item.Item.Id))
             throw new ArgumentException("此作品的本机登记尚待同步，请先同步登记；离线计时及感想仍可在游玩会话中保存。");
         ShelfPlayResolver.RequireSelection(book.Item?.Item.Id, play);
-        return edits.EnqueueAsync(book.Id, Origin, play?.Id, new(details, book.Item?.Item.Id, play?.Revision), ct);
+        return edits.EnqueueAsync(book.Id, Origin, play?.Id, new(details, book.Item?.Item.Id, play?.Revision), ct, play);
     }
     public Task<PersonalPlayView> SyncAsync(PersonalEditDraft draft, CancellationToken ct) => edits.SyncOneAsync(
         remote() ?? throw new WebUnavailableException(), Origin, draft, ct);
     public Task WithdrawConflictAsync(PersonalEditDraft draft, CancellationToken ct) => edits.WithdrawConflictAsync(draft, ct);
+    public Task<PersonalEditInspection> InspectAsync(PersonalEditDraft draft, bool refresh, CancellationToken ct) => edits.InspectAsync(draft, Origin, remote(), refresh, ct);
 }

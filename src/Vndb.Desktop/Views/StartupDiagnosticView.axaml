@@ -1,0 +1,10 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:Vndb.Desktop.ViewModels"
+             x:Class="Vndb.Desktop.Views.StartupDiagnosticView" x:DataType="vm:StartupDiagnosticViewModel">
+  <StackPanel Classes="form">
+    <TextBlock Text="{Binding Summary}" Classes="strong wrap" AutomationProperties.Name="最近启动检查摘要" />
+    <TextBlock Text="仅记录阶段、时间、错误类别和固定建议。报告不包含异常原文、堆栈、凭据、地址、游戏位置或个人记录。" Classes="caption wrap" />
+    <ItemsControl ItemsSource="{Binding Steps}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:StartupStepDisplay"><Border Classes="panel"><StackPanel Classes="compact"><TextBlock Text="{Binding Label}" Classes="strong wrap" /><SelectableTextBlock Text="{Binding Detail}" Classes="wrap" /></StackPanel></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+    <Button Content="导出脱敏启动报告" Command="{Binding ExportCommand}" AutomationProperties.Name="导出脱敏启动报告" />
+    <TextBlock Text="{Binding ExportMessage}" Classes="caption wrap" AutomationProperties.LiveSetting="Polite" />
+  </StackPanel>
+</UserControl>

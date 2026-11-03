@@ -9,7 +9,13 @@ public sealed record PersonalOrganizationDraft(string Id, PersonalOrganizationCh
 public sealed record PersonalOrganizationDocument(string Origin, string? ServiceInstanceId, PersonalOrganizationState Confirmed,
     IReadOnlyList<PersonalOrganizationDraft> Pending, bool Conflict = false, string Format = "vn-personal-organization", int FormatVersion = 1)
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public bool Attempted { get; init; }
     [JsonExtensionData] public Dictionary<string, JsonElement>? Extensions { get; init; }
+}
+public sealed record PersonalOrganizationInspection(PersonalOrganizationDocument Document, PersonalOperationState State,
+    PersonalOrganizationState? Current = null, DateTimeOffset? ObservedAt = null, bool ReadFailed = false)
+{
+    public IReadOnlyList<FieldDifference> Differences => Document.Pending.Count == 0 ? [] : PersonalComparison.Organization(Document.Confirmed, Current, Document.Pending[0].Change);
 }
 
 /// <summary>Small service-scoped JSON projection and immutable offline operations. Never contains resource locations.</summary>
@@ -57,17 +63,21 @@ public sealed class PersonalOrganizationStore(string directory, string? server)
         if (doc.ServiceInstanceId is null) { doc = doc with { ServiceInstanceId = info.ServiceInstanceId }; await _file.SaveAsync(doc, ct); }
         foreach (var draft in doc.Pending.ToArray())
         {
+            var wasAttempted = doc.Attempted;
             try
             {
+                if (!doc.Attempted) { doc = doc with { Attempted = true }; await _file.SaveAsync(doc, ct); }
                 var saved = await web.SavePersonalOrganizationAsync(draft.Change, "organization-" + draft.Id, ct, doc.ServiceInstanceId);
                 PersonalOrganizationRules.Validate(saved); Safe(saved);
                 if (LocalArchiveFormat.Hash(saved) != draft.ResultSha256) throw new ClientApiException("organization_receipt_invalid", 200);
                 await JsonSnapshotStore.AtomicWriteAsync(Path.Combine(directory, "personal-organization-receipts", draft.Id + ".json"),
                     new { draft.Id, draft.ResultSha256, service_instance_id = info.ServiceInstanceId, origin = _origin }, true, ct);
-                doc = doc with { Confirmed = saved, Pending = doc.Pending.Skip(1).ToArray() }; await _file.SaveAsync(doc, ct);
+                doc = doc with { Confirmed = saved, Pending = doc.Pending.Skip(1).ToArray(), Attempted = false }; await _file.SaveAsync(doc, ct);
             }
             catch (ClientApiException e) when (e.Status is 400 or 409)
-            { await _file.SaveAsync(doc with { Conflict = true }, ct); break; }
+            { await _file.SaveAsync(doc with { Conflict = true }, CancellationToken.None); break; }
+            catch (ClientApiException e) when (e.Status is 401 or 403 or 429)
+            { await _file.SaveAsync(doc with { Attempted = wasAttempted }, CancellationToken.None); throw; }
         }
         return doc.Pending.Count;
     }
@@ -89,7 +99,23 @@ public sealed class PersonalOrganizationStore(string directory, string? server)
         if (state.Revision < doc.Confirmed.Revision) throw new InvalidDataException("分类修订发生回退；保留本机原件并核对服务恢复状态。");
         if (resolveConflict && doc.Conflict)
             await JsonSnapshotStore.AtomicWriteAsync(Path.Combine(directory, "personal-organization-conflicts", Guid.NewGuid().ToString("D") + ".json"), doc, false, ct);
-        doc = doc with { Confirmed = state, Pending = [], Conflict = false, ServiceInstanceId = info.ServiceInstanceId };
+        doc = doc with { Confirmed = state, Pending = [], Conflict = false, Attempted = false, ServiceInstanceId = info.ServiceInstanceId };
         await _file.SaveAsync(doc, ct); return doc;
+    }
+    public async Task<PersonalOrganizationInspection> InspectAsync(ISyncApi? web = null, bool refresh = false, CancellationToken ct = default)
+    {
+        using var lease = await LocalFileLease.AcquireAsync(directory, "personal-organization-operation", ct);
+        var doc = await ReadAsync(ct);
+        var status = doc.Conflict ? PersonalOperationState.Conflict : doc.Pending.Count == 0 ? PersonalOperationState.Applied : doc.Attempted ? PersonalOperationState.Uncertain : PersonalOperationState.Pending;
+        if (!refresh) return new(doc, status);
+        if (web is null) return new(doc, status, ReadFailed: true);
+        try
+        {
+            RequireService(doc, await web.OrganizationInfoAsync(ct));
+            var current = await web.PersonalOrganizationAsync(ct) ?? throw new ClientApiException("protocol_invalid", 200);
+            PersonalOrganizationRules.Validate(current); Safe(current);
+            return new(doc, status, current, DateTimeOffset.UtcNow);
+        }
+        catch (Exception e) when (e is WebUnavailableException or HttpRequestException) { return new(doc, status, ReadFailed: true); }
     }
 }

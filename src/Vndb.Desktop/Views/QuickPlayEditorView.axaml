@@ -25,6 +25,7 @@
       <Button Content="放弃当前未保存修改" Classes="quiet" Command="{Binding ResetUnsavedCommand}" IsVisible="{Binding IsDirty}" IsEnabled="{Binding Editable}" />
       <Border Classes="panel"><TextBlock Text="{Binding TimeSummary}" Classes="caption wrap" /></Border>
       <TextBlock Text="原表来源由Web保留；自动会话及调整记录单独计算。未记录时长与零分钟含义不同。" Classes="caption wrap" />
+      <Expander Header="字段对照（不自动合并）" HorizontalContentAlignment="Stretch"><StackPanel Classes="form"><TextBlock Text="{Binding Outcome}" Classes="strong" /><TextBlock Text="{Binding ComparisonSummary}" Classes="caption wrap" /><WrapPanel Classes="filters"><Button Content="预览字段变化" Command="{Binding PreviewChangesCommand}" /><Button Content="只读当前Web对照" Command="{Binding ReadComparisonCommand}" IsVisible="{Binding HasDraft}" /></WrapPanel><ItemsControl ItemsSource="{Binding Differences}" ItemTemplate="{StaticResource FieldComparisonTemplate}" /></StackPanel></Expander>
     </StackPanel></ScrollViewer>
     <StackPanel Grid.Row="2" Classes="form">
       <TextBlock Text="{Binding Message}" Classes="wrap" AutomationProperties.Name="快速编辑结果" AutomationProperties.LiveSetting="Polite" />

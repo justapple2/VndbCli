@@ -42,6 +42,10 @@ public sealed partial class QuickPlayEditorViewModel : ObservableObject
     [ObservableProperty] private bool _conflict;
     [ObservableProperty] private string _message = "选择要更新的游玩记录，或明确新建一次游玩／重玩。";
     [ObservableProperty] private string _timeSummary = "自动会话和人工调整保持原样；此处只编辑手工记录时长。";
+    [ObservableProperty] private IReadOnlyList<FieldComparisonDisplay> _differences = [];
+    [ObservableProperty] private string _comparisonSummary = "对照只读原稿与Web，不自动合并或改变操作ID。";
+    private PersonalEditInspection? _inspection;
+    public string Outcome => Applied ? "已应用" : Conflict ? "明确冲突／拒绝" : _inspection?.State == PersonalOperationState.Uncertain ? "结果未确认" : HasDraft ? "待同步" : "尚未保存";
     private PersonalPlayData? _basis;
     private bool _newRecord;
     private bool _settingFields;
@@ -67,6 +71,9 @@ public sealed partial class QuickPlayEditorViewModel : ObservableObject
             Draft = pending; SelectedPlay = Plays.SingleOrDefault(p => p.Play.Id == pending.PlayId);
             _basis = pending.Request.Details; SetFields(_basis); HasSelection = true;
             Message = "已载入上次未同步的修改，可以重试同步。";
+            await InspectCoreAsync(false);
+            if (Conflict) Message = "已恢复明确冲突／拒绝的原稿；可先只读字段对照，再保留原稿并重新读取。";
+            else if (_inspection?.State == PersonalOperationState.Uncertain) Message = "已恢复结果未确认的原操作；只按原ID重试，不按相似Web内容推断已应用。";
         }
     }
     partial void OnSelectedPlayChanged(PlayChoice? value)
@@ -99,6 +106,7 @@ public sealed partial class QuickPlayEditorViewModel : ObservableObject
         if (e.PropertyName is nameof(Busy) or nameof(Draft) or nameof(Applied) or nameof(Conflict))
         { OnPropertyChanged(nameof(CanChooseRecord)); OnPropertyChanged(nameof(CanRetry)); }
         if (e.PropertyName is nameof(Draft) or nameof(SelectedPlay) or nameof(HasSelection)) OnPropertyChanged(nameof(TargetSummary));
+        if (e.PropertyName is nameof(Draft) or nameof(Applied) or nameof(Conflict)) OnPropertyChanged(nameof(Outcome));
     }
     [RelayCommand] private void NewRecord()
     {
@@ -132,8 +140,35 @@ public sealed partial class QuickPlayEditorViewModel : ObservableObject
     {
         Draft = await _service.QueueAsync(Reference, _newRecord ? null : SelectedPlay?.Play, BuildDetails(), CancellationToken.None);
         Message = "编辑原稿已保存到本机，正在同步…"; await SyncCoreAsync();
+    }, true);
+    [RelayCommand] private Task RetryAsync() => RunAsync(SyncCoreAsync, true);
+    [RelayCommand] private Task PreviewChangesAsync() => RunAsync(async () =>
+    {
+        if (Draft is not null) await InspectCoreAsync(false);
+        else
+        {
+            Differences = FieldComparisonDisplay.Rows(PersonalComparison.Play(_newRecord ? null : _basis?.ToPersonal(), true, null, false, BuildDetails().ToPersonal()));
+            ComparisonSummary = "原值为本次编辑基准；Web当前值未读取。尚未保存，也未发送请求。";
+        }
     });
-    [RelayCommand] private Task RetryAsync() => RunAsync(SyncCoreAsync);
+    [RelayCommand] private Task ReadComparisonAsync() => RunAsync(() => InspectCoreAsync(true));
+    private async Task InspectCoreAsync(bool refresh)
+    {
+        if (Draft is not { } draft) throw new ArgumentException("请先保存原稿；未保存内容可使用字段预览。");
+        _inspection = await _service.InspectAsync(draft, refresh, CancellationToken.None);
+        Conflict |= _inspection.State == PersonalOperationState.Conflict;
+        Applied |= _inspection.State == PersonalOperationState.Applied;
+        var rows = _inspection.Differences.ToList();
+        if (_inspection.Conflict is { ItemRevision: not null } target && target.ItemNovelId != draft.Request.Details.NovelId)
+            rows.Add(new("item_novel_id", new(draft.Request.Details.NovelId), new(target.ItemNovelId), new(draft.Request.Details.NovelId)));
+        Differences = FieldComparisonDisplay.Rows(rows);
+        ComparisonSummary = (draft.OriginalKnown ? "原值来自原稿基准。" : "旧稿未保存原值，明确显示未知。") +
+            (_inspection.ObservedAt is { } at ? $" Web观测：{at.ToLocalTime():g}。" : _inspection.CurrentKnown ? " Web值来自已确认回执，尚未重新读取。" : " Web值尚未读取。") +
+            (_inspection.ReadFailed ? " 本次读取未完成，保留已有观测与原稿。" : "") +
+            (_inspection.Current?.ItemId is { } actualItem && draft.Request.ItemId is { } expectedItem && actualItem != expectedItem ? " 记录归属已改变，需回书架核对。" : "") +
+            (_inspection.Conflict?.ItemRemoved == true ? " 书架条目已移除，需回书架核对。" : "");
+        OnPropertyChanged(nameof(Outcome));
+    }
     private async Task SyncCoreAsync()
     {
         var draft = Draft ?? throw new ArgumentException("没有待同步原稿。");
@@ -147,7 +182,7 @@ public sealed partial class QuickPlayEditorViewModel : ObservableObject
     [RelayCommand] private Task ReloadConflictAsync() => RunAsync(async () =>
     {
         await _service.WithdrawConflictAsync(Draft ?? throw new ArgumentException("没有待核对原稿。"), CancellationToken.None);
-        IsDirty = false; _acceptedPlay = null; Draft = null; Conflict = false; Applied = false; HasSelection = false; SelectedPlay = null; _basis = null;
+        IsDirty = false; _acceptedPlay = null; Draft = null; Conflict = false; Applied = false; HasSelection = false; SelectedPlay = null; _basis = null; _inspection = null; Differences = [];
         await InitializeAsync(); Message = "已保留冲突原稿并载入Web版本，请核对后重新编辑。";
     });
     [RelayCommand] private void ClearDates() { if (Editable) { StartedOn = null; FinishedOn = null; } }
@@ -163,7 +198,7 @@ public sealed partial class QuickPlayEditorViewModel : ObservableObject
     }
     [RelayCommand] private void ContinueEditing() => ConfirmClose = false;
     [RelayCommand] private void DiscardAndClose() { if (!Busy && !HasDraft) _close(); }
-    private async Task RunAsync(Func<Task> action)
+    private async Task RunAsync(Func<Task> action, bool inspectAfter = false)
     {
         if (Busy) return; Busy = true;
         try { await action(); }
@@ -171,6 +206,12 @@ public sealed partial class QuickPlayEditorViewModel : ObservableObject
         catch (WebUnavailableException) { Message = "Web暂时不可达，修改已保存在本机；联网后可重试同步。"; }
         catch (ClientApiException e) when (e.Status is 401 or 403) { Message = "修改已保留，请在设置中核对Web管理密钥后重试。"; }
         catch (Exception e) when (e is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or ClientApiException or HttpRequestException or System.Text.Json.JsonException) { Message = "未完成：" + e.Message; }
-        finally { Busy = false; }
+        finally
+        {
+            if (inspectAfter && Draft is not null)
+                try { await InspectCoreAsync(false); }
+                catch (Exception e) when (e is IOException or InvalidDataException or ArgumentException or InvalidOperationException or System.Text.Json.JsonException or UnauthorizedAccessException) { ComparisonSummary = "原稿／回执对照无法读取；未确认新的结果，请保留原件核对。"; }
+            Busy = false;
+        }
     }
 }

@@ -1,6 +1,6 @@
 # VNDB Local
 
-当前版本 **0.5**（SemVer `0.5.0`），采用 [Apache-2.0](LICENSE)。
+当前版本 **0.6.0**（SemVer `0.6.0`），采用 [Apache-2.0](LICENSE)。
 
 基于 .NET 10 的个人视觉小说资料库与启动器。Docker Web 保存完整数据库，桌面端提供书架、游戏启动及本机目录管理，CLI 提供命令行查询和整理入口。
 

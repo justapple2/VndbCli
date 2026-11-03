@@ -109,3 +109,5 @@ known_hosts*
 **/personal-organization-receipts/
 **/personal-organization-conflicts/
 **/local-resources.json
+
+**/startup-diagnostics.json

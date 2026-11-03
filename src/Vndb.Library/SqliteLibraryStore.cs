@@ -127,7 +127,6 @@ public sealed partial class SqliteLibraryStore : ILibraryStore
                 entry.Provenance == "web_vndb" ? entry.UpdatedAt : null);
             Event(connection, transaction, entry.Novel.Id, "metadata-save", before is null ? null : Json(before), Json(entry));
         }
-        Execute(connection, transaction, "CREATE TABLE IF NOT EXISTS personal_organization(id INTEGER PRIMARY KEY CHECK(id=1),record_json TEXT NOT NULL CHECK(json_valid(record_json))); PRAGMA user_version=14;");
         transaction.Commit();
     }
     public void SaveEnrichment(LibraryEntry entry, long expectedRevision, IReadOnlyList<Producer> originalProducers)

@@ -17,18 +17,21 @@ namespace Vndb.Tests;
 public sealed class UiRefreshTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
-    private sealed class Factory(string path) : WebApplicationFactory<Program>
+    internal sealed class Factory(string path) : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder) => builder.UseSetting("Library:DataDirectory", path).UseSetting("Library:WriteKey", "ui-test-key").UseSetting("CatalogJobs:Enabled", "false");
     }
-    private sealed class Traffic : DelegatingHandler
+    internal sealed class Traffic : DelegatingHandler
     {
         public bool LoseNextWrite { get; set; }
         public bool UnauthorizedWrites { get; set; }
         public string? InstanceOverride { get; set; }
+        public bool FailReadsAfterConflict { get; set; }
+        public bool ReadUnavailable { get; set; }
         public List<(string Body, string Key)> Writes { get; } = [];
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
+            if (ReadUnavailable && request.Method == HttpMethod.Get && request.RequestUri!.AbsolutePath.StartsWith("/api/v1/plays/", StringComparison.Ordinal)) throw new HttpRequestException("Synthetic read unavailable");
             var write = request.Method is { } method && (method == HttpMethod.Post || method == HttpMethod.Patch) && request.RequestUri!.AbsolutePath.StartsWith("/api/v1/plays", StringComparison.Ordinal);
             if (write)
             {
@@ -36,6 +39,7 @@ public sealed class UiRefreshTests
                 if (UnauthorizedWrites) return new(HttpStatusCode.Unauthorized) { Content = JsonContent.Create(new ApiProblem("unauthorized", "synthetic", 401)) };
             }
             var response = await base.SendAsync(request, ct);
+            if (write && response.StatusCode == HttpStatusCode.Conflict && FailReadsAfterConflict) ReadUnavailable = true;
             if (request.RequestUri!.AbsolutePath == "/api/v1/info" && InstanceOverride is not null)
             {
                 var info = (await response.Content.ReadFromJsonAsync<ServiceInfo>(VndbJson.Options, ct))!;
@@ -45,7 +49,7 @@ public sealed class UiRefreshTests
             return response;
         }
     }
-    private sealed class Fixture : IDisposable
+    internal sealed class Fixture : IDisposable
     {
         public readonly TestDirectory Dir = new();
         public readonly Factory App;

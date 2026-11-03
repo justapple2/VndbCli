@@ -42,7 +42,7 @@ class ReleaseTests(unittest.TestCase):
         stage = Path(intent['stage'])
         for folder, name in [('web', 'Vndb.Web'), ('cli', 'vndb'), ('admin', 'vndb-admin')]:
             (stage / folder).mkdir()
-            (stage / folder / (name + '.deps.json')).write_text('{"libraries":{"Vndb.Core/0.5.0":{}}}')
+            (stage / folder / (name + '.deps.json')).write_text('{"libraries":{"Vndb.Core/0.6.0":{}}}')
             Path(str(stage) + '.' + folder + '.msbuild-files').write_text(name + '.deps.json\n', encoding='utf-8')
         (stage / 'Dockerfile').write_text('FROM runtime')
         return stage
@@ -77,7 +77,7 @@ class ReleaseTests(unittest.TestCase):
     def test_client_documentation_includes_licenses_and_referenced_demo_images(self):
         stage = Path(release.begin(self.root / 'client', 'cli', 'win-x64')['stage'])
         deps = stage / 'vndb.deps.json'
-        deps.write_text('{"libraries":{"Vndb.Core/0.5.0":{}}}')
+        deps.write_text('{"libraries":{"Vndb.Core/0.6.0":{}}}')
         Path(str(stage) + '.msbuild-files').write_text('vndb.deps.json\n', encoding='utf-8')
         release.capture(stage, [('Cli', deps)])
         release.finalize(stage)

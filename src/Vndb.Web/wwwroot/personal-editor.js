@@ -1,14 +1,14 @@
 /* Personal editing presentation only. Writes use the existing revisioned v1 API. */
 (function(root, factory) {
- 'use strict'; const value=factory(); if(typeof module==='object')module.exports=value;else root.VnPersonal=value;
-})(globalThis, function() {
+ 'use strict'; const value=factory(typeof module==='object'?require('./field-comparison.js'):root.VnDifferences); if(typeof module==='object')module.exports=value;else root.VnPersonal=value;
+})(globalThis, function(comparison) {
  'use strict';
  const labels={not_started:'未游玩',playing:'游玩中',played:'已游玩',completed:'本次完成',on_hold:'搁置',dropped:'放弃'};
  const clone=value=>structuredClone(value), same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
  const operation=()=>globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
  const editorKey=(record,item)=>record?'play:'+record.id:'item:'+(item?.id??'unselected')+'|new';
  function session(record,item=null,newId=operation) {
-  let original=record?clone(record):null, pending=null, state='editing', archived=[];
+  let original=record?clone(record):null, pending=null, state='editing', archived=[],observed=null,observedKnown=false,observedAt=null;
   const itemId=item?.id??record?.item_id??null;
   if(!itemId)throw Error('请先在我的书架选择具体条目或核对历史记录的关联，再编辑游玩；不会按标题或VNDB ID猜测版本。');
   function requireTarget(value) {
@@ -18,6 +18,9 @@
   return {
    get record(){return original&&clone(original);}, get pending(){return pending&&clone(pending);},
    get state(){return state;},get archived(){return clone(archived);},get itemId(){return itemId;},
+   get observedAt(){return observedAt;},
+   observe(value){if(original&&value&&value.id!==original.id)throw Error('Web对照记录身份不符。');observed=value?clone(value):null;observedKnown=!!original;observedAt=new Date().toISOString();},
+   review(incoming){return comparison.play(original?.details,observed?.details,pending?.body.details||incoming,{currentKnown:observedKnown});},
    async submit(details,send) {
     if(state==='applied'||state==='submitting'||state==='conflict')throw Error('请先核对当前操作状态。');
     if(!pending)pending={path:'/plays'+(original?'/'+encodeURIComponent(original.id):''),method:original?'PATCH':'POST',
@@ -33,7 +36,7 @@
    reload(value) {
     if(!['conflict','rejected'].includes(state))throw Error('结果尚未确认，只能重试原操作。');
     if(original){requireTarget(value);if(value.id!==original.id||value.details.novel_id!==original.details.novel_id)throw Error('原记录关联已变化，原稿保留。');}
-    if(pending)archived.push(clone(pending));original=value?clone(value):original;pending=null;state='editing';
+    if(pending)archived.push({...clone(pending),basis:clone(original)});original=value?clone(value):original;pending=null;state='editing';observed=null;observedKnown=false;observedAt=null;
    }
   };
  }
@@ -67,7 +70,7 @@
   const b=element('button',text,kind);b.type='button';let running=false;b.onclick=async()=>{if(running)return;running=true;b.setAttribute('aria-busy','true');try{await run();}catch(e){parent.append(element('p',e.message,'notice error'));}finally{running=false;b.removeAttribute('aria-busy');}};parent.append(b);return b;
  }
  function create({changed=async()=>{}}={}) {
-  const retained=new Map();let current=null,basis={},initial='',returnFocus=null,readGeneration=0,busy=false;
+  const retained=new Map();let current=null,basis={},initial='',returnFocus=null,readGeneration=0,busy=false,comparisonRead=0;
   const dialog=element('dialog',undefined,'personal-editor'),heading=element('h2','游玩记录');heading.id='personal-editor-title';dialog.setAttribute('aria-labelledby',heading.id);
   const context=element('p',undefined,'personal-context'),form=element('form'),fields=element('fieldset'),grid=element('div',undefined,'personal-grid'),inputs={};
   function input(name,label,type='text',maxLength) {
@@ -87,10 +90,20 @@
   for(const [name,label,max] of [['review','个人评价',20000],['notes','备注一',10000],['extra_notes','备注二',10000]]){const c=input(name,label,'textarea',max);c.rows=name==='review'?4:2;}
   const summary=element('p',undefined,'personal-context'),feedback=element('p',undefined,'notice'),history=element('details',undefined,'personal-originals'),historyBody=element('div');history.append(element('summary','保留的冲突／拒绝原稿（当前页面内）'),historyBody);
   feedback.setAttribute('role','status');
+  const reviewSection=element('details',undefined,'personal-comparison'),reviewActions=element('div',undefined,'personal-actions-inline'),reviewBody=element('div'),reviewMessage=element('p',undefined,'personal-context');
+  reviewSection.append(element('summary','原值／Web值／本机稿对照'),reviewActions,reviewMessage,reviewBody);
+  const preview=action(reviewActions,'预览字段变化',async()=>showComparison()),readCurrent=action(reviewActions,'只读当前Web对照',async()=>{
+   const target=current,record=target?.record,token=++comparisonRead,key=target?.pending?.operationId||record?.revision;
+   if(!record){reviewMessage.textContent='新建请求不能凭相似记录判断结果；待确认操作只按原ID重试。';return;}
+   let latest;try{latest=await request('/plays/'+encodeURIComponent(record.id));}catch(error){if(error.status!==404)throw error;latest=null;}
+   if(current!==target||!dialog.open||token!==comparisonRead||(target.pending?.operationId||target.record?.revision)!==key)return;
+   target.observe(latest);showComparison();reviewMessage.textContent='只读观测 '+new Date().toLocaleString()+'；操作ID、原稿和同步状态未改变。'+(latest&&(latest.deleted_at||latest.item_id!==target.itemId||latest.details.novel_id!==target.record.details.novel_id)?'记录移除或关联已变化，请回书架核对。':'');
+  });
   const bar=element('div',undefined,'personal-actions'),save=element('button','保存本次记录','primary'),retry=element('button','重试原操作','primary'),reload=element('button','保留原稿并重新读取','secondary'),cancel=element('button','取消／返回','plain');
-  save.type='submit';for(const b of [retry,reload,cancel])b.type='button';bar.append(save,retry,reload,cancel);form.append(fields,summary,feedback,history,bar);dialog.append(heading,context,form);document.body.append(dialog);
+  save.type='submit';for(const b of [retry,reload,cancel])b.type='button';bar.append(save,retry,reload,cancel);form.append(fields,summary,feedback,reviewSection,history,bar);dialog.append(heading,context,form);document.body.append(dialog);
   const values=()=>Object.fromEntries(Object.entries(inputs).map(([k,c])=>[k,c.type==='checkbox'?c.checked:c.value]));
   const dirty=()=>JSON.stringify(values())!==initial;
+  function showComparison(){if(!current||!comparison)return;const incoming=current.pending?.body.details||details(values(),basis);comparison.render(reviewBody,current.review(incoming),comparison.outcome(current.state));reviewSection.open=true;}
   function update() {
    fields.disabled=busy||current?.pending!==null;
    save.hidden=current?.pending!==null;save.disabled=busy;
@@ -98,9 +111,12 @@
    reload.hidden=!['conflict','rejected'].includes(current?.state);reload.disabled=busy;cancel.disabled=busy;
    inputs.hours.disabled=inputs.minutes.disabled=!inputs.known.checked;
    history.hidden=!current?.archived.length;historyBody.replaceChildren();
-   for(const entry of current?.archived||[])historyBody.append(element('pre',JSON.stringify(entry.body,null,2)));
+   for(const entry of current?.archived||[]){const block=element('section');historyBody.append(block);if(comparison)comparison.render(block,comparison.play(entry.basis?.details,current.record?.details,entry.body.details,{originalKnown:'basis'in entry,currentKnown:true}), '已保留原操作 '+entry.operationId);else block.append(element('pre',JSON.stringify(entry.body,null,2)));}
+   preview.disabled=readCurrent.disabled=busy;
+   if(current?.pending&&comparison)showComparison();
   }
   function populate(d) {
+   comparisonRead++;reviewBody.replaceChildren();reviewSection.open=false;reviewMessage.textContent=current.observedAt?'Web观测 '+new Date(current.observedAt).toLocaleString():'Web当前值尚未读取；预览不发送请求。';
    basis=clone(d);for(const [name,c] of Object.entries(inputs)){if(name==='known')c.checked=d.duration_minutes!=null;else c.value=name==='hours'?d.duration_minutes==null?'':Math.floor(d.duration_minutes/60):name==='minutes'?d.duration_minutes==null?'':d.duration_minutes%60:d[name]??'';}
    inputs.novel_id.readOnly=true;initial=JSON.stringify(values());
    context.textContent='条目 '+current.itemId+'\n'+(current.record?'记录 '+current.record.id+' · 修订 '+current.record.revision:'新的独立记录，原有记录保留');

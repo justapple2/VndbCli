@@ -1,6 +1,6 @@
 # Docker／NAS部署与运维
 
-适用版本：0.5.0，API v1，SQLite schema14。推荐在开发机交叉发布，NAS仅构建运行时镜像。Web、资料补全队列和SQLite在一个服务内运行，无需另部署数据库、消息队列或自动化服务。以下目录、域名及代际名均为示例。
+适用版本：0.6.0，API v1，SQLite schema14。推荐在开发机交叉发布，NAS仅构建运行时镜像。Web、资料补全队列和SQLite在一个服务内运行，无需另部署数据库、消息队列或自动化服务。以下目录、域名及代际名均为示例。
 
 ## 1. 部署内容与准备条件
 
@@ -23,9 +23,9 @@ Linux x64 NAS选择`linux-x64`；脚本也支持`linux-arm64`，需匹配实际C
 Remove-Item Env:VN_LIBRARY_KEY, Env:VNDB_API_TOKEN -ErrorAction SilentlyContinue
 ./scripts/Test.ps1
 # OutputRoot必须是全新目录；脚本会在下面创建linux-x64。
-./scripts/Publish-Runtime.ps1 -Runtime linux-x64 -OutputRoot ../VndbCli.private/releases/0.5.0/runtime/example-generation
-python -B scripts/release_guard.py verify ../VndbCli.private/releases/0.5.0/runtime/example-generation/linux-x64 --kind runtime
-python -B scripts/package_release.py runtime ../VndbCli.private/releases/0.5.0/runtime-example.tar.gz --runtime-root ../VndbCli.private/releases/0.5.0/runtime/example-generation/linux-x64
+./scripts/Publish-Runtime.ps1 -Runtime linux-x64 -OutputRoot ../VndbCli.private/releases/0.6.0/runtime/example-generation
+python -B scripts/release_guard.py verify ../VndbCli.private/releases/0.6.0/runtime/example-generation/linux-x64 --kind runtime
+python -B scripts/package_release.py runtime ../VndbCli.private/releases/0.6.0/runtime-example.tar.gz --runtime-root ../VndbCli.private/releases/0.6.0/runtime/example-generation/linux-x64
 ```
 
 脚本生成唯一binlog，核对Web／CLI／Admin实际依赖、SDK发布清单、源码提交／树摘要、RID和逐文件SHA256，再封存。打包器拒绝未封存、被改写或含私有文件的目录，也拒绝覆盖已有归档。保留失败暂存，另选新代际重试；不要往旧发布目录追加本机配置。根多阶段Dockerfile供源码构建参考，NAS推荐使用发布目录内的运行时Dockerfile。
@@ -159,7 +159,7 @@ Admin的`library backup`只备份DB，不能替代完整snapshot；Admin是受�
 每次使用新封存代际和唯一镜像标签，即使产品版本相同也区分源码／代际。新目录如`releases/example-next/runtime/`，不覆盖现有release：
 
 1. 私有audit保存原Compose、镜像ID、UID:GID、端口／挂载／安全设置、密钥指纹及服务实例。只检查本项目，避免完整环境转储泄露密钥。
-2. 上传／核验新runtime，在原Web运行时先构建唯一标签镜像。例如从项目根执行`docker build --label org.opencontainers.image.revision=<完整提交> -t vndb-local:0.5.0-example-next -f releases/example-next/runtime/Dockerfile releases/example-next/runtime`；先替换占位符。
+2. 上传／核验新runtime，在原Web运行时先构建唯一标签镜像。例如从项目根执行`docker build --label org.opencontainers.image.revision=<完整提交> -t vndb-local:0.6.0-example-next -f releases/example-next/runtime/Dockerfile releases/example-next/runtime`；先替换占位符。
 3. 完整snapshot并隔离restore验证；短暂停原Web保存最终一致DB副本／逐行摘要。所有SQLite读取和备份用原文件属主，不用管理员身份打开活库。
 4. 只改Compose的image及build context，保留其余配置；执行`docker compose up -d --no-deps --no-build library`，有界等待Healthy。
 5. 比较info身份、schema、原始行、封面SHA、密钥及属主；核对新程序集／静态文件与封存清单，再用已有ID测API／CLI本地优先查询。区分合法任务推进和原数据丢失，不能只比较总数。

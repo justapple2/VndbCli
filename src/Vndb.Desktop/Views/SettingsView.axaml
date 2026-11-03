@@ -1,5 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:Vndb.Desktop.ViewModels"
-             xmlns:local="using:Vndb.Local" x:Class="Vndb.Desktop.Views.SettingsView" x:DataType="vm:MainViewModel">
+             xmlns:local="using:Vndb.Local" xmlns:views="using:Vndb.Desktop.Views" x:Class="Vndb.Desktop.Views.SettingsView" x:DataType="vm:MainViewModel">
   <ScrollViewer HorizontalScrollBarVisibility="Disabled"><StackPanel Classes="settings-page">
     <TextBlock Text="连接与本机偏好" Classes="section-title" />
     <TextBlock Text="修改连接、全局LE或目录默认值后，点击“保存并应用”。游戏位置与启动配置仅保存在本机JSON。" Classes="caption wrap" />
@@ -36,6 +36,7 @@
       <Button Classes="form-action" Content="保存外观偏好" Command="{Binding SaveAppearanceCommand}" />
     </StackPanel></Border>
     <TextBlock Text="高级维护" Classes="section-title" />
+    <Expander Classes="advanced" Header="最近启动检查／脱敏报告" HorizontalContentAlignment="Stretch"><StackPanel Classes="form"><views:StartupDiagnosticView DataContext="{Binding Diagnostics}" /><Button Content="重新尝试未完成的启动" Command="{Binding RetryStartupCommand}" /></StackPanel></Expander>
     <Expander Classes="advanced" Header="本机数据与查询作用域"><StackPanel Classes="form">
       <TextBlock Text="本机数据根（系统文档目录，与程序位置无关）" Classes="wrap" /><SelectableTextBlock Text="{Binding DataRootLocation}" Classes="wrap" />
       <TextBlock Text="当前服务的查询快照／待同步目录" Classes="wrap" /><SelectableTextBlock Text="{Binding StateLocation}" Classes="wrap" />

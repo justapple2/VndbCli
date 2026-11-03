@@ -1,6 +1,6 @@
 # CLI使用说明
 
-适用版本0.5.0。`vndb`面向命令行和脚本；日常查询、元数据同步与经过批准的本机整理复用共享模块。CLI不带数据库，不直接读NAS SQLite，不提供通用个人CRUD／游戏启动命令；个人编辑和启动使用[桌面](DESKTOP.md)，第三方集成使用[Web API](WEB-API.md)。
+适用版本0.6.0。`vndb`面向命令行和脚本；日常查询、元数据同步与经过批准的本机整理复用共享模块。CLI不带数据库，不直接读NAS SQLite，不提供通用个人CRUD／游戏启动命令；个人编辑和启动使用[桌面](DESKTOP.md)，第三方集成使用[Web API](WEB-API.md)。
 
 ## 1. 安装与帮助
 
@@ -235,6 +235,8 @@ vndb observe status --identity-dir "D:\SyntheticClient" --json
 ## 个人分类与本机资源档案
 
 `personal status`读取当前服务作用域的分类快照／离线稿，`personal pull`读取Web，`personal queue --change-json change.json`登记明确变更而不联网，`personal sync`按原操作同步。使用既有`--server`／`--cache-dir`选择与桌面相同作用域；`VN_LIBRARY_KEY`提供Web管理密钥。明确冲突后可用`personal pull --resolve-conflict`保留旧稿并读取Web，结果不明不能放弃原操作。
+
+`personal review --json`只读队首分类原稿的原值／Web值／本机稿和操作状态；Web值尚未读取时明确标为未知。加`--online`显式GET当前Web分类，输出观测时间、读取是否失败及字段差异，不修改分类快照／队列，也不确认写入结果。待提交、结果未确认、明确冲突和已确认应用各自独立；即使读到相同内容，结果未确认的操作仍使用原ID重试。
 
 `change.json`内容为`{"expected_revision":0,"label":{"id":"my-list","name":"想玩","kind":"collection"}}`；状态ID可由`personal status --json`核对。成员修改示例：`{"expected_revision":1,"items":[{"item_id":"item-example","favorite":true,"label_ids":["my-list"]}]}`。只对准确个人条目分类，不使用物理路径或VN ID。
 

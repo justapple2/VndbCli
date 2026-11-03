@@ -5,3 +5,5 @@
 #item-inputs{border:0;padding:0;min-width:0}#item-originals pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto}
 
 .personal-editor input:not([type=checkbox]),.personal-editor select,.personal-editor textarea{width:100%;min-width:0;border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--light);color:var(--ink);font:inherit}.personal-editor input:read-only{color:var(--muted);background:var(--panel)}.personal-editor fieldset:disabled{opacity:.8}.personal-grid .personal-wide{grid-column:1/-1}.personal-editor .personal-known{flex-direction:row;align-items:center;justify-content:space-between}.personal-editor .personal-known input{margin:0}.personal-editor label{font-weight:500}
+
+.field-comparison{min-width:0;overflow-wrap:anywhere}.field-comparison details{border-top:1px solid var(--line);padding:10px 0}.field-comparison summary{cursor:pointer;font-weight:600}.field-comparison strong{display:block;font-size:12px;color:var(--muted);margin-top:8px}.field-comparison p{white-space:pre-wrap;max-height:280px;overflow:auto;margin:4px 0 10px}.personal-actions-inline{display:flex;gap:8px;flex-wrap:wrap}

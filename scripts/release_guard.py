@@ -75,7 +75,7 @@ def begin(target, kind, rid):
     reservation = target.with_name('.' + target.name + '.publish-intent.json')
     stage = target.with_name('.' + target.name + '.staging-' + uuid.uuid4().hex)
     intent = {'format': 'vn-release-intent', 'target': str(target), 'stage': str(stage), 'kind': kind, 'rid': rid,
-              'version': '0.5.0', 'api': 1, 'schema': 14, 'source': source(), 'build_mode': 'cross-published-runtime' if kind == 'runtime' else 'self-contained-client'}
+              'version': '0.6.0', 'api': 1, 'schema': 14, 'source': source(), 'build_mode': 'cross-published-runtime' if kind == 'runtime' else 'self-contained-client'}
     write_new(reservation, intent)
     stage.mkdir()
     return intent
@@ -171,7 +171,7 @@ def finalize(stage):
 def verify(root, expected_kind=None):
     root = ordinary(root)
     manifest = json.loads(ordinary(root / MANIFEST).read_text(encoding='utf-8'))
-    if manifest.get('format') != 'vn-release-v1' or expected_kind and manifest.get('kind') != expected_kind or manifest.get('version') != '0.5.0' or manifest.get('schema') != 14 or manifest.get('api') != 1:
+    if manifest.get('format') != 'vn-release-v1' or expected_kind and manifest.get('kind') != expected_kind or manifest.get('version') != '0.6.0' or manifest.get('schema') != 14 or manifest.get('api') != 1:
         raise ValueError('Unknown or mismatched sealed release')
     content = files(root)
     content.pop(MANIFEST, None)

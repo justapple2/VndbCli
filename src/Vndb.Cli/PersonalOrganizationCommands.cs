@@ -10,19 +10,22 @@ public sealed partial class CliApplication
     private void AddPersonalOrganization(RootCommand root)
     {
         var group = new Command("personal", "收藏／虚拟集合／标签；JSON原稿与Web修订同步，不改动游戏目录。");
-        foreach (var name in new[] { "status", "queue", "pull", "sync" })
+        foreach (var name in new[] { "status", "queue", "pull", "sync", "review" })
         {
-            var command = new Command(name, name switch { "status" => "读取本机已确认分类和离线稿。", "queue" => "登记明确的分类变更JSON（需expected_revision），不联网。", "pull" => "读取Web；未确认原操作不丢弃。", _ => "按原ID同步离线稿。" });
-            var file = new Option<string>("--change-json") { Required = true }; var resolve = new Option<bool>("--resolve-conflict");
+            var command = new Command(name, name switch { "status" => "读取本机已确认分类和离线稿。", "queue" => "登记明确的分类变更JSON（需expected_revision），不联网。", "pull" => "读取Web；未确认原操作不丢弃。", "review" => "只读字段对照；--online显式读取Web，不确认或改写原稿。", _ => "按原ID同步离线稿。" });
+            var file = new Option<string>("--change-json") { Required = true }; var resolve = new Option<bool>("--resolve-conflict"); var online = new Option<bool>("--online");
             if (name == "queue") command.Add(file); if (name == "pull") command.Add(resolve);
+            if (name == "review") command.Add(online);
             Bind(command, async (_, parsed, ct) =>
             {
                 var scope = QueryScope(parsed); var store = new PersonalOrganizationStore(scope.DirectoryPath, scope.Origin);
                 if (name == "queue") { await store.EnqueueAsync(RunJournal.Read<PersonalOrganizationChange>(parsed.GetValue(file)!), ct); return await store.ReadAsync(ct); }
                 if (name == "status") return await store.ReadAsync(ct);
+                if (name == "review" && !parsed.GetValue(online)) { var review = await store.InspectAsync(ct: ct); return new { review.State, review.Differences }; }
                 var uri = ClientSettings.ServerUri(scope.Origin ?? throw new ArgumentException("需要明确Web地址。"));
                 using var http = CreateHttpClient(); var api = new WebLibraryClient(http, uri, Env("VN_LIBRARY_KEY"), TimeSpan.FromSeconds(parsed.GetValue(_timeout)));
                 if (name == "pull") return await store.RefreshAsync(api, parsed.GetValue(resolve), ct);
+                if (name == "review") { var review = await store.InspectAsync(api, true, ct); return new { review.State, review.ObservedAt, review.ReadFailed, review.Differences }; }
                 await store.SyncAsync(api, ct); return await store.ReadAsync(ct);
             }); group.Add(command);
         }

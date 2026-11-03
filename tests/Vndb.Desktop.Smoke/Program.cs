@@ -467,6 +467,28 @@ public static class Program
             Check(resourceView.GetVisualDescendants().OfType<Button>().Any(b => ReferenceEquals(b.Command, resourceVm.HashCommand)), "K5 hashing is an explicit command only");
             Check(!resourceVm.ManuallyApplied && resourceVm.Verification == "unreviewed", "K5 resources never infer patch applicability or application");
             Save(resourceWindow, output, "k5-local-resource-archive.png"); resourceWindow.Close();
+            var reviewOriginal = summaryBook.Plays[0];
+            var reviewRequest = reviewOriginal.Details with { Review = "本机合成感想 · " + new string('文', 180), DurationMinutes = 0 };
+            var reviewDraft = new PersonalEditDraft(Guid.NewGuid().ToString("D"), summaryBook.Id, "http://test.local/", reviewOriginal.Id,
+                new(reviewRequest, summaryBook.Item!.Item.Id, reviewOriginal.Revision), DateTimeOffset.UtcNow) { Original = reviewOriginal.Details, OriginalKnown = true };
+            var inspection = new PersonalEditInspection(reviewDraft, PersonalOperationState.Conflict, reviewOriginal with { Details = reviewOriginal.Details with { Review = "Web合成感想" }, Revision = reviewOriginal.Revision + 1 }, true, DateTimeOffset.UtcNow);
+            var reviewVm = new QuickPlayEditorViewModel(summaryBook, new QuickService(inspection), () => { }, () => Task.CompletedTask);
+            await reviewVm.InitializeAsync(); var reviewView = new QuickPlayEditorView { DataContext = reviewVm };
+            var reviewWindow = new Window { Width = 720, Height = 900, Content = reviewView }; reviewWindow.Show(); await Render(reviewWindow);
+            Check(reviewVm.Conflict && !reviewVm.CanRetry && reviewVm.Differences.Count > 0, "K6 reopening an existing conflict never offers a new write or blind retry");
+            var comparePanel = reviewView.GetVisualDescendants().OfType<Expander>().Single(e => e.Header?.ToString() == "字段对照（不自动合并）"); comparePanel.IsExpanded = true; await Render(reviewWindow);
+            var reviewField = reviewView.GetVisualDescendants().OfType<Expander>().Single(e => e.Header?.ToString()?.StartsWith("个人评价 ·", StringComparison.Ordinal) == true);
+            Check(!reviewField.IsExpanded, "K6 long review comparison is folded by default"); reviewField.IsExpanded = true; await Render(reviewWindow);
+            Check(reviewView.GetVisualDescendants().OfType<SelectableTextBlock>().Any(t => t.Text == "Web合成感想") && reviewView.GetVisualDescendants().OfType<SelectableTextBlock>().Any(t => t.Text == reviewRequest.Review), "K6 compiled three-way fields render Web and immutable incoming values separately");
+            var reviewScroll = reviewView.GetVisualDescendants().OfType<ScrollViewer>().First(); reviewScroll.Offset = new Vector(0, 100000); await Render(reviewWindow);
+            Save(reviewWindow, output, "k6-three-way-fields.png"); reviewWindow.Close();
+            vm.Diagnostics.Trace.Begin(); vm.Diagnostics.Trace.RecordFailure(StartupStage.Shelf, new InvalidDataException("Synthetic hidden private diagnostic value")); vm.Diagnostics.Refresh();
+            var diagnosticView = new StartupDiagnosticView { DataContext = vm.Diagnostics }; var diagnosticWindow = new Window { Width = 640, Height = 600, Content = new ScrollViewer { Margin = new Thickness(16), Content = diagnosticView } };
+            diagnosticWindow.Show(); await Render(diagnosticWindow);
+            Check(diagnosticView.GetVisualDescendants().OfType<TextBlock>().Any(t => t.Text?.Contains("个人书架与分类") == true), "K6 startup diagnostic stage is rendered through its shared template");
+            Check(diagnosticView.GetVisualDescendants().OfType<Button>().Any(b => ReferenceEquals(b.Command, vm.Diagnostics.ExportCommand)), "K6 explicit sanitized export command is bound");
+            Check(!diagnosticView.GetVisualDescendants().OfType<TextBlock>().Any(t => t.Text?.Contains("hidden private") == true), "K6 raw exception text never appears in the diagnostic model or display");
+            Save(diagnosticWindow, output, "k6-startup-diagnostics.png"); diagnosticWindow.Close();
             await File.WriteAllTextAsync(Path.Combine(output, "ui-warnings.json"), JsonSerializer.Serialize(logs.Messages));
             Console.WriteLine("Screens rendered; checking bindings.");
             var bindingsValid = !logs.Messages.Any(m => m.Contains("Binding") || m.Contains("Error"));
@@ -487,10 +509,11 @@ public static class Program
         public Task<string?> FolderAsync(string title) => Task.FromResult<string?>(null);
         public Task<string?> SaveJsonAsync(string name) => Task.FromResult<string?>(null);
     }
-    private sealed class QuickService : IQuickPlayService
+    private sealed class QuickService(PersonalEditInspection? inspection = null) : IQuickPlayService
     {
-        public Task<IReadOnlyList<PersonalPlayView>> LoadAsync(QuickPlayBook book, CancellationToken ct) => Task.FromResult(book.Plays);
-        public Task<PersonalEditDraft?> PendingAsync(QuickPlayBook book, CancellationToken ct) => Task.FromResult<PersonalEditDraft?>(null);
+        public Task<IReadOnlyList<PersonalPlayView>> LoadAsync(QuickPlayBook book, CancellationToken ct) => Task.FromResult<IReadOnlyList<PersonalPlayView>>(inspection?.Current is { } current ? [current] : book.Plays);
+        public Task<PersonalEditDraft?> PendingAsync(QuickPlayBook book, CancellationToken ct) => Task.FromResult(inspection?.Draft);
+        public Task<PersonalEditInspection> InspectAsync(PersonalEditDraft draft, bool refresh, CancellationToken ct) => Task.FromResult(inspection ?? new PersonalEditInspection(draft, PersonalOperationState.Pending));
         public Task<PersonalEditDraft> QueueAsync(QuickPlayBook book, PersonalPlayView? play, PersonalPlayData details, CancellationToken ct) => Task.FromResult(new PersonalEditDraft(Guid.NewGuid().ToString("D"), book.Id, "http://test.local/", play?.Id, new(details, book.Item?.Item.Id, play?.Revision), DateTimeOffset.UtcNow));
         public Task<PersonalPlayView> SyncAsync(PersonalEditDraft draft, CancellationToken ct) => throw new InvalidOperationException("Headless appearance inspection must not submit writes.");
         public Task WithdrawConflictAsync(PersonalEditDraft draft, CancellationToken ct) => throw new InvalidOperationException();

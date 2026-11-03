@@ -28,7 +28,7 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty] private int _section;
     [ObservableProperty] private string _status = "加载本机配置后即可查询或配置离线启动。";
-    [ObservableProperty] private bool _busy;
+    [ObservableProperty, NotifyCanExecuteChangedFor(nameof(RetryStartupCommand))] private bool _busy;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(SelectedMetadata))] private BookViewModel? _selectedBook;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(SelectedComponents))] private LocalInstallationView? _selectedInstallation;
     public MetadataSnapshot? SelectedMetadata => SelectedBook?.Metadata;
@@ -69,6 +69,7 @@ public partial class MainViewModel : ObservableObject
         PersonalOrganization = new(() => new(Services().QueryDirectory, Services().Settings.Server), () => _services?.Web,
             () => Shelf.Books.ToArray(), ApplyPersonalOrganization, () => _services?.ActivityHost?.SignalSync());
         ResourceArchive = new(() => new(Services().LocalLibrary, Services().Identity?.Id ?? throw new InvalidOperationException("本机身份未加载。")), () => _dialogs.FolderAsync("选择资源检索根"));
+        Diagnostics = new(() => _dialogs.SaveJsonAsync("vn-startup-diagnostics.json"));
         Shelf.SelectionChanged += book => SelectedBook = book;
         Discovery = new(library, dialogs, GuardAsync, text => Status = text, () => _services?.QueryScope);
         Discovery.Completed += PresentQuery;
@@ -88,6 +89,7 @@ public partial class MainViewModel : ObservableObject
     public BookDetailsViewModel BookDetails { get; } = new();
     public PersonalOrganizationViewModel PersonalOrganization { get; }
     public ResourceArchiveViewModel ResourceArchive { get; }
+    public StartupDiagnosticViewModel Diagnostics { get; }
     private void ApplyPersonalOrganization(PersonalOrganizationState state)
     {
         var members = state.Items.ToDictionary(i => i.ItemId, StringComparer.Ordinal);
@@ -111,13 +113,34 @@ public partial class MainViewModel : ObservableObject
     public ImportFeedbackViewModel Imports { get; }
     [ObservableProperty] private string _queryRootOverride = "";
     public Task InitializeAsync() => GuardAsync(InitializeCoreAsync);
-    public Task<bool> StartAsync(Action initialized) => GuardAsync(async ct =>
+    private Action? _startupInitialized;
+    public event Action<bool>? StartupFinished;
+    public async Task<bool> StartAsync(Action initialized)
     {
-        await InitializeCoreAsync(ct);
-        initialized();
-        await RefreshCoreAsync(ct);
-        await InitializeSessionsCoreAsync(ct);
-    });
+        if (Busy) return false;
+        _startupInitialized = initialized; Diagnostics.Trace.Begin(); var success = false;
+        try
+        {
+            success = await GuardAsync(async ct =>
+            {
+                await Diagnostics.Trace.RunAsync(StartupStage.Configuration, InitializeCoreAsync, ct);
+                await Diagnostics.Trace.RunAsync(StartupStage.Covers, _ => { initialized(); return Task.CompletedTask; }, ct);
+                await Diagnostics.Trace.RunAsync(StartupStage.Shelf, RefreshCoreAsync, ct);
+                await Diagnostics.Trace.RunAsync(StartupStage.Sessions, InitializeSessionsCoreAsync, ct);
+            });
+        }
+        catch (Exception e) when (e is not OutOfMemoryException and not AccessViolationException)
+        { Status = "启动未完成；原数据保留。请在设置中查看启动检查并导出脱敏报告。"; }
+        finally
+        {
+            Diagnostics.Refresh();
+            if (_services is not null && !await Diagnostics.Trace.SaveLatestAsync(_services.SettingsStore.DirectoryPath)) Diagnostics.ExportMessage = "最近启动报告未能落盘；可另选新JSON文件导出。";
+            RetryStartupCommand.NotifyCanExecuteChanged(); StartupFinished?.Invoke(success);
+        }
+        return success;
+    }
+    private bool CanRetryStartup() => !Busy && Diagnostics.Trace.Failed && _services?.Sessions is null && _startupInitialized is not null;
+    [RelayCommand(CanExecute = nameof(CanRetryStartup))] private Task RetryStartupAsync() => StartAsync(_startupInitialized!);
     private async Task InitializeCoreAsync(CancellationToken ct)
     {
         if (_services is not null)

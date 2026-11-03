@@ -5,7 +5,7 @@
  const searchHistory=VnView.historyControl($('item-history'),$('item-query'),'shelf');
  VnDetails.preferencesControl($('title-preferences'),()=>{if(lastBooks)renderBooks(lastBooks);if(book)structuredDetails(book);});
  let display=stored.read(),key=VnView.storage('sessionStorage').get('library-key')||'',tab='shelf',page=display.page,book=null,limits=null,lastBooks=null;
- let itemAttempt=null,itemInitial='';
+ let itemAttempt=null,itemInitial='',itemRejected=null;
  const reads=VnView.latest(),keys=new Map();
  const operation=()=>globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
  function notice(text,error=false){$('message').textContent=text;$('message').hidden=!text;$('message').className='notice'+(error?' error':'');}
@@ -91,7 +91,7 @@
 
     const ticket=++itemRead;
     if(item){const full=await api('/items/'+encodeURIComponent(item.id));if(ticket!==itemRead||itemAttempt)return;if(full.item.id!==item.id||full.item.deleted_at)throw Error('条目身份或移除状态变化，请刷新。');detailView=full;item=full.item;}else detailView=null;
-    book=item;organizer?.mountEditor($('personal-membership'),item?.id);structuredDetails(item);const d=item?.details||{};$('item-editor-title').textContent=item?'编辑个人条目':'新增作品（可暂不关联 VNDB）';
+    book=item;itemRejected=null;if($('item-comparison'))$('item-comparison').replaceChildren();organizer?.mountEditor($('personal-membership'),item?.id);structuredDetails(item);const d=item?.details||{};$('item-editor-title').textContent=item?'编辑个人条目':'新增作品（可暂不关联 VNDB）';
     for(const [id,value] of Object.entries({'item-title':d.title,'item-company':d.company_hint,'item-title-override':d.title_override,'item-company-override':d.company_override,'item-notes':d.notes,'item-extra':d.extra_notes}))$(id).value=value||'';
     $('item-fields').open=!item;$('item-inputs').disabled=false;$('item-reload').hidden=true;$('item-save').textContent='保存个人条目';
     $('item-vn').textContent='关联：'+(d.novel_id||'尚未关联');$('link-query').value=d.title||'';$('item-candidates').replaceChildren();$('item-plays').replaceChildren();feedback('item-feedback','');itemInitial=JSON.stringify(itemDraft());
@@ -122,11 +122,24 @@
       if(!saved.id||!saved.details||book&&saved.id!==book.id||saved.revision!==(attempt.body.expected_revision||0)+1)throw Error('条目保存结果不符，尚未确认。');
       itemAttempt=null;book=saved;await editItem(book);await loadBooks();
     }catch(e){
-      if(e.status>=400&&e.status<500&&![408,429].includes(e.status)){itemAttempt=null;$('item-inputs').disabled=false;}
+      if(e.status>=400&&e.status<500&&![408,429].includes(e.status)){if(itemAttempt){itemRejected=structuredClone(itemAttempt);$('item-originals').querySelector('pre').textContent+='\n'+JSON.stringify(itemRejected,null,2);$('item-originals').hidden=false;}itemAttempt=null;$('item-inputs').disabled=false;}
       $('item-reload').hidden=e.status!==409||!book;
       feedback('item-feedback',e.message+(itemAttempt?'；结果尚未确认，字段已锁定，请重试原操作。':'；当前原稿保留，冲突时请明确重新读取。'));
       $('item-fields').open=true;$('item-save').textContent=itemAttempt?'重试原条目修改':'保存个人条目';
     }finally{$('item-save').disabled=false;}
+  };
+  if($('item-compare'))$('item-compare').onclick=async()=>{
+    const original=book,attempt=itemAttempt||itemRejected;
+    if(!original){feedback('item-feedback','请先选择已保存的个人条目；未创建的操作不能凭相似标题判断结果。');return;}
+    try{
+      const latest=await api('/items/'+encodeURIComponent(original.id));
+      if(book!==original||attempt!==(itemAttempt||itemRejected)||!$('item-dialog').open)return;
+      if(latest.item?.id!==original.id)throw Error('Web对照条目身份不符。');
+      const d=original.details,keep=(id,name)=>$(id).value===(typeof d[name]==='string'?d[name].replace(/\r\n?/g,'\n'):d[name]??'')?d[name]??null:$(id).value||null;
+      const incoming=attempt?.body.details||{...d,title:$('item-title').value.trim(),company_hint:keep('item-company','company_hint'),title_override:keep('item-title-override','title_override'),company_override:keep('item-company-override','company_override'),notes:keep('item-notes','notes'),extra_notes:keep('item-extra','extra_notes')};
+      globalThis.VnDifferences?.render($('item-comparison'),VnDifferences.item(original.details,latest.item.details,incoming,{currentKnown:true}),'条目字段对照 · 基准 '+original.revision+' / Web '+latest.item.revision);
+      feedback('item-feedback','只读观测；原操作ID和字段保持。'+(latest.item.deleted_at?'条目已移除，请回书架核对。':''));
+    }catch(error){feedback('item-feedback',error.message+'；原稿和已显示对照保留。');}
   };
   $('item-reload').onclick=async()=>{
     if(!book||itemAttempt)return;const retained={item_id:book.id,expected_revision:book.revision,fields:itemDraft()};

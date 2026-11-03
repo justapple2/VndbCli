@@ -1,5 +1,5 @@
 /* Flat virtual collections/tags and favorites. File locations never enter this module. */
-(function(root,factory){const api=factory();if(typeof module==='object')module.exports=api;else root.VnOrganization=api;})(globalThis,()=>{
+(function(root,factory){const api=factory(typeof module==='object'?require('./field-comparison.js'):root.VnDifferences);if(typeof module==='object')module.exports=api;else root.VnOrganization=api;})(globalThis,comparison=>{
  'use strict';
  const validId=id=>typeof id==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(id);
  function validate(value){
@@ -17,18 +17,27 @@
  }
  function create({api,changed,writer=VnTools.writes(api)}){
   let state={revision:0,labels:[],items:[]},loaded=false,read=0,manager=null,editor=null,status=null,editorStatus=null,busy=false,instance=null;
+  let pendingBasis=null,observed=null,observedAt=null,reviewSequence=0;
   const node=(tag,text,cls)=>VnView.element(tag,cls,text),labelName=l=>(l.kind==='collection'?'集合 · ':'标签 · ')+l.name;
   function button(parent,text,run){const b=node('button',text,'secondary');b.type='button';b.onclick=async()=>{if(busy)return;busy=true;b.disabled=true;try{await run();}catch(e){message(e.message,true);}finally{busy=false;b.disabled=false;}};parent.append(b);return b;}
-  function message(text,error=false){if(editorStatus){editorStatus.textContent=text;editorStatus.className=error?'notice error':'notice';}if(status){status.textContent=text;status.className=error?'notice error':'notice';}const pending=writer.peek('organization');if(pending&&status){VnTools.details(status,'保留的分类原操作',writer.proof('organization'));if(['uncertain','retryable'].includes(pending.state))button(status,'按原操作重试',async()=>accept(await writer.retry('organization')));}}
-  function accept(value){state=validate(value);loaded=true;renderManager();renderEditor();changed?.(true);return state;}
+  function message(text,error=false){if(editorStatus){editorStatus.textContent=text;editorStatus.className=error?'notice error':'notice';}if(status){status.textContent=text;status.className=error?'notice error':'notice';}const pending=writer.peek('organization');if(pending){for(const parent of [status,editorStatus].filter(Boolean)){parent.append(node('p',comparison?.outcome(pending.state)||'原操作待核对'));if(comparison&&pendingBasis){const block=node('section');parent.append(block);comparison.render(block,review().rows,'队首原操作字段对照');}button(parent,'只读当前Web对照',()=>readReview());if(['uncertain','retryable'].includes(pending.state))button(parent,'按原操作重试',async()=>accept(await writer.retry('organization')));}if(status)VnTools.details(status,'原始操作证明（高级）',writer.proof('organization'));}}
+  function accept(value){state=validate(value);loaded=true;pendingBasis=null;observed=null;observedAt=null;renderManager();renderEditor();changed?.(true);return state;}
+  function review(){const pending=writer.proof('organization');return {state:pending?.state||'applied',observedAt,rows:pending&&pendingBasis&&comparison?comparison.organization(pendingBasis,observed,pending.body.change):[]};}
+  async function readReview(){
+   const pending=writer.peek('organization');if(!pending)return review();const token=++reviewSequence;
+   const [info,current]=await Promise.all([api('/info',{method:'GET'}),api('/personal-organization',{method:'GET'})]);
+   if(token!==reviewSequence||writer.peek('organization')?.id!==pending.id)return review();
+   if(info.service_instance_id!==instance)throw Error('服务实例改变，原稿保留。');observed=validate(current);observedAt=new Date().toISOString();message('只读观测 '+new Date(observedAt).toLocaleString()+'；未确认原操作是否应用，状态与ID保持。');return review();
+  }
   async function refresh(resolve=false){
    const pending=writer.peek('organization');if(pending){if(!resolve||!['conflict','rejected'].includes(pending.state)){message('分类原操作待处理；结果不明时只能按原ID重试。',true);return state;}writer.reload();}
    const ticket=++read;const [info,saved]=await Promise.all([api('/info',{method:'GET'}),api('/personal-organization',{method:'GET'})]);const result=validate(saved);if(ticket!==read)return state;if(!info.service_instance_id||!info.capabilities?.includes('personal_organization')||instance&&instance!==info.service_instance_id)throw Error('服务实例或分类能力已改变，原稿保留。');instance=info.service_instance_id;
-   state=result;loaded=true;renderManager();renderEditor();message('分类已读取。收藏与分类独立于游玩状态和本机已有。');changed?.(false);return state;
+   state=result;loaded=true;pendingBasis=null;observed=null;observedAt=null;renderManager();renderEditor();message('分类已读取。收藏与分类独立于游玩状态和本机已有。');changed?.(false);return state;
   }
   async function write(fields){
    if(!loaded)throw Error('请先读取个人分类。');
    const body={expected_revision:state.revision,...fields};
+   if(!writer.peek('organization')){const ids=new Set((body.items||[]).map(i=>i.item_id));pendingBasis=structuredClone({revision:state.revision,labels:state.labels,items:state.items.filter(i=>ids.has(i.item_id))});observed=null;observedAt=null;}
    return accept(await writer.execute('organization','/personal-organization',{service_instance_id:instance,change:body},r=>confirms(r,body)));
   }
   function badge(itemId){const row=state.items.find(i=>i.item_id===itemId);return row?node('span',[row.favorite?'★ 收藏':'',...state.labels.filter(l=>row.label_ids.includes(l.id)).map(l=>l.name)].filter(Boolean).join(' · ')):null;}
@@ -52,7 +61,7 @@
    for(const l of state.labels){const check=node('input');check.type='checkbox';check.checked=old?.label_ids.includes(l.id)||false;const label=node('label',labelName(l));label.prepend(check);parent.append(label);checks.push([l.id,check]);}
    button(parent,'保存此作品的收藏与分类',()=>write({items:[{item_id:itemId,favorite:favorite.checked,label_ids:checks.filter(([,c])=>c.checked).map(([id])=>id)}]}));
   }
-  return {refresh,write,badge,filter,mountManager,mountEditor,get state(){return state;},get unsettled(){return writer.unsettled;}};
+  return {refresh,write,review,readReview,badge,filter,mountManager,mountEditor,get state(){return state;},get unsettled(){return writer.unsettled;}};
  }
  return {validate,confirms,create};
 });

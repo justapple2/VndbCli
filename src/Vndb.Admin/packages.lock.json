@@ -61,7 +61,7 @@
       "vndb.contracts": {
         "type": "Project",
         "dependencies": {
-          "Vndb.Core": "[0.5.0, )"
+          "Vndb.Core": "[0.6.0, )"
         }
       },
       "vndb.core": {
@@ -71,8 +71,8 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.Data.Sqlite": "[10.0.13, )",
-          "Vndb.Contracts": "[0.5.0, )",
-          "Vndb.Core": "[0.5.0, )",
+          "Vndb.Contracts": "[0.6.0, )",
+          "Vndb.Core": "[0.6.0, )",
           "ZstdSharp.Port": "[0.8.8, )"
         }
       }

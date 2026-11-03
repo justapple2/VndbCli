@@ -31,6 +31,9 @@ public sealed partial class PersonalOrganizationViewModel(Func<PersonalOrganizat
     [ObservableProperty] private string _message = "收藏、集合与标签不改变物理目录或游玩状态。";
     [ObservableProperty] private string _batchPreview = "";
     [ObservableProperty] private bool _conflict;
+    [ObservableProperty] private IReadOnlyList<FieldComparisonDisplay> _differences = [];
+    [ObservableProperty] private string _comparisonSummary = "只读当前队首原操作；不会合并、撤回或重建操作ID。";
+    [ObservableProperty] private string _outcome = "尚无待同步操作";
     public string SelectedTitle => _book?.Title ?? "请先选择个人书架作品";
     public bool CanEditMember => _book?.Item is not null;
     partial void OnSelectedLabelChanged(PersonalLabel? value) { if (value is not null) { Name = value.Name; Kind = value.Kind; } _batch = null; BatchPreview = ""; }
@@ -54,6 +57,9 @@ public sealed partial class PersonalOrganizationViewModel(Func<PersonalOrganizat
         var id = SelectedLabel?.Id; Labels = _state.Labels; SelectedLabel = Labels.SingleOrDefault(l => l.Id == id);
         Select(_book); changed(_state); _batch = null; BatchPreview = "";
         Message = doc.Conflict ? "分类修订冲突；原稿保留。可保留原稿并读取Web，再重新编辑。" : doc.Pending.Count > 0 ? $"{doc.Pending.Count} 条分类修改待同步；离线仍可筛选。" : "分类已读取；不改变文件位置与游玩状态。";
+        Outcome = doc.Conflict ? "明确冲突／拒绝" : doc.Pending.Count == 0 ? "已确认快照" : doc.Attempted ? "结果未确认（按原ID重试）" : "待同步";
+        Differences = doc.Pending.Count == 0 ? [] : FieldComparisonDisplay.Rows(PersonalComparison.Organization(doc.Confirmed, null, doc.Pending[0].Change));
+        ComparisonSummary = doc.Pending.Count > 0 ? $"队首原操作 {doc.Pending[0].Id}，基于修订 {doc.Pending[0].Change.ExpectedRevision}；后续 {doc.Pending.Count - 1} 条保持原顺序。" : "没有待同步分类原稿。";
     }
     private async Task QueueAsync(PersonalOrganizationChange change, CancellationToken ct)
     {
@@ -78,6 +84,14 @@ public sealed partial class PersonalOrganizationViewModel(Func<PersonalOrganizat
         var web = remote() ?? throw new InvalidOperationException("请先连接Web。");
         var generation = ++_generation; var service = store(); var doc = await service.RefreshAsync(web, true, ct);
         if (generation == _generation && service.ScopeKey == store().ScopeKey) Apply(doc);
+    });
+    [RelayCommand] private Task ReadComparisonAsync() => RunAsync(async ct =>
+    {
+        var generation = ++_generation; var service = store(); var inspection = await service.InspectAsync(remote(), true, ct);
+        if (generation != _generation || service.ScopeKey != store().ScopeKey) return;
+        if (inspection.ReadFailed) { ComparisonSummary = "Web只读对照未完成；保留原稿和此前已显示对照，不改变同步状态。"; return; }
+        Differences = FieldComparisonDisplay.Rows(inspection.Differences);
+        ComparisonSummary = inspection.Document.Pending.Count == 0 ? "没有待同步分类原稿。" : $"队首原操作基于修订 {inspection.Document.Pending[0].Change.ExpectedRevision}；Web修订 {inspection.Current?.Revision}，观测 {inspection.ObservedAt?.ToLocalTime():g}。";
     });
     [RelayCommand] private Task CreateLabelAsync() => RunAsync(ct => QueueAsync(new(_state.Revision, new(Guid.NewGuid().ToString("D"), Name.Trim(), Kind)), ct));
     [RelayCommand] private Task RenameLabelAsync() => RunAsync(ct => QueueAsync(new(_state.Revision, (SelectedLabel ?? throw new ArgumentException("请选择分类。")) with { Name = Name.Trim() }), ct));

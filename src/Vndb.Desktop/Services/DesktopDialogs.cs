@@ -16,5 +16,5 @@ public sealed class DesktopDialogs(Window owner) : IDesktopDialogs
     public async Task<string?> FolderAsync(string title) => (await owner.StorageProvider.OpenFolderPickerAsync(new()
         { Title = title, AllowMultiple = false })).FirstOrDefault()?.TryGetLocalPath();
     public async Task<string?> SaveJsonAsync(string name) => (await owner.StorageProvider.SaveFilePickerAsync(new()
-        { Title = "导出公开资料JSON", SuggestedFileName = name, DefaultExtension = "json", FileTypeChoices = [new("JSON") { Patterns = ["*.json"] }] }))?.TryGetLocalPath();
+        { Title = "导出JSON", SuggestedFileName = name, DefaultExtension = "json", FileTypeChoices = [new("JSON") { Patterns = ["*.json"] }] }))?.TryGetLocalPath();
 }
