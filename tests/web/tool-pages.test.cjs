@@ -12,6 +12,7 @@ class Element {
  add(option){this.append(option);}
  querySelectorAll(selector){const match=n=>selector==='button'?n.tagName==='BUTTON':selector==='details'?n.tagName==='DETAILS':selector.startsWith('.')?(n.className||'').split(' ').includes(selector.slice(1)):false;return this.children.flatMap(n=>[...(match(n)?[n]:[]),...n.querySelectorAll(selector)]);}
  querySelector(s){return this.querySelectorAll(s)[0]||null;}
+ contains(node){return this===node||this.children.some(child=>child.contains(node));}
 }
 const drain=async()=>{for(let i=0;i<12;i++)await new Promise(resolve=>setImmediate(resolve));};
 function page(name,route,tab='imports',personalOrganization=false){
@@ -24,7 +25,7 @@ function page(name,route,tab='imports',personalOrganization=false){
  vm.createContext(context);
  const adapter=context.VnView;vm.runInContext(fs.readFileSync(path.join(root,'library-view.js'),'utf8'),context,{filename:'library-view.js'});
  context.VnView={...adapter,card:context.VnView.card,itemBadges:context.VnView.itemBadges,progressLabel:context.VnView.progressLabel,historyControl:context.VnView.historyControl,shelfQuickViews:context.VnView.shelfQuickViews,personalCompany:context.VnView.personalCompany};
- for(const file of ['tool-feedback.js','import-input.js','vn-details.js','releases.js',...(personalOrganization?['personal-organization.js']:[]),name+'.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context,{filename:file});
+ for(const file of ['tool-feedback.js','import-input.js','vn-details.js','releases.js',...(personalOrganization?['personal-organization.js']:[]),...(name==='manage'?['dataset-sync.js']:[]),name+'.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context,{filename:file});
  return {elements,tabs,calls,intervals,context,buttons:id=>elements[id].querySelectorAll('button'),text:id=>elements[id].textContent};
 }
 const info={import_limits:{maximum_bytes:1048576,maximum_items:500}};
@@ -96,6 +97,76 @@ test('official dataset confirmation retains accepted creation across a failed pr
  assert.deepEqual(p.calls.find(c=>c.method==='POST').body,{snapshot_date:'2026-10-27'});
 });
 
+const syncStatus=(patch={})=>({settings:{revision:0,enabled:false,interval_days:7},latest_snapshot_date:null,last_checked_at:null,last_attempt_at:null,
+ check_not_before:null,next_check_at:null,error:null,checking:false,completed_snapshot_at:'2026-10-27T08:00:27Z',completed_at:'2026-10-29T00:05:00Z',active_job:null,update_available:null,worker_enabled:true,...patch});
+const syncInfo={...info,capabilities:['dataset_sync']};
+function syncPage(route){return page('manage',async c=>{
+ if(c.url.endsWith('/info'))return syncInfo;
+ if(c.url.endsWith('/imports')||c.url.endsWith('/metadata/jobs')||c.url.endsWith('/datasets'))return [];
+ return route(c);
+});}
+test('dataset synchronization shows passive freshness and checks only on explicit action',async()=>{
+ let state=syncStatus();const p=syncPage(async c=>{
+  if(c.url.endsWith('/sync/check')){state=syncStatus({latest_snapshot_date:'2026-11-06',last_checked_at:'2026-11-06T12:00:00Z',update_available:true});return state;}
+  if(c.url.endsWith('/sync'))return state;throw Error(c.url);
+ });await drain();assert.equal(p.calls.filter(c=>c.method==='POST').length,0);assert.match(p.text('dataset-sync-facts'),/2026-10-27/);assert.match(p.text('dataset-sync-status'),/尚未检查/);
+ assert.equal(p.elements['dataset-sync-enabled'].checked,false);assert.equal(p.elements['dataset-sync-days'].value,'7');
+ await p.buttons('dataset-sync-actions').find(b=>b.textContent==='检查最新版').onclick();
+ assert.match(p.text('dataset-sync-status'),/发现可导入/);assert.match(p.text('dataset-sync-facts'),/2026-11-06/);
+ assert.equal(p.calls.filter(c=>c.method==='POST').length,1);assert.ok(p.calls.find(c=>c.method==='POST').url.endsWith('/sync/check'));
+});
+test('passive sync status polling preserves action nodes and keyboard focus targets',async()=>{
+ const p=syncPage(async c=>{if(c.url.endsWith('/sync'))return syncStatus();throw Error(c.url);});await drain();
+ const check=p.buttons('dataset-sync-actions')[0],save=p.buttons('dataset-sync-settings-actions')[0];
+ await p.elements['dataset-sync-refresh'].onclick();assert.equal(p.buttons('dataset-sync-actions')[0],check);assert.equal(p.buttons('dataset-sync-settings-actions')[0],save);
+ p.elements['dataset-sync-days'].value='14';p.elements['dataset-sync-days'].onchange();
+ assert.notEqual(p.buttons('dataset-sync-settings-actions')[0],save);assert.equal(p.buttons('dataset-sync-actions')[0],check);
+});
+test('lost update response retains the exact operation across status refresh and input changes',async()=>{
+ let lose=true;const accepted={state:'queued',snapshot_date:'2026-11-06',job:{id:'original-job'}};
+ const p=syncPage(async c=>{
+  if(c.url.endsWith('/sync'))return syncStatus({latest_snapshot_date:'2026-11-06',update_available:true});
+  if(c.url.endsWith('/sync/update')){if(lose){lose=false;throw TypeError('Synthetic lost response');}return accepted;}throw Error(c.url);
+ });await drain();await p.buttons('dataset-sync-actions').find(b=>b.textContent==='检查并更新').onclick();
+ p.elements['dataset-date'].value='2026-11-05';await p.elements['dataset-sync-refresh'].onclick();
+ const retry=p.buttons('dataset-sync-actions').find(b=>b.textContent==='按原操作重试'&&!b.hidden);assert.ok(retry);await retry.onclick();
+ const writes=p.calls.filter(c=>c.method==='POST');assert.equal(writes.length,2);assert.deepEqual(writes[0],writes[1]);assert.match(p.text('dataset-sync-outcome'),/后台导入任务.*尚未完成/);
+});
+test('polling preserves dirty schedule fields and conflict reread keeps proof until the GET succeeds',async()=>{
+ let state=syncStatus(),fail=false;const p=syncPage(async c=>{
+  if(c.url.endsWith('/sync'))return fail?{status:500,data:{title:'Synthetic read failure'}}:state;
+  if(c.url.endsWith('/sync/settings'))return {status:409,data:{title:'Synthetic revision conflict'}};throw Error(c.url);
+ });await drain();p.elements['dataset-sync-enabled'].checked=true;p.elements['dataset-sync-enabled'].onchange();p.elements['dataset-sync-days'].value='3';p.elements['dataset-sync-days'].onchange();
+ state=syncStatus({settings:{revision:1,enabled:false,interval_days:7}});await p.elements['dataset-sync-refresh'].onclick();
+ assert.equal(p.elements['dataset-sync-days'].value,'3');assert.equal(p.elements['dataset-sync-enabled'].checked,true);
+ await p.buttons('dataset-sync-settings-actions').find(b=>b.textContent==='保存定时同步设置').onclick();
+ const original=p.calls.find(c=>c.method==='POST');assert.deepEqual(original.body,{expected_revision:0,enabled:true,interval_days:3});
+ fail=true;await p.elements['dataset-sync-reload-settings'].onclick();assert.equal(p.elements['dataset-sync-days'].value,'3');assert.match(p.text('dataset-sync-settings-actions'),/原操作/);
+ fail=false;await p.elements['dataset-sync-reload-settings'].onclick();assert.equal(p.elements['dataset-sync-days'].value,'7');assert.match(p.text('dataset-sync-history'),/expected_revision/);assert.equal(p.calls.filter(c=>c.method==='POST').length,1);
+});
+test('a matching status GET cannot acknowledge lost settings and later form edits do not replace its retry body',async()=>{
+ let state=syncStatus(),lose=true;const p=syncPage(async c=>{
+  if(c.url.endsWith('/sync'))return state;
+  if(c.url.endsWith('/sync/settings')){state=syncStatus({settings:{revision:1,enabled:c.body.enabled,interval_days:c.body.interval_days}});if(lose){lose=false;throw TypeError('Synthetic response lost');}return state.settings;}throw Error(c.url);
+ });await drain();p.elements['dataset-sync-enabled'].checked=true;p.elements['dataset-sync-days'].value='3';p.elements['dataset-sync-days'].onchange();
+ await p.buttons('dataset-sync-settings-actions').find(b=>b.textContent==='保存定时同步设置').onclick();await p.elements['dataset-sync-refresh'].onclick();
+ p.elements['dataset-sync-days'].value='14';p.elements['dataset-sync-days'].onchange();
+ await p.buttons('dataset-sync-settings-actions').find(b=>b.textContent==='按原操作重试'&&!b.hidden).onclick();
+ const writes=p.calls.filter(c=>c.method==='POST');assert.equal(writes.length,2);assert.deepEqual(writes[0],writes[1]);assert.equal(writes[1].body.interval_days,3);assert.equal(p.elements['dataset-sync-days'].value,'14');
+});
+test('late synchronization reads cannot replace newer status and inactive worker settings can still be disabled',async()=>{
+ let delayed=false,release,state=syncStatus({worker_enabled:false,settings:{revision:1,enabled:true,interval_days:7}});
+ const p=syncPage(async c=>{
+  if(c.url.endsWith('/sync')){if(delayed)return new Promise(r=>release=r);return state;}
+  if(c.url.endsWith('/sync/settings'))return {revision:2,enabled:false,interval_days:7};throw Error(c.url);
+ });await drain();assert.equal(p.elements['dataset-sync-settings'].disabled,false);
+ delayed=true;const old=p.elements['dataset-sync-refresh'].onclick();await drain();delayed=false;
+ state=syncStatus({worker_enabled:false,settings:{revision:1,enabled:true,interval_days:7},latest_snapshot_date:'2026-11-06',update_available:true});await p.elements['dataset-sync-refresh'].onclick();
+ release(syncStatus());await old;assert.match(p.text('dataset-sync-facts'),/2026-11-06/);
+ p.elements['dataset-sync-enabled'].checked=false;p.elements['dataset-sync-enabled'].onchange();
+ await p.buttons('dataset-sync-settings-actions').find(b=>b.textContent==='保存定时同步设置').onclick();assert.equal(p.calls.find(c=>c.method==='POST').body.enabled,false);
+});
+
 test('manage actual handlers retain every file result and successful progress through later read failure',async()=>{
  let fail=false;const p=page('manage',async c=>{
   if(c.url.endsWith('/info'))return info;if(c.url.endsWith('/imports/preview'))return {...batch(),state:'preview',accepted:false};
@@ -112,6 +183,22 @@ test('manage late import refresh cannot replace view after navigation to candida
 test('background import polling does not accumulate requests while a slow refresh is pending',async()=>{
  let release,slow=false;const p=page('manage',async c=>{if(c.url.endsWith('/info'))return info;if(c.url.endsWith('/imports'))return slow?new Promise(r=>release=r):[batch()];if(c.url.endsWith('/metadata/jobs'))return [];throw Error(c.url);});await drain();slow=true;p.intervals[0]();await drain();const calls=p.calls.length;
  for(let n=0;n<10;n++)p.intervals[0]();await drain();assert.equal(p.calls.length,calls);release([batch()]);await drain();assert.match(p.text('batches'),/等待处理/);
+});
+
+test('dataset background polling is bounded and preserves focused task controls until focus leaves',async()=>{
+ let slow=false,release,processed=1;
+ const p=page('manage',async c=>{
+  if(c.url.endsWith('/info'))return syncInfo;
+  if(c.url.endsWith('/imports')||c.url.endsWith('/metadata/jobs'))return [];
+  if(c.url.endsWith('/sync'))return syncStatus();
+  if(c.url.endsWith('/datasets'))return slow?new Promise(r=>release=r):[{id:'synthetic-job',source:'vndb-db-2026-11-06.tar.zst',state:'queued',revision:1,processed,total:3,written:0,kept:0}];throw Error(c.url);
+ });await drain();p.intervals[1]();await drain();
+ const pause=p.buttons('datasets').find(b=>b.textContent==='暂停');assert.ok(pause);p.context.document.activeElement=pause;
+ processed=2;p.intervals[1]();await drain();assert.equal(p.buttons('datasets')[0],pause);assert.match(p.text('datasets'),/已处理 1/);
+ p.context.document.activeElement=null;p.intervals[1]();await drain();assert.match(p.text('datasets'),/已处理 2/);
+ slow=true;p.intervals[1]();await drain();const calls=p.calls.length;
+ for(let n=0;n<10;n++)p.intervals[1]();await drain();assert.equal(p.calls.length,calls);
+ release([]);await drain();assert.match(p.text('datasets'),/没有官方导入任务/);assert.ok(p.calls.every(c=>c.method==='GET'));
 });
 test('activity imports continue after individual failure and retain prior results across another selection',async()=>{
  const p=page('sessions',async c=>{if(c.url.endsWith('/info'))return info;if(c.url.endsWith('/activity/batches'))return c.body.batch_id==='bad'?{status:400,data:{code:'invalid_json',title:'synthetic invalid'}}:{batch_id:c.body.batch_id,complete:false,results:[{kind:'plays',key:'p',status:'dependency_pending'}]};if(c.url.endsWith('/plays')||c.url.endsWith('/play-sessions')||c.url.endsWith('/play-edit-conflicts'))return [];throw Error(c.url);});await drain();

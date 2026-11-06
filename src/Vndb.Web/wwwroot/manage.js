@@ -21,8 +21,9 @@
   keys.delete(signature);return data;
  }
  const organizer=globalThis.VnOrganization?.create({api:(path,options)=>api(path,options.method,options.body,undefined,options.operationId),changed:mutated=>{controls();if(mutated&&lastBooks)loadBooks();}});
+ const datasetSync=globalThis.VnDatasetSync?.create({api:(path,options)=>api(path,options.method,options.body,undefined,options.operationId),changed:()=>loadDatasets()});
  organizer?.mountManager($('personal-organization-tools'));
- window.addEventListener('beforeunload',event=>{if(organizer?.unsettled){event.preventDefault();event.returnValue='';}});
+ window.addEventListener('beforeunload',event=>{if(organizer?.unsettled||datasetSync?.unsettled){event.preventDefault();event.returnValue='';}});
  let organizationLoaded=false;
  function action(parent,text,run,kind='secondary'){
   const b=node('button',text,kind);b.type='button';b.onclick=async()=>{b.disabled=true;try{await run();}catch(e){notice(VnView.failure(e),true);}finally{b.disabled=false;}};parent.append(b);return b;
@@ -216,8 +217,9 @@
     }catch(e){if(current()&&tab==='trash')notice('移除记录读取失败；保留最近成功显示。'+VnTools.failure(e),true);}
   }
 
- const datasetRead=VnTools.latest();
- async function loadDatasets(){
+ const datasetRead=VnTools.latest();let datasetsInFlight=0;
+ async function loadDatasets(background=false){
+  datasetsInFlight++;
   const current=datasetRead.next();
   try{
    const jobs=await api('/datasets');if(!current())return;
@@ -235,9 +237,12 @@
       'dataset/'+job.id,'/datasets/'+job.id+'/'+action,{expected_revision:job.revision},loadDatasets,r=>r.id===job.id&&r.revision>job.revision);
     content.append(card);
    }
-   if(!jobs.length)empty(content,'没有官方导入任务。');$('datasets').replaceChildren(content);
+   if(!jobs.length)empty(content,'没有官方导入任务。');
+   if(background!==true||!$('datasets').contains(document.activeElement))$('datasets').replaceChildren(content);
    $('datasets-summary').textContent='最近 '+jobs.length+' 个任务；完成仅表示所选公共资料处理通过，不含全量图片。';
+   await datasetSync?.refresh();
   }catch(error){if(current())$('datasets-summary').textContent='进度读取失败，保留已显示内容。'+VnTools.failure(error);}
+  finally{datasetsInFlight--;}
  }
  $('datasets-refresh').onclick=()=>explicitToolReload(loadDatasets);
  $('dataset-create').onclick=()=>{
@@ -265,7 +270,8 @@
  $('refresh-imports').onclick=()=>explicitToolReload(loadImports).catch(e=>notice(e.message,true));$('refresh-candidates').onclick=()=>explicitToolReload(loadCandidates).catch(e=>notice(e.message,true));$('refresh-trash').onclick=()=>explicitToolReload(loadRemoved).catch(e=>notice(e.message,true));
  window.addEventListener('popstate',()=>{display=stored.read();page=display.page;controls();show(['imports','review','trash'].includes(new URLSearchParams(location.search).get('tab'))?new URLSearchParams(location.search).get('tab'):'shelf',{push:false,rememberOld:false}).catch(e=>notice(VnView.failure(e),true));});
  let scrollTimer;window.addEventListener('scroll',()=>{clearTimeout(scrollTimer);scrollTimer=setTimeout(remember,180);},{passive:true});window.addEventListener('pagehide',remember);
- controls();api('/info').then(info=>{limits=VnImport.limits(info);$('import-limits').textContent=VnImport.describe(limits);}).catch(e=>notice(e.message,true));
+ controls();api('/info').then(info=>{limits=VnImport.limits(info);$('import-limits').textContent=VnImport.describe(limits);datasetSync?.activate(info.capabilities?.includes('dataset_sync'));}).catch(e=>notice(e.message,true));
  show(['imports','review','trash'].includes(new URLSearchParams(location.search).get('tab'))?new URLSearchParams(location.search).get('tab'):'shelf',{push:false,rememberOld:false}).catch(e=>notice(VnView.failure(e),true));
  setInterval(()=>{if(tab==='imports'&&document.visibilityState==='visible'&&!importsInFlight)loadImports().catch(()=>{});},5000);
+ setInterval(()=>{if(tab==='imports'&&document.visibilityState==='visible'&&!datasetsInFlight)loadDatasets(true).catch(()=>{});},15000);
 })();

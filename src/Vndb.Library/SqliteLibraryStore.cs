@@ -101,7 +101,7 @@ public sealed partial class SqliteLibraryStore : ILibraryStore
         InitializeReleases(connection, transaction);
         InitializeDatasets(connection, transaction);
         InitializeCatalogIndex(connection, transaction, oldVersion);
-        Execute(connection, transaction, "CREATE TABLE IF NOT EXISTS personal_organization(id INTEGER PRIMARY KEY CHECK(id=1),record_json TEXT NOT NULL CHECK(json_valid(record_json))); PRAGMA user_version=14;");
+        Execute(connection, transaction, "CREATE TABLE IF NOT EXISTS personal_organization(id INTEGER PRIMARY KEY CHECK(id=1),record_json TEXT NOT NULL CHECK(json_valid(record_json))); PRAGMA user_version=15;");
         transaction.Commit();
     }
     public LibraryEntry? Get(string id)

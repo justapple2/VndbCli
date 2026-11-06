@@ -1,6 +1,6 @@
 # Web API使用与交换契约
 
-适用版本0.6.1／API v1／schema14。**客户端使用`/api/v1`**，机器规范为运行中`/openapi/v1.json`；数据库schema不是客户端协议。示例使用虚构个人资料和`http://nas.local:5187/`，请替换为自己的服务。0.6.1保持原数据库格式，新增的封面修复能力通过`cover_repair`协商。
+适用版本0.6.1／API v1／schema15。**客户端使用`/api/v1`**，机器规范为运行中`/openapi/v1.json`；数据库schema不是客户端协议。示例使用虚构个人资料和`http://nas.local:5187/`，请替换为自己的服务。封面修复与官方更新分别通过`cover_repair`、`dataset_sync`可选能力协商。
 
 封面补全：`POST /api/v1/metadata/covers/repair`，请求`{"item_ids":["item-example"]}`（1–100个唯一且未移除的个人书架ID），沿用管理密钥、`X-Library-Request: 1`与`Idempotency-Key`。返回每项`item_id`、`vndb_id`、`state`和可选`job_id`。已有封面／确认无图／未关联分别为`ready`／`no_cover`／`unlinked`；其余复用原metadata队列，按VN ID去重。明确重试可重新排队已结束的失败任务，已有暂停任务保持暂停；用既有jobs入口查看和控制。请求不改个人关联、修订或游玩数据，也不遍历公共全库。网络补全按既有至少5秒间隔及有限退避执行，返回queued不代表图片已下载。
 
@@ -160,7 +160,7 @@ not_started不允许实际游玩日期或正时长。v1 PersonalPlayView保留re
 
 写入前读当前revision，保持原稿与稳定Idempotency-Key；同键同内容返回原结果，不同内容冲突。409返回ApiProblem，不承诺正文附当前记录，客户端须主动GET并展示比较。软移除不删除游戏，重新导入也不应自动复活被移除个人项。
 
-字段对照复用这些既有GET与个人分类GET，不增加比较／历史／诊断写入接口，API v1和schema14不变。原始编辑基准只保存在客户端；GET观测值不作为写入回执，也不改变原请求内容、修订、关联或幂等键。明确拒绝后保留原稿再重读编辑；结果不明按原键原内容重试，不能用“读到相同值”推定已确认。
+字段对照复用这些既有GET与个人分类GET，不增加比较／历史／诊断写入接口，API v1保持兼容。原始编辑基准只保存在客户端；GET观测值不作为写入回执，也不改变原请求内容、修订、关联或幂等键。明确拒绝后保留原稿再重读编辑；结果不明按原键原内容重试，不能用“读到相同值”推定已确认。
 
 ## 4. 元数据导入／队列
 
@@ -353,6 +353,23 @@ GET /api/v1/collection/stats返回public_novels、personal_items、played、unpl
 响应为`DatasetJob`，含`id/source/state/phase/revision/created_at/sha256/snapshot_at/total/processed/written/kept/download_bytes/error/completed_at/earliest_resume_at`。`queued`只表示接收，完成状态和计数需另行读取；关闭页面不取消任务。
 
 进度更新可能令控制请求返回409，先刷新修订；写入结果不明时保持原请求及幂等键。同包或同日期重复提交返回已有任务，同一时间只允许一个活动任务，包含暂停和失败状态。损坏上传只形成失败任务，不执行包内内容。使用、空间与恢复条件见[公共资料目录](CATALOG.md)。
+
+## 官方资料更新与可选调度
+
+`info.capabilities`包含`dataset_sync`。所有POST需要管理密钥、`X-Library-Request: 1`及固定`Idempotency-Key`；保持API v1，不接受下载URL或本机位置。
+
+| API | 请求与行为 |
+| --- | --- |
+| `GET /api/v1/datasets/sync` | 只读数据库状态，无上游请求 |
+| `POST /api/v1/datasets/sync/check` | 无请求体；只对固定官方latest别名发HEAD，严格校验日期化重定向，不跟随下载 |
+| `POST /api/v1/datasets/sync/update` | 无请求体；先检查，再为准确日期排入已有导入队列，原键重试不改目标日期 |
+| `POST /api/v1/datasets/sync/settings` | `{"expected_revision":0,"enabled":false,"interval_days":7}`；周期1–30天，默认关闭／7天 |
+
+状态包含`settings`（`revision/enabled/interval_days`）、`latest_snapshot_date`、`last_checked_at`（最近成功检查）、`last_attempt_at`、`check_not_before`、`next_check_at`、`error`、`checking`、`completed_snapshot_at`、`completed_at`、`active_job`、`update_available`和`worker_enabled`。尚未检查时`update_available=null`；它比较完整导入与最近成功发现的日期，不代表全部网站内容或全部字段实时一致。失败时保留原日期并显示错误。状态不公开内部检查令牌、暂存或路径。
+
+`update`返回`DatasetSyncResult`：`state`为`queued`（已排队）、`existing`（复用原任务）、`current`（已导入最近检查到的日期）、`blocked`（先处理原任务）、`checking`、`check_failed`或`not_checked`，另含`snapshot_date`和可选`job`。200仅表示操作结果明确；`queued/existing`不表示导入完成。结果不明仍用原键重试，即使官方latest改变也不会重定向原操作；状态GET不能代替写入回执。
+
+检查最短间隔15分钟，限流／维护遵守Retry-After（等待有界在15分钟至1天），普通错误按1小时退避。调度在现有Web worker中执行，先持久预留重试窗口；相同包去重、单活动任务和人工暂停规则沿用。关闭/修改调度使尚未排队的旧调度失效，已接收任务另行控制。`CatalogJobs:Enabled=false`时不运行调度且禁止新启用开关，仍允许关闭已有设置。设置保存只推进配置修订，后台检查不会制造表单修订冲突；409保留原稿并明确重读。
 
 ## 公共目录只读浏览
 

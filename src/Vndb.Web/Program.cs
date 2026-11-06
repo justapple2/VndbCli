@@ -56,7 +56,8 @@ builder.Services.AddSingleton<ActivityImports>();
 builder.Services.AddSingleton<CatalogMaintenance>();
 builder.Services.AddSingleton<QualityReview>();
 builder.Services.AddSingleton(provider => new DatasetImports(provider.GetRequiredService<SqliteLibraryStore>(),
-    provider.GetRequiredService<IHttpClientFactory>().CreateClient("vndb")));
+    provider.GetRequiredService<IHttpClientFactory>().CreateClient("vndb"), provider.GetRequiredService<TimeProvider>(),
+    builder.Configuration.GetValue("CatalogJobs:Enabled", true)));
 builder.Services.AddOpenApi(options => options.ShouldInclude = description => description.RelativePath?.StartsWith("api/v1/", StringComparison.Ordinal) == true);
 if (builder.Configuration.GetValue("CatalogJobs:Enabled", true)) builder.Services.AddHostedService<CatalogJobWorker>();
 builder.Services.AddRateLimiter(options =>

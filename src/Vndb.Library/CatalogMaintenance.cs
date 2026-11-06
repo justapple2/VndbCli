@@ -16,6 +16,7 @@ public sealed class CatalogMaintenance(MetadataImports imports, ActivityImports 
         await jobs.StepAsync(ct);
         if (datasets is not null)
         {
+            await datasets.StepSyncAsync(ct);
             // Local batches need no upstream pacing. Yield between short bursts so foreground reads
             // and other queues keep their opportunity; each existing transaction remains 25 entities.
             var start = time.GetTimestamp();

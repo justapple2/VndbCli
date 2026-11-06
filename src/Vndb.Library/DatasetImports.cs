@@ -7,7 +7,7 @@ using Vndb.Core;
 namespace Vndb.Library;
 
 /// <summary>One existing Web worker owns execution. Durable cursor and writes commit together.</summary>
-public sealed class DatasetImports(SqliteLibraryStore store, HttpClient http) : IDisposable
+public sealed partial class DatasetImports(SqliteLibraryStore store, HttpClient http, TimeProvider? time = null, bool workerEnabled = true) : IDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Dictionary<string, string> _verified = [];
@@ -143,5 +143,5 @@ public sealed class DatasetImports(SqliteLibraryStore store, HttpClient http) : 
         }
         finally { _gate.Release(); }
     }
-    public void Dispose() => _gate.Dispose();
+    public void Dispose() { _gate.Dispose(); _syncGate.Dispose(); }
 }

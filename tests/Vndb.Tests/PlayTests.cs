@@ -73,7 +73,7 @@ public sealed class PlayTests
         using var db = new SqliteConnection("Data Source=" + backup + ";Pooling=False");
         db.Open(); using var command = db.CreateCommand(); command.CommandText = "PRAGMA integrity_check";
         Assert.Equal("ok", command.ExecuteScalar());
-        command.CommandText = "PRAGMA user_version"; Assert.Equal(14L, command.ExecuteScalar());
+        command.CommandText = "PRAGMA user_version"; Assert.Equal((long)SqliteLibraryStore.SchemaVersion, command.ExecuteScalar());
     }
 
     [Fact]

@@ -120,7 +120,7 @@ public sealed class M1Tests
         using var directory = new TestDirectory(); using var upstream = Upstream();
         await using var factory = new Factory(directory.Path, upstream); using var http = factory.CreateClient();
         var info = await http.GetFromJsonAsync<ServiceInfo>("/api/v1/info", VndbJson.Options, Ct);
-        Assert.Contains(1, info!.ApiVersions); Assert.True(info.MetadataImportAvailable); Assert.Equal(14, info.SchemaVersion);
+        Assert.Contains(1, info!.ApiVersions); Assert.True(info.MetadataImportAvailable); Assert.Equal(SqliteLibraryStore.SchemaVersion, info.SchemaVersion);
         var second = await http.GetFromJsonAsync<ServiceInfo>("/api/v1/info", VndbJson.Options, Ct);
         Assert.Equal(info.ServiceInstanceId, second!.ServiceInstanceId);
         using var spec = JsonDocument.Parse(await http.GetStringAsync("/openapi/v1.json", Ct));

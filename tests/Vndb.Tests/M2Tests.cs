@@ -285,6 +285,6 @@ public sealed class M2Tests
         Assert.NotNull(item.Id); Assert.Null(item.Details.NovelId); Assert.Single(factory.Services.GetRequiredService<SqliteLibraryStore>().PersonalItems());
         var page = await http.GetStringAsync("/manage.html", Ct); Assert.Contains("JSON 导入", page); Assert.Contains("已移除", page);
         using var schema = JsonDocument.Parse(await http.GetStringAsync("/api/v1/schemas/metadata-batch-v1.json", Ct)); Assert.Equal("urn:vndb-local:metadata-batch:v1", schema.RootElement.GetProperty("$id").GetString());
-        var info = await http.GetFromJsonAsync<ServiceInfo>("/api/v1/info", VndbJson.Options, Ct); Assert.True(info!.MetadataImportAvailable); Assert.Equal(500, info.ImportLimits!.MaximumItems); Assert.Equal(14, info.SchemaVersion);
+        var info = await http.GetFromJsonAsync<ServiceInfo>("/api/v1/info", VndbJson.Options, Ct); Assert.True(info!.MetadataImportAvailable); Assert.Equal(500, info.ImportLimits!.MaximumItems); Assert.Equal(SqliteLibraryStore.SchemaVersion, info.SchemaVersion);
     }
 }

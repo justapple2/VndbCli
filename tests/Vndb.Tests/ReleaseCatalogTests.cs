@@ -158,7 +158,7 @@ public sealed class ReleaseCatalogTests
         store.Save(entry with { Novel = entry.Novel with { ReleaseCatalog = new([Release()], DateTimeOffset.UtcNow) } });
         File.WriteAllText(Path.Combine(live, "service-instance-id"), Guid.NewGuid().ToString("D"));
         var snapshot = Path.Combine(dir.Path, "snapshot"); var restored = Path.Combine(dir.Path, "restored");
-        Assert.Equal(14, LibrarySnapshot.Create(live, snapshot, "synthetic-image", cancellationToken: Ct).Schema);
+        Assert.Equal(SqliteLibraryStore.SchemaVersion, LibrarySnapshot.Create(live, snapshot, "synthetic-image", cancellationToken: Ct).Schema);
         LibrarySnapshot.Restore(snapshot, restored, cancellationToken: Ct);
         var result = new SqliteLibraryStore(restored); Assert.Single(result.Get("v17")!.Novel.ReleaseCatalog!.Items);
         using var db = new SqliteConnection("Data Source=" + Path.Combine(restored, "library.db") + ";Pooling=False"); db.Open();
