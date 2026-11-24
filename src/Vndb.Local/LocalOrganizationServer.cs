@@ -6,16 +6,51 @@ using Vndb.Core;
 namespace Vndb.Local;
 
 /// <summary>Local JSON coordinator for the existing safe rename/recovery engine. No HTTP or database.</summary>
-public sealed class LocalOrganizationServer(LocalLibraryStore library, LocalLauncher launcher, string deviceId) : IOrganizationServer
+public sealed partial class LocalOrganizationServer(LocalLibraryStore library, LocalLauncher launcher, string deviceId) : IOrganizationServer
 {
     private string Root => Path.Combine(library.DirectoryPath, "organization-state");
     private string RunFile(string id)
     { if (!Guid.TryParseExact(id, "D", out _)) throw new InvalidDataException("无效本机计划ID。"); return Path.Combine(Root, id + ".json"); }
     private FileStream Lock()
     { Directory.CreateDirectory(Root); return new(Path.Combine(Root, "write.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None); }
-    public Task<ServiceInfo> OrganizationInfoAsync(CancellationToken ct) => Task.FromResult(new ServiceInfo("local-" + deviceId, [1], "0.6.1", 0, false, ["archive_runs", "local_json_only"], [1], false));
+    public Task<ServiceInfo> OrganizationInfoAsync(CancellationToken ct) => Task.FromResult(new ServiceInfo("local-" + deviceId, [1], "0.6.2", 0, false, ["archive_runs", "local_json_only"], [1], false));
     public async Task<LocalArchiveRunView> ArchiveRunAsync(string id, CancellationToken ct) =>
         JsonSerializer.Deserialize<LocalArchiveRunView>(await File.ReadAllTextAsync(RunFile(id), ct), VndbJson.Options) ?? throw new InvalidDataException("本机计划损坏，原件保留。");
+    public async Task<long?> CurrentInstallationRevisionAsync(string installationId, CancellationToken ct) =>
+        (await library.ReadAsync(ct)).Installations.Single(i => i.Installation.Id == installationId).Installation.Revision;
+    public async Task<string?> PreviousRootAsync(LocalInstallation installation, CancellationToken ct)
+    {
+        if (installation.Details.DeviceId != deviceId || installation.RemovedAt is not null) return null;
+        var runs = Path.Combine(library.DirectoryPath, "archive-runs");
+        LocalFiles.CheckAncestors(runs);
+        if (!Directory.Exists(runs)) return null;
+        var target = installation.Details.RootPath;
+        LocalFiles.CheckAncestors(target);
+        if (!Directory.Exists(target)) return null;
+        var identity = NativeFiles.Identity(target);
+        LocalArchiveRunView? latest = null;
+        foreach (var run in Directory.EnumerateDirectories(runs))
+        {
+            ct.ThrowIfCancellationRequested();
+            var id = Path.GetFileName(run);
+            if (!Guid.TryParseExact(id, "D", out _)) continue;
+            var receiptFile = Path.Combine(run, "server-archived.json");
+            LocalFiles.CheckAncestors(receiptFile);
+            if (!File.Exists(receiptFile) || new FileInfo(receiptFile).Length > 8192) continue;
+            var receipt = RunJournal.Read<ArchiveReceipt>(receiptFile);
+            if (receipt.InstallationId != installation.Id || receipt.DeviceId != deviceId || receipt.Id != id ||
+                receipt.InstallationRevision > installation.Revision || latest is not null && receipt.UpdatedAt <= latest.Receipt.UpdatedAt) continue;
+            var file = RunFile(id);
+            LocalFiles.CheckAncestors(file);
+            if (!File.Exists(file)) continue;
+            var row = await ArchiveRunAsync(id, ct);
+            if (row.Plan.InstallationId == installation.Id && row.Plan.DeviceId == deviceId && row.Receipt.State == "archived" &&
+                row.Receipt == receipt && row.Plan.Before.Root == identity && LocalFiles.Same(row.Plan.DestinationPath, target) &&
+                LocalArchiveFormat.MatchesHash(row.Plan, receipt.PlanSha256)) latest = row;
+        }
+        var source = latest?.Plan.SourcePath;
+        return source is not null && !LocalFiles.Exists(source) ? source : null;
+    }
     private Task Save(LocalArchiveRunView run, CancellationToken ct) => JsonSnapshotStore.AtomicWriteAsync(RunFile(run.Plan.Id), run, true, ct);
     public async Task<ArchiveReceipt> PlanArchiveAsync(LocalArchivePlan plan, CancellationToken ct)
     {
@@ -44,9 +79,12 @@ public sealed class LocalOrganizationServer(LocalLibraryStore library, LocalLaun
         using var held = Lock(); var run = await ArchiveRunAsync(plan.RunId, ct);
         if (run.RestorePlan is not null)
         { if (!LocalArchiveFormat.MatchesHash(plan, run.Receipt.RestoreSha256 ?? "")) throw new InvalidDataException("复原计划不同。"); await ObservationResourceIntents.SetAsync(library.DirectoryPath, run.Plan.InstallationId, plan.RunId, run.Receipt.State == "restore_planned", ct); return run.Receipt; }
-        if (run.Receipt.State != "archived" || run.Receipt.Revision != plan.RunRevision || run.Receipt.InstallationRevision != plan.InstallationRevision || plan.ArchiveSha256 != run.Receipt.PlanSha256 ||
+        var current = (await library.ReadAsync(ct)).Installations.Single(i => i.Installation.Id == run.Plan.InstallationId).Installation;
+        if (current.Details.DeviceId != deviceId || current.RemovedAt is not null || current.Revision != plan.InstallationRevision ||
+            !LocalFiles.Same(current.Details.RootPath, plan.SourcePath) || NativeFiles.Identity(plan.SourcePath) != run.Plan.Before.Root ||
+            run.Receipt.State != "archived" || run.Receipt.Revision != plan.RunRevision || plan.ArchiveSha256 != run.Receipt.PlanSha256 ||
             !LocalFiles.Same(plan.SourcePath, run.Plan.DestinationPath) || !LocalFiles.Same(plan.DestinationPath, run.Plan.SourcePath)) throw new InvalidDataException("复原边界／修订无效。");
-        var receipt = run.Receipt with { State = "restore_planned", Revision = run.Receipt.Revision + 1, UpdatedAt = DateTimeOffset.UtcNow, RestoreSha256 = LocalArchiveFormat.Hash(plan) };
+        var receipt = run.Receipt with { State = "restore_planned", Revision = run.Receipt.Revision + 1, InstallationRevision = current.Revision, UpdatedAt = DateTimeOffset.UtcNow, RestoreSha256 = LocalArchiveFormat.Hash(plan) };
         await Save(run with { RestorePlan = plan, Receipt = receipt }, ct); await ObservationResourceIntents.SetAsync(library.DirectoryPath, run.Plan.InstallationId, plan.RunId, true, ct); return receipt;
     }
     public async Task<EvidenceReceipt> UploadEvidenceAsync(string file, string runId, string phase, CancellationToken ct)

@@ -12,6 +12,7 @@ public sealed partial class SqliteLibraryStore
     {
         private static readonly Meter Meter = new("Vndb.Library.Reads");
         private static readonly Counter<long> Commands = Meter.CreateCounter<long>("vndb.library.read.commands");
+        private static readonly Counter<long> Bytes = Meter.CreateCounter<long>("vndb.library.read.bytes", "By");
         private static readonly Histogram<double> Duration = Meter.CreateHistogram<double>("vndb.library.read.duration", "ms");
         private readonly Stopwatch _watch = Stopwatch.StartNew();
         private readonly string _operation;
@@ -27,6 +28,8 @@ public sealed partial class SqliteLibraryStore
         public SqliteCommand ForIds(string sql, IReadOnlyList<string> ids) => Query(
             sql.Replace("{ids}", string.Join(',', ids.Select((_, n) => "$id" + n)), StringComparison.Ordinal),
             ids.Select((id, n) => ("$id" + n, (object?)id)).ToArray());
+        public void ObserveText(string text) => Bytes.Add(System.Text.Encoding.UTF8.GetByteCount(text), new KeyValuePair<string, object?>("operation", _operation));
+        public T Decode<T>(string json) { ObserveText(json); return Read<T>(json); }
         public void Dispose()
         { _tx.Dispose(); _db.Dispose(); Duration.Record(_watch.Elapsed.TotalMilliseconds, new KeyValuePair<string, object?>("operation", _operation)); }
     }
@@ -53,7 +56,7 @@ public sealed partial class SqliteLibraryStore
         using (var reader = select.ExecuteReader())
             while (reader.Read())
             {
-                var item = Read<LibraryItem>(reader.GetString(0));
+                var item = read.Decode<LibraryItem>(reader.GetString(0));
                 if ((item.DeletedAt is not null) == deleted && (!unmatched || item.Details.NovelId is null) &&
                     (string.IsNullOrEmpty(query) || string.Join('\n', item.Details.Title, item.Details.TitleOverride, item.Details.CompanyHint, item.Details.Notes).Contains(query, StringComparison.OrdinalIgnoreCase))) rows.Add(item);
             }
@@ -88,7 +91,7 @@ public sealed partial class SqliteLibraryStore
             var projection = summary ? "json_set(json_remove(n.entry_json,'$.novel.release_catalog','$.novel.description','$.novel.relations','$.novel.aliases','$.novel.developers','$.producers'),'$.producers',json((SELECT json_group_array(json_object('id',p.id,'name',p.name,'original',p.original)) FROM (SELECT producer_id FROM novel_developers WHERE novel_id=n.id ORDER BY ordinal) d JOIN producers p ON p.id=d.producer_id)))" : "n.entry_json";
             using var select = read.ForIds("SELECT n.id," + projection + " FROM novels n WHERE n.id IN ({ids})", novels);
             using var reader = select.ExecuteReader();
-            while (reader.Read()) metadata.Add(reader.GetString(0), MetadataImports.Snapshot(Deserialize(reader.GetString(1))));
+            while (reader.Read()) metadata.Add(reader.GetString(0), MetadataImports.Snapshot(read.Decode<LibraryEntry>(reader.GetString(1))));
         }
         states ??= ReadItemStates(read, items.Select(i => i.Id).ToArray());
         var latest = new Dictionary<string, string>(StringComparer.Ordinal);

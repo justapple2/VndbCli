@@ -31,7 +31,7 @@ public sealed partial class SqliteLibraryStore
         // Large release catalogues/descriptions stay on the explicit detail route, not every card.
         using (var select = read.Query((personal ? PersonalOrderCte : "") + "SELECT json_remove(n.entry_json,'$.novel.release_catalog','$.novel.description','$.novel.relations'),json_type(n.entry_json,'$.novel.release_catalog')='object' FROM novels n " + (personal ? PersonalOrderJoin : "") + where + " ORDER BY " + order + " LIMIT $limit OFFSET $offset",
             [.. parameters, ("$limit", q.PageSize), ("$offset", (q.Page - 1) * q.PageSize)]))
-        using (var reader = select.ExecuteReader()) while (reader.Read()) rows.Add((Deserialize(reader.GetString(0)), !reader.IsDBNull(1) && reader.GetBoolean(1)));
+        using (var reader = select.ExecuteReader()) while (reader.Read()) rows.Add((read.Decode<LibraryEntry>(reader.GetString(0)), !reader.IsDBNull(1) && reader.GetBoolean(1)));
         var links = new List<(string Novel, string Item)>();
         if (rows.Count > 0)
         {

@@ -43,7 +43,8 @@ public sealed class OrganizationRunner(IOrganizationServer server, string origin
         if (run.Receipt.State != "archived" || run.Receipt.PlanSha256 != intent.Receipt.PlanSha256) throw new InvalidOperationException("任务尚未完成归档或已进入复原。");
         CheckScopes(intent.Plan); var tree = LocalFiles.Snapshot(intent.Plan.DestinationPath, ct);
         if (tree.Root != intent.Plan.Before.Root || LocalFiles.Exists(intent.Plan.SourcePath)) throw new IOException("原路径被占用或安装身份已改变，不能复原。");
-        return new(run.Receipt.Id, run.Receipt.PlanSha256, intent.Plan.DestinationPath, intent.Plan.SourcePath, tree, run.Receipt.InstallationRevision, run.Receipt.Revision, DateTimeOffset.UtcNow);
+        var revision = await server.CurrentInstallationRevisionAsync(intent.Plan.InstallationId, ct) ?? run.Receipt.InstallationRevision;
+        return new(run.Receipt.Id, run.Receipt.PlanSha256, intent.Plan.DestinationPath, intent.Plan.SourcePath, tree, revision, run.Receipt.Revision, DateTimeOffset.UtcNow);
     }
     public async Task<OrganizationResult> CancelAsync(string directory, string approval, CancellationToken ct = default)
     {

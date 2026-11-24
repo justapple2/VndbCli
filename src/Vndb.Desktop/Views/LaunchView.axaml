@@ -45,8 +45,7 @@
               <TextBlock Text="只有点击发现才读取指定目录。选择或导入资料不会创建启动配置，快捷方式也不会被自动解析执行。" Classes="caption wrap" />
             </StackPanel>
           </Expander>
-          <Expander Classes="advanced" Header="迁移后的注册信息检查／路径修复" IsExpanded="{Binding RegistryExpanded}"><views:RegistryRepairView /></Expander>
-          <TextBlock Text="启动失败且怀疑目录迁移时，可展开上方检查注册路径：输入旧目录 → 读取已有值 → 预览 → 备份并确认。仅处理厂商路径字符串；不自动导入REG、不提权。" Classes="caption wrap" />
+          <Expander Classes="advanced" Header="启动诊断与修复" IsExpanded="{Binding RegistryExpanded}"><views:RegistryRepairView /></Expander>
         </StackPanel>
       </ScrollViewer>
     </Grid>

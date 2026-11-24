@@ -89,6 +89,8 @@ known_hosts*
 **/organization-state/
 **/legacy-records/
 **/registry-repairs/
+**/engine-path-repairs/
+**/dataset-cleanups/
 **/shelf-preferences.json
 **/search-history-*.json
 **/catalog-producers.json

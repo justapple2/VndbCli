@@ -4,6 +4,12 @@ namespace Vndb.Client;
 
 public sealed partial class WebLibraryClient
 {
+    public Task<DatasetMaintenanceStatus> DatasetMaintenanceAsync(CancellationToken ct = default) =>
+        SendAsync<DatasetMaintenanceStatus>(HttpMethod.Get, "api/v1/datasets/maintenance", null, ct);
+    public Task<DatasetCleanupPreview> PreviewDatasetCleanupAsync(string key, CancellationToken ct = default) =>
+        SendAsync<DatasetCleanupPreview>(HttpMethod.Post, "api/v1/datasets/maintenance/preview", null, ct, key);
+    public Task<DatasetCleanupResult> CleanupDatasetAsync(DatasetCleanupRequest request, string key, CancellationToken ct = default) =>
+        SendAsync<DatasetCleanupResult>(HttpMethod.Post, "api/v1/datasets/maintenance/cleanup", request, ct, key);
     public Task<DatasetSyncStatus> DatasetSyncAsync(CancellationToken ct = default) => SendAsync<DatasetSyncStatus>(HttpMethod.Get, "api/v1/datasets/sync", null, ct);
     public Task<DatasetSyncStatus> CheckDatasetAsync(string key, CancellationToken ct = default) => SendAsync<DatasetSyncStatus>(HttpMethod.Post, "api/v1/datasets/sync/check", null, ct, key);
     public Task<DatasetSyncResult> UpdateDatasetAsync(string key, CancellationToken ct = default) => SendAsync<DatasetSyncResult>(HttpMethod.Post, "api/v1/datasets/sync/update", null, ct, key);

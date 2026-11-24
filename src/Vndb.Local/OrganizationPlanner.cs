@@ -12,7 +12,7 @@ public static class OrganizationPlanner
         if (!GameDirectoryNaming.IsCompatibleRoot(root) || parts.Length != 2 || parts.Any(p => !GameDirectoryNaming.IsCompatibleName(p)))
             throw new InvalidDataException("目标根或会社／游戏目录名含不兼容符号；尚未移动的旧计划请撤销后重新预览，不改写原恢复证据。");
     }
-    public static LocalArchivePlan Create(LocalInstallationView installation, LocalArchivePolicy policy, string company, string japaneseTitle, CancellationToken ct = default)
+    public static LocalArchivePlan Create(LocalInstallationView installation, LocalArchivePolicy policy, string company, string japaneseTitle, CancellationToken ct = default, string? directoryAlias = null)
     {
         var source = LocalFiles.Full(installation.Installation.Details.RootPath); var scope = LocalFiles.Full(policy.SourceScope); var target = LocalFiles.Full(policy.TargetRoot);
         if (policy.Naming != "company-japanese-v1" || policy.Conflict != "stop" || !LocalFiles.Within(scope, source) || LocalFiles.Within(source, target) || LocalFiles.Same(source, target)) throw new ArgumentException("源安装必须在明确源范围内；目标不能位于安装中，规则必须为无覆盖停止。");
@@ -25,7 +25,7 @@ public static class OrganizationPlanner
             if (existing.Length == 2 && GameDirectoryNaming.IsCompatibleName(existing[0]) && Name(existing[0]).Equals(companyName, StringComparison.OrdinalIgnoreCase))
                 companyName = existing[0]; // Keep a compatible established company folder, including its width/case.
         }
-        var destination = LocalFiles.Full(Path.Combine(target, companyName, Name(japaneseTitle)));
+        var destination = LocalFiles.Full(Path.Combine(target, companyName, Name(directoryAlias ?? japaneseTitle)));
         if (!GameDirectoryNaming.IsCompatibleRoot(target)) throw new ArgumentException("目标根路径含不兼容符号，请选择兼容的整理目标根；不会改名系统目录。");
         LocalFiles.CheckAncestors(destination);
         if (LocalFiles.Same(source, destination) || LocalFiles.Exists(destination) || LocalFiles.Within(destination, source)) throw new IOException("目标已存在、与源相同或边界重叠；不合并／覆盖。");

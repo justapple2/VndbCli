@@ -74,7 +74,13 @@ public partial class MainViewModel : ObservableObject
         Discovery = new(library, dialogs, GuardAsync, text => Status = text, () => _services?.QueryScope);
         Discovery.Completed += PresentQuery;
         PublicCatalog = new(library, GuardAsync, text => Status = text, PresentQuery, () => _services?.QueryScope);
-        Organization = new(() => Services().OrganizationWorkspace(), () => SelectedInstallation, () => _installations, dialogs, GuardAsync, text => Status = text);
+        Organization = new(() => Services().OrganizationWorkspace(), () => SelectedInstallation, () => _installations, dialogs, GuardAsync, text => Status = text, RefreshMovedInstallationAsync);
+        LaunchRepair = new(() => new(SelectedInstallation, ComponentId, SelectedLaunchComponent?.Title ?? ComponentId, SelectedProfile, LaunchDraftChanged, RegistrySource),
+            () => Services().OrganizationWorkspace(), () => new(Services().SettingsStore.DirectoryPath), launcher, GuardAsync,
+            (previous, target) => { if (string.IsNullOrWhiteSpace(RegistrySource) && previous is not null) RegistrySource = previous; RegistryTarget = target; },
+            RefreshRepairedProfileAsync,
+            plan => { Organization.PresentPlan(plan); Section = 4; }, text => Status = text);
+        PropertyChanged += (_, e) => { if (e.PropertyName == nameof(LaunchDraftChanged)) LaunchRepair.Invalidate(); };
         Registration = new(() => new(Services().LocalLibrary, Services().Identity ?? throw new InvalidOperationException("请先加载本机身份。")),
             () => _services?.Settings.Server, () => new(Services().LocalLibrary), dialogs, GuardAsync, text => Status = text, RegistrationSavedAsync);
         Packages = new(() => new(Services().LocalLibrary, Services().Identity ?? throw new InvalidOperationException("请先加载本机身份。")),
@@ -106,6 +112,7 @@ public partial class MainViewModel : ObservableObject
     public QueryFeatureViewModel Discovery { get; }
     public PublicCatalogViewModel PublicCatalog { get; }
     public OrganizationFeatureViewModel Organization { get; }
+    public LaunchRepairViewModel LaunchRepair { get; }
     public RegistrationFeatureViewModel Registration { get; }
     public PackagesFeatureViewModel Packages { get; }
     public PresenceFeatureViewModel Presence { get; }
@@ -243,12 +250,13 @@ public partial class MainViewModel : ObservableObject
     partial void OnSectionChanged(int value) { Shelf.Activate(value); OnPropertyChanged(nameof(SelectedNavigation)); }
     partial void OnSelectedInstallationChanged(LocalInstallationView? value)
     {
+        LaunchRepair.Invalidate();
         if (_applyingObservation) { OnPropertyChanged(nameof(FilteredProfiles)); OnPropertyChanged(nameof(LaunchComponents)); Organization.Invalidate(); InvalidateRegistry(); UpdateBookDetails(); return; }
         OnPropertyChanged(nameof(FilteredProfiles));
         OnPropertyChanged(nameof(LaunchComponents)); OnPropertyChanged(nameof(SelectedLaunchComponent));
         OnPropertyChanged(nameof(LaunchInstallations)); OnPropertyChanged(nameof(SelectedLaunchInstallation)); OnPropertyChanged(nameof(LaunchDraftChanged)); OnPropertyChanged(nameof(LaunchDraftNotice));
         Organization.Invalidate(); InvalidateRegistry(); RegistryCandidates.Clear();
-        RegistrySource = RegistryTarget = value?.Installation.Details.RootPath ?? ""; RegistryTerm = SelectedBook?.GroupCompany ?? "";
+        RegistrySource = ""; RegistryTarget = value?.Installation.Details.RootPath ?? ""; RegistryTerm = "";
         UpdateBookDetails();
         if (value is null) return;
         if (_editingLaunchAssociation)
@@ -268,6 +276,8 @@ public partial class MainViewModel : ObservableObject
     partial void OnLaunchFilterChanged(string value) => OnPropertyChanged(nameof(FilteredProfiles));
     partial void OnSelectedProfileChanged(LaunchProfile? value)
     {
+        LaunchRepair.Invalidate();
+        InvalidateRegistry();
         LaunchPreview = "当前选择已变化，请重新预览已保存命令；尚未运行程序。";
         if (value is null) return;
         if (value.InstallationId != SelectedInstallation?.Installation.Id)
@@ -358,6 +368,38 @@ public partial class MainViewModel : ObservableObject
         try { Profiles.Clear(); foreach (var p in profiles) Profiles.Add(p); } finally { _loadingProfiles = false; }
         foreach (var book in _books.Concat(_queryBooks)) UpdateOwnership(book);
         OnPropertyChanged(nameof(FilteredProfiles)); UpdateBookDetails();
+    }
+    private async Task RefreshRepairedProfileAsync(LaunchProfile updated, CancellationToken ct)
+    {
+        var selectedId = SelectedProfile?.Id; var hadDraft = LaunchDraftChanged;
+        await LoadProfilesAsync(ct);
+        if (!hadDraft && !LaunchDraftChanged && selectedId == updated.Id && SelectedInstallation?.Installation.Id == updated.InstallationId &&
+            (SelectedProfile is null || SelectedProfile.Id == selectedId)) SelectedProfile = Profiles.Single(p => p.Id == updated.Id);
+    }
+
+    private async Task RefreshMovedInstallationAsync(CancellationToken ct)
+    {
+        var selectedId = SelectedInstallation?.Installation.Id;
+        var profileId = SelectedProfile?.Id;
+        var services = Services(); var previousObservation = services.ObservationResult;
+        var catalog = await services.LocalLibrary.ReadAsync(ct);
+        var root = catalog.Installations.FirstOrDefault(i => i.Installation.Id == selectedId)?.Installation.Details.RootPath;
+        if (root is not null && (services.ObservationSettings.Roots ?? []).Any(r => r.Kind == "games" && ObservationSettingsStore.Within(r.Path, root)))
+        {
+            await services.CheckObservationAsync(ct, root); ApplyObservation();
+            catalog = await services.LocalLibrary.ReadAsync(ct);
+        }
+        else _shownObservation = previousObservation;
+        services.Library.Seed(catalog);
+        _installations = catalog.Installations;
+        Installations.Clear();
+        foreach (var installation in _installations.Where(i => SelectedBook is null || MatchesBook(i, SelectedBook))) Installations.Add(installation);
+        SelectedInstallation = Installations.FirstOrDefault(i => i.Installation.Id == selectedId);
+        await LoadProfilesAsync(ct);
+        if (profileId is not null) SelectedProfile = Profiles.FirstOrDefault(p => p.Id == profileId);
+        foreach (var book in _books.Concat(_queryBooks)) UpdateOwnership(book);
+        Shelf.Refresh(); UpdateBookDetails();
+        OnPropertyChanged(nameof(LaunchInstallations));
     }
     [RelayCommand] private Task SyncAsync() => GuardAsync(async ct =>
     {

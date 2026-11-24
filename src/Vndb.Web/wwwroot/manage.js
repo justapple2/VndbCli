@@ -22,8 +22,9 @@
  }
  const organizer=globalThis.VnOrganization?.create({api:(path,options)=>api(path,options.method,options.body,undefined,options.operationId),changed:mutated=>{controls();if(mutated&&lastBooks)loadBooks();}});
  const datasetSync=globalThis.VnDatasetSync?.create({api:(path,options)=>api(path,options.method,options.body,undefined,options.operationId),changed:()=>loadDatasets()});
+ const datasetMaintenance=globalThis.VnDatasetMaintenance?.create({api:(path,options)=>api(path,options.method,options.body,undefined,options.operationId)});
  organizer?.mountManager($('personal-organization-tools'));
- window.addEventListener('beforeunload',event=>{if(organizer?.unsettled||datasetSync?.unsettled){event.preventDefault();event.returnValue='';}});
+ window.addEventListener('beforeunload',event=>{if(organizer?.unsettled||datasetSync?.unsettled||datasetMaintenance?.unsettled){event.preventDefault();event.returnValue='';}});
  let organizationLoaded=false;
  function action(parent,text,run,kind='secondary'){
   const b=node('button',text,kind);b.type='button';b.onclick=async()=>{b.disabled=true;try{await run();}catch(e){notice(VnView.failure(e),true);}finally{b.disabled=false;}};parent.append(b);return b;
@@ -152,18 +153,11 @@
   const toolsRead=VnTools.latest(), toolWrites=VnTools.writes((path,options)=>VnTools.request('/api/v1'+path,options,key));
   let importsInFlight=0;
   function toolAction(parent,label,slot,path,body,refresh,validate){return VnTools.action(parent,{label,slot,path,body,refresh,validate},toolWrites);}
-  function explicitToolReload(load){toolWrites.reload();$('tool-history').replaceChildren();if(toolWrites.archived.length)VnTools.details($('tool-history'),'重读前保留的原操作',toolWrites.archived.map(e=>({id:e.id,path:e.path,body:JSON.parse(e.json),state:e.state})));return load();}
+  function explicitToolReload(load){toolWrites.reload();batchProgress.invalidateActions();jobProgress.invalidateActions();$('tool-history').replaceChildren();if(toolWrites.archived.length)VnTools.details($('tool-history'),'重读前保留的原操作',toolWrites.archived.map(e=>({id:e.id,path:e.path,body:JSON.parse(e.json),state:e.state})));return load();}
   window.addEventListener('beforeunload',e=>{if(toolWrites.unsettled){e.preventDefault();e.returnValue='';}});
-  function batchCard(batch,preview=false){
-    const card=node('article',undefined,'manager-block');card.append(node('h3',(preview?'文件预览':'导入批次')+' · '+VnTools.label(batch.state)),node('p',(batch.accepted?'Web已接收；':'尚未提交；')+'处理 '+batch.completed+' / '+batch.total+' 项。处理结束仍可能含候选或失败。','small'));
-    const rows=node('details');rows.append(node('summary','逐项结果（'+batch.items.length+'）'));
-    for(const item of batch.items){const row=node('div',undefined,'tool-row');row.append(node('strong',(item.index+1)+'. '+item.title),node('p',VnTools.label(item.status),'tool-state'));if(item.message)row.append(node('p',item.message,'small'));rows.append(row);}card.append(rows);VnTools.details(card,'批次ID、摘要与原回执',batch);
-    const valid=r=>r.id===batch.id&&Array.isArray(r.items)&&r.total===batch.total;
-    if(preview&&batch.state==='preview')toolAction(card,'确认提交此批次','batch/'+batch.id,'/imports/'+batch.id+'/commit',null,loadImports,valid);
-    if(['queued','processing'].includes(batch.state))toolAction(card,'暂停导入','batch/'+batch.id,'/imports/'+batch.id+'/pause',null,loadImports,valid);
-    if(batch.state==='paused')toolAction(card,'继续导入','batch/'+batch.id,'/imports/'+batch.id+'/resume',null,loadImports,valid);
-    return card;
-  }
+  const batchProgress=VnImportProgress.create({container:$('batches'),kind:'batch',action:toolAction,pending:slot=>toolWrites.peek(slot),refresh:()=>loadImports()});
+  const jobProgress=VnImportProgress.create({container:$('jobs'),kind:'job',action:toolAction,pending:slot=>toolWrites.peek(slot),refresh:()=>loadImports()});
+  function batchCard(batch,preview=false){return batchProgress.card(batch,preview);}
   $('preview-files').onclick=async()=>{
     notice('');$('preview-files').disabled=true;const files=Array.from($('json-files').files),addToLibrary=$('import-shelf').checked;
     try{
@@ -178,16 +172,10 @@
     }catch(e){notice(VnTools.failure(e),true);}finally{$('preview-files').disabled=false;}
   };
   async function loadImports(){
-    importsInFlight++;
+    if(importsInFlight)return;importsInFlight++;
     const current=toolsRead.next();try{
       const [batches,jobs]=await Promise.all([api('/imports'),api('/metadata/jobs')]);if(!current()||tab!=='imports')return;
-      const cards=document.createDocumentFragment(),jobCards=document.createDocumentFragment();
-      for(const batch of batches)cards.append(batchCard(batch));if(!batches.length)empty(cards,'尚无导入批次。');
-      for(const job of jobs){const card=node('article',undefined,'manager-block');card.append(node('h3',job.title),node('p',VnTools.label(job.state),'tool-state'),node('p','尝试 '+job.attempts+(job.error?' · '+job.error:''),'small'));VnTools.details(card,'任务及候选证明',job);
-        for(const [caption,command] of job.state==='paused'?[['继续补全','resume']]:['queued','working'].includes(job.state)?[['暂停补全','pause']]:['error','not_found'].includes(job.state)?[['重试补全','retry']]:[])
-          toolAction(card,caption,'job/'+job.id,'/metadata/jobs/'+job.id+'/'+command,null,loadImports,r=>r.id===job.id);jobCards.append(card);}
-      if(!jobs.length)empty(jobCards,'没有联网补全任务。');
-      $('batches').replaceChildren(cards);$('jobs').replaceChildren(jobCards);$('imports-summary').textContent=batches.length+' 个批次 · '+batches.filter(b=>b.state!=='complete').length+' 个未结束 · '+jobs.filter(j=>j.state==='error'||j.state==='not_found').length+' 个任务待核对';
+      batchProgress.update(batches);jobProgress.update(jobs);$('imports-summary').textContent=batches.length+' 个批次 · '+batches.filter(b=>b.state!=='complete').length+' 个未结束 · '+jobs.filter(j=>j.state==='error'||j.state==='not_found').length+' 个任务待核对';
     }catch(e){if(current()&&tab==='imports')notice('进度刷新失败；保留最近成功显示。'+VnTools.failure(e),true);}finally{importsInFlight--;}
   }
   async function loadCandidates(){
@@ -241,6 +229,7 @@
    if(background!==true||!$('datasets').contains(document.activeElement))$('datasets').replaceChildren(content);
    $('datasets-summary').textContent='最近 '+jobs.length+' 个任务；完成仅表示所选公共资料处理通过，不含全量图片。';
    await datasetSync?.refresh();
+   await datasetMaintenance?.refresh();
   }catch(error){if(current())$('datasets-summary').textContent='进度读取失败，保留已显示内容。'+VnTools.failure(error);}
   finally{datasetsInFlight--;}
  }
@@ -270,7 +259,7 @@
  $('refresh-imports').onclick=()=>explicitToolReload(loadImports).catch(e=>notice(e.message,true));$('refresh-candidates').onclick=()=>explicitToolReload(loadCandidates).catch(e=>notice(e.message,true));$('refresh-trash').onclick=()=>explicitToolReload(loadRemoved).catch(e=>notice(e.message,true));
  window.addEventListener('popstate',()=>{display=stored.read();page=display.page;controls();show(['imports','review','trash'].includes(new URLSearchParams(location.search).get('tab'))?new URLSearchParams(location.search).get('tab'):'shelf',{push:false,rememberOld:false}).catch(e=>notice(VnView.failure(e),true));});
  let scrollTimer;window.addEventListener('scroll',()=>{clearTimeout(scrollTimer);scrollTimer=setTimeout(remember,180);},{passive:true});window.addEventListener('pagehide',remember);
- controls();api('/info').then(info=>{limits=VnImport.limits(info);$('import-limits').textContent=VnImport.describe(limits);datasetSync?.activate(info.capabilities?.includes('dataset_sync'));}).catch(e=>notice(e.message,true));
+ controls();api('/info').then(info=>{limits=VnImport.limits(info);$('import-limits').textContent=VnImport.describe(limits);datasetSync?.activate(info.capabilities?.includes('dataset_sync'));datasetMaintenance?.activate(info.capabilities?.includes('dataset_maintenance'));}).catch(e=>notice(e.message,true));
  show(['imports','review','trash'].includes(new URLSearchParams(location.search).get('tab'))?new URLSearchParams(location.search).get('tab'):'shelf',{push:false,rememberOld:false}).catch(e=>notice(VnView.failure(e),true));
  setInterval(()=>{if(tab==='imports'&&document.visibilityState==='visible'&&!importsInFlight)loadImports().catch(()=>{});},5000);
  setInterval(()=>{if(tab==='imports'&&document.visibilityState==='visible'&&!datasetsInFlight)loadDatasets(true).catch(()=>{});},15000);

@@ -36,9 +36,9 @@ public partial class MainViewModel
     {
         if (book?.Item is null || !book.HasInstallation) { Status = "仅安装包不能修复注册路径；请先登记并选择实际安装目录。"; return; }
         ConfigureBook(book); RegistryExpanded = true;
-        Status = SelectedInstallation is null ? "请先在此页明确选择需要修复的安装目录，再输入旧目录查找。" : "已定位当前安装。输入迁移前旧目录，查找路径值、预览并备份后再确认修复。";
+        Status = SelectedInstallation is null ? "请先选择需要诊断的本机安装。" : "已定位当前安装。可检查启动配置、引擎线索和迁移记录。";
     }
-    partial void OnRegistrySourceChanged(string value) => InvalidateRegistry();
+    partial void OnRegistrySourceChanged(string value) { InvalidateRegistry(); LaunchRepair.Invalidate(); }
     partial void OnRegistryTargetChanged(string value) => InvalidateRegistry();
     partial void OnRegistryTermChanged(string value) => InvalidateRegistry();
     public bool HasRegistryPreview => _registryPlan is not null || _registryRestore is not null;
@@ -76,10 +76,12 @@ public partial class MainViewModel
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException();
         InvalidateRegistry(); var context = _registryContext;
         var term = RegistryTerm;
-        var result = await Task.Run(() => OperatingSystem.IsWindows() ? new WindowsGameRegistry().Find(term, ct) : throw new PlatformNotSupportedException(), ct);
+        var source = LocalFiles.Full(RegistrySource); var target = LocalFiles.Full(RegistryTarget);
+        if (LocalFiles.Same(source, target)) throw new ArgumentException("旧目录与当前目录相同，请核对迁移记录。");
+        var result = await Task.Run(() => OperatingSystem.IsWindows() ? new WindowsGameRegistry().Find(term, source, ct) : throw new PlatformNotSupportedException(), ct);
         if (context != _registryContext) throw new InvalidOperationException("读取期间注册信息条件已变化，请重新读取。");
         SetRegistryCandidates(result);
-        Status = "只读查找完成，32／64位结果分开显示；只显示精确旧目录相关字符串。";
+        Status = "只读查找完成。HKCU 共享视图只列一次，HKLM 分别核对 32／64 位。";
     });
     [RelayCommand] private Task ReadRegistryFileAsync() => GuardAsync(async ct =>
     {
@@ -103,7 +105,7 @@ public partial class MainViewModel
         var plan = _registryPlan; InvalidateRegistry();
         var service = RegistryService();
         try { var run = await Task.Run(() => service.ApplyAsync(plan, ct), ct); RegistryPreview = "已备份并核对路径值：" + run; Status = "注册路径已更新；是否可运行仍需用户自行验证。"; }
-        finally { RefreshRegistryRuns(); SelectedRegistryRun = plan.Id; }
+        finally { RefreshRegistryRuns(); SelectedRegistryRun = plan.Id; RegistryPreview = DescribeRegistryRun(service, plan); }
     });
     [RelayCommand] private void RefreshRegistryRuns()
     {
@@ -115,7 +117,7 @@ public partial class MainViewModel
         var context = _registryContext;
         var plan = await RegistryService().ReadRunAsync(SelectedRegistryRun ?? throw new ArgumentException("请选择恢复记录。"), ct);
         if (context != _registryContext) throw new InvalidOperationException("读取期间恢复记录或条件已变化，请重新预览。");
-        RegistryPreview = "将恢复原键值（其他程序已修改的值会停止处理）：\n" + JsonSerializer.Serialize(plan, VndbJson.Options);
+        RegistryPreview = "将恢复原键值（其他程序已修改的值会停止处理）：\n" + DescribeRegistryRun(RegistryService(), plan);
         _registryRestore = plan;
         RegistryProofChanged();
     });
@@ -125,6 +127,10 @@ public partial class MainViewModel
     {
         if (!RegistryApproved || _registryRestore is null || _registryRestore.Id != SelectedRegistryRun) throw new ArgumentException("请先预览恢复并勾选确认。");
         var plan = _registryRestore; _registryRestore = null; RegistryApproved = false; RegistryProofChanged();
-        await Task.Run(() => RegistryService().RestoreAsync(plan, ct), ct); Status = "原注册路径已恢复并核对。";
+        var service = RegistryService();
+        try { await Task.Run(() => service.RestoreAsync(plan, ct), ct); Status = "原注册路径已恢复并核对。"; }
+        finally { RegistryPreview = DescribeRegistryRun(service, plan); }
     });
+    private static string DescribeRegistryRun(RegistryRepair service, RegistryRepairPlan plan) =>
+        string.Join("\n", service.InspectRun(plan).Select(row => $"{row.State} · {row.Change.Location.Hive} ({row.Change.Location.View}位)\\{row.Change.Location.Key} [{row.Change.Location.Name}]\n{row.Change.Before?.Data ?? "无原值"} → {row.Change.After.Data}"));
 }

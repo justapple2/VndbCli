@@ -7,7 +7,8 @@ using Vndb.Core;
 namespace Vndb.Library;
 
 /// <summary>One existing Web worker owns execution. Durable cursor and writes commit together.</summary>
-public sealed partial class DatasetImports(SqliteLibraryStore store, HttpClient http, TimeProvider? time = null, bool workerEnabled = true) : IDisposable
+public sealed partial class DatasetImports(SqliteLibraryStore store, HttpClient http, TimeProvider? time = null, bool workerEnabled = true,
+    Func<string, long>? availableSpace = null) : IDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Dictionary<string, string> _verified = [];
@@ -26,25 +27,39 @@ public sealed partial class DatasetImports(SqliteLibraryStore store, HttpClient 
     }
     public async Task<DatasetJob> UploadAsync(Stream input, string key, CancellationToken ct)
     {
-        if (key.Length is < 1 or > 160 || key.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not ('-' or '_' or '.')))
-            throw new ArgumentException("上传需要有效Idempotency-Key。");
-        DumpPackage.EnsureSpace(Root, 4L * 1024 * 1024 * 1024); Directory.CreateDirectory(Root);
+        RequireSyncKey(key);
+        using var files = await FileLeaseAsync(ct);
+        if (store.HasDatasetReceipt(key))
+        {
+            var replay = await CopyAsync(input, null, ct); // validate the complete body even when no additional disk space is needed
+            return store.ReplayDatasetUpload(key, replay.Sha);
+        }
+        RequireSpace(Root, 4L * 1024 * 1024 * 1024);
         var name = Guid.NewGuid().ToString("N") + ".zst";
-        var bytes = await CopyAsync(input, PathFor(name), ct);
-        return store.EnqueueDataset("upload", key, name, DumpPackage.Hash(PathFor(name)), bytes);
+        try
+        {
+            var copied = await CopyAsync(input, PathFor(name), ct);
+            ct.ThrowIfCancellationRequested();
+            return store.EnqueueDataset("upload", key, name, copied.Sha, copied.Bytes);
+        }
+        finally { RemoveUnacceptedFile(name); }
     }
-    private static async Task<long> CopyAsync(Stream input, string file, CancellationToken ct)
+    private static async Task<(long Bytes, string Sha)> CopyAsync(Stream input, string? file, CancellationToken ct)
     {
-        using var output = new FileStream(file, FileMode.CreateNew, FileAccess.Write, FileShare.None, 65536, FileOptions.Asynchronous);
+        using var output = file is null ? null : new FileStream(file, FileMode.CreateNew, FileAccess.Write, FileShare.None, 65536, FileOptions.Asynchronous);
+        using var digest = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         var buffer = new byte[65536]; long total = 0; int count;
         while ((count = await input.ReadAsync(buffer, ct)) != 0)
         {
             total += count;
             if (total > DumpPackage.MaximumCompressedBytes) throw new ImportValidationException("dataset_too_large", 413, "官方包超过512MiB限额。");
-            await output.WriteAsync(buffer.AsMemory(0, count), ct);
+            digest.AppendData(buffer, 0, count);
+            if (output is not null) await output.WriteAsync(buffer.AsMemory(0, count), ct);
         }
         if (total == 0) throw new ArgumentException("导出包为空。");
-        await output.FlushAsync(ct); output.Flush(true); return total;
+        ct.ThrowIfCancellationRequested();
+        if (output is not null) { await output.FlushAsync(ct); output.Flush(true); }
+        return (total, Convert.ToHexStringLower(digest.GetHashAndReset()));
     }
     public DatasetJob Control(string id, string action, DatasetRevision revision, string key) => store.ControlDataset(id, action, revision, key);
     public async Task<bool> StepAsync(CancellationToken ct)
@@ -52,6 +67,8 @@ public sealed partial class DatasetImports(SqliteLibraryStore store, HttpClient 
         if (!await _gate.WaitAsync(0, ct)) return false;
         try
         {
+            using var files = TryFileLease();
+            if (files is null) return false;
             var work = store.ActiveDataset();
             if (work is null || work.Job.State is "paused" or "failed") return false;
             var id = work.Job.Id;
@@ -67,7 +84,7 @@ public sealed partial class DatasetImports(SqliteLibraryStore store, HttpClient 
                 if (work.Job.Phase == "download")
                 {
                     store.UpdateDataset(id, w => w with { Job = w.Job with { State = "downloading" } });
-                    DumpPackage.EnsureSpace(Root, 4L * 1024 * 1024 * 1024); Directory.CreateDirectory(Root);
+                    RequireSpace(Root, 4L * 1024 * 1024 * 1024);
                     using var deadline = CancellationTokenSource.CreateLinkedTokenSource(stop.Token); deadline.CancelAfter(TimeSpan.FromMinutes(10));
                     using var response = await http.GetAsync(new Uri("https://dl.vndb.org/dump/" + work.Job.Source), HttpCompletionOption.ResponseHeadersRead, deadline.Token);
                     if ((int)response.StatusCode == 429)
@@ -81,21 +98,28 @@ public sealed partial class DatasetImports(SqliteLibraryStore store, HttpClient 
                     if (response.Content.Headers.ContentLength > DumpPackage.MaximumCompressedBytes) throw new InvalidDataException("官方包过大。");
                     var name = Guid.NewGuid().ToString("N") + ".zst";
                     await using var input = await response.Content.ReadAsStreamAsync(deadline.Token);
-                    var bytes = await CopyAsync(input, PathFor(name), deadline.Token);
-                    var sha = DumpPackage.Hash(PathFor(name));
-                    store.UpdateDataset(id, w => w with { SourceFile = name, Job = w.Job with { State = "queued", Phase = "prepare", Sha256 = sha, DownloadBytes = bytes } });
+                    try
+                    {
+                        var copied = await CopyAsync(input, PathFor(name), deadline.Token);
+                        store.UpdateDataset(id, w => w with { SourceFile = name, Job = w.Job with { State = "queued", Phase = "prepare", Sha256 = copied.Sha, DownloadBytes = copied.Bytes } });
+                    }
+                    finally { RemoveUnacceptedFile(name); }
                 }
                 else if (work.Job.Phase == "prepare")
                 {
                     if (work.SourceFile is null || DumpPackage.Hash(PathFor(work.SourceFile)) != work.Job.Sha256) throw new InvalidDataException("原包散列变化。");
-                    DumpPackage.EnsureSpace(Root, 4L * 1024 * 1024 * 1024);
+                    RequireSpace(Root, 4L * 1024 * 1024 * 1024);
                     var stageName = "stage-" + Guid.NewGuid().ToString("N");
-                    store.UpdateDataset(id, w => w with { Stage = stageName, Job = w.Job with { State = "preparing" } });
-                    _ = DumpPackage.Prepare(PathFor(work.SourceFile), PathFor(stageName), stop.Token);
-                    var manifest = DumpNormalization.Normalize(PathFor(stageName), stop.Token);
-                    var proof = DumpPackage.Hash(Path.Combine(PathFor(stageName), "manifest.json"));
-                    store.UpdateDataset(id, w => w with { ManifestSha = proof, Cursor = "", Job = w.Job with { State = "queued", Phase = "producer", SnapshotAt = manifest.SnapshotAt,
-                        Total = manifest.Rows["vn"] + manifest.Rows["producers"] } });
+                    store.UpdateDataset(id, w => w with { Job = w.Job with { State = "preparing" } });
+                    try
+                    {
+                        _ = DumpPackage.Prepare(PathFor(work.SourceFile), PathFor(stageName), stop.Token);
+                        var manifest = DumpNormalization.Normalize(PathFor(stageName), stop.Token);
+                        var proof = DumpPackage.Hash(Path.Combine(PathFor(stageName), "manifest.json"));
+                        store.UpdateDataset(id, w => w with { Stage = stageName, ManifestSha = proof, Cursor = "", Job = w.Job with { State = "queued", Phase = "producer", SnapshotAt = manifest.SnapshotAt,
+                            Total = manifest.Rows["vn"] + manifest.Rows["producers"] } });
+                    }
+                    finally { RemoveUnacceptedStage(stageName); }
                 }
                 else if (work.Job.Phase is "producer" or "vn")
                 {
@@ -128,7 +152,7 @@ public sealed partial class DatasetImports(SqliteLibraryStore store, HttpClient 
                             rowSha != Convert.ToHexStringLower(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(json)))) throw new InvalidDataException("规范条目散列变化。");
                         rows.Add((rowId, json)); bytes += json.Length;
                     }
-                    stop.Token.ThrowIfCancellationRequested(); DumpPackage.EnsureSpace(store.DataDirectory, 1024L * 1024 * 1024);
+                    stop.Token.ThrowIfCancellationRequested(); RequireSpace(store.DataDirectory, 1024L * 1024 * 1024);
                     store.CommitDatasetBatch(id, work.Cursor, work.Job.Phase, rows, manifest);
                 }
                 return true;
@@ -137,7 +161,7 @@ public sealed partial class DatasetImports(SqliteLibraryStore store, HttpClient 
             catch (OperationCanceledException) when (stop.IsCancellationRequested) { return true; }
             catch (Exception error) when (error is InvalidDataException or IOException or JsonException or ArgumentException or FormatException or OverflowException or InvalidOperationException or HttpRequestException or Microsoft.Data.Sqlite.SqliteException or ImportValidationException or OperationCanceledException or ZstdSharp.ZstdException)
             {
-                store.UpdateDataset(id, w => w with { Job = w.Job with { State = "failed", Error = "下载、格式验证或写入未完成；原资料及暂存保留，请核对后恢复。" } });
+                store.UpdateDataset(id, w => w with { Job = w.Job with { State = "failed", Error = "下载、格式验证或写入未完成；已接收原包及暂存保留，未接收的本次临时文件清理，请核对后恢复。" } });
                 return true;
             }
         }

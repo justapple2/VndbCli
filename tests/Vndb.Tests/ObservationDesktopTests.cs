@@ -39,4 +39,22 @@ public sealed class ObservationDesktopTests
         vm.Observation.Enabled = false; vm.Observation.Approved = true; await vm.Observation.SaveCommand.ExecuteAsync(null);
         Assert.Null(services.ObservationHost); Assert.Equal(watches.Created, watches.Disposed); Assert.True(File.Exists(Path.Combine(f.Data, "launch-profiles.json")));
     }
+    [Fact]
+    public async Task ShelfDoesNotApplyAnOldPathObservationToTheMovedInstallation()
+    {
+        using var f = new ObservationTests.Fixture(); await f.InitializeAsync();
+        await JsonSnapshotStore.AtomicWriteAsync(Path.Combine(f.Data, "device.json"), new ClientDeviceIdentity(f.Device, "Synthetic", "windows", f.Clock.GetUtcNow()), false, Ct);
+        using var services = new DesktopServices(f.Data, observationFiles: f.Files, observationTime: f.Clock);
+        var vm = new MainViewModel(services.Library, services.Launcher, new Dialogs(), services);
+        await vm.InitializeAsync();
+        await services.ConfigureObservationAsync(f.Settings with { Enabled = false }, Ct);
+        f.Files.RemoveTree(f.Game); await services.CheckObservationAsync(Ct); vm.UpdateSessionStatus();
+        await vm.RefreshCommand.ExecuteAsync(null); Assert.False(Assert.Single(vm.Shelf.Books).CanLaunchObserved);
+        await f.Store.UpdateAsync(local => local with { Installations = local.Installations.Select(i => i with
+        { Installation = i.Installation with { Details = i.Installation.Details with { RootPath = f.Game + "-Moved" }, Status = "present", Revision = i.Installation.Revision + 1 } }).ToArray() }, Ct);
+        await vm.RefreshCommand.ExecuteAsync(null);
+        var moved = Assert.Single(vm.Shelf.Books);
+        Assert.True(moved.CanLaunchObserved); Assert.Equal("", moved.LocalObservation);
+        Assert.Equal(f.Game + "-Moved", services.LocalCatalog.Installations[0].Installation.Details.RootPath);
+    }
 }

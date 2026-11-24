@@ -27,12 +27,16 @@ public sealed class LibraryImporter(VndbClient client, CoverDownloader covers, I
     public async Task<IReadOnlyList<LibraryEntry>> SaveFetchedManyAsync(IReadOnlyList<VisualNovel> novels,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (novels.Count == 0) return [];
         await _gate.WaitAsync(cancellationToken);
         try
         {
             var cache = new Dictionary<string, Producer>(StringComparer.Ordinal);
-            foreach (var producer in store.FindProducers("")) cache.TryAdd(producer.Producer.Id, producer.Producer);
-            var missing = novels.SelectMany(n => n.Developers).Select(p => p.Id).Distinct().Where(id => !cache.ContainsKey(id)).ToArray();
+            var requested = novels.SelectMany(n => n.Developers).Select(p => p.Id).Distinct().ToArray();
+            var known = store is SqliteLibraryStore sqlite ? sqlite.GetProducers(requested) : requested.Select(store.GetProducer).OfType<StoredProducer>().ToArray();
+            foreach (var producer in known) cache.TryAdd(producer.Producer.Id, producer.Producer);
+            var missing = requested.Where(id => !cache.ContainsKey(id)).ToArray();
             foreach (var ids in missing.Chunk(100))
                 foreach (var producer in (await client.GetProducersAsync(ids, cancellationToken)).Results) cache[producer.Id] = producer;
             var results = new List<LibraryEntry>();

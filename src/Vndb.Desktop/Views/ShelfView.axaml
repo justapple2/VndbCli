@@ -117,7 +117,7 @@
             <Button Content="配置／选择启动入口" Command="{Binding ConfigureBookCommand}" CommandParameter="{Binding SelectedBook}" IsVisible="{Binding BookDetails.HasInstallation}" />
             <Button Content="登记／重新核对本机安装" Command="{Binding RegisterBookCommand}" CommandParameter="{Binding SelectedBook}" />
             <Button Content="登记本地安装包" Command="{Binding RegisterPackageBookCommand}" CommandParameter="{Binding SelectedBook}" />
-            <Button Content="检查／修复注册路径…" Command="{Binding RegistryBookCommand}" CommandParameter="{Binding SelectedBook}" IsVisible="{Binding BookDetails.HasInstallation}" />
+            <Button Content="启动诊断与修复…" Command="{Binding RegistryBookCommand}" CommandParameter="{Binding SelectedBook}" IsVisible="{Binding BookDetails.HasInstallation}" />
             <Expander Header="本机安装与组件" HorizontalContentAlignment="Stretch"><StackPanel Classes="compact"><ComboBox ItemsSource="{Binding Installations}" SelectedItem="{Binding SelectedInstallation}" ItemTemplate="{StaticResource InstallationTemplate}" AutomationProperties.Name="完整安装" /><ItemsControl ItemsSource="{Binding SelectedComponents}" ItemTemplate="{StaticResource ComponentTemplate}" /></StackPanel></Expander>
             </StackPanel>
             <Button Content="读取所选作品资料与经历" Command="{Binding DetailCommand}" IsVisible="{Binding BookDetails.DetailsPending}" />

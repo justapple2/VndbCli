@@ -50,7 +50,8 @@ public partial class MainViewModel
         book.SetResourceState(installations.Length > 0, installations.Any(i => i.Installation.Status == "missing") || records.Any(p => p.Status == "missing"),
             installations.Any(i => i.Installation.Status is not ("present" or "missing")) || records.Any(p => p.Status is not ("present" or "missing")), profiles.Any(p => ids.Contains(p.InstallationId ?? "")));
         var managed = (_services?.ObservationSettings.Roots ?? []).Select(r => r.Id).ToHashSet(StringComparer.Ordinal);
-        book.SetObservation(ids.Select(id => _resourceObservations.GetValueOrDefault(id)).OfType<LocalInstallationObservation>().Where(r => managed.Contains(r.RootId)).ToArray(), profiles);
+        book.SetObservation(ids.Select(id => _resourceObservations.GetValueOrDefault(id)).OfType<LocalInstallationObservation>()
+            .Where(r => managed.Contains(r.RootId) && installations.Any(i => i.Installation.Id == r.Id && LocalFiles.Same(i.Installation.Details.RootPath, r.Path))).ToArray(), profiles);
     }
     private async Task PackagesSavedAsync(CancellationToken ct)
     {

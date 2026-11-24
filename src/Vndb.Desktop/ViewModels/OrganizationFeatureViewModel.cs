@@ -12,7 +12,8 @@ namespace Vndb.Desktop.ViewModels;
 /// <summary>Organization presentation state. All filesystem decisions run in Local.</summary>
 public partial class OrganizationFeatureViewModel(Func<LocalOrganizationWorkspace> workspace,
     Func<LocalInstallationView?> selection, Func<IReadOnlyList<LocalInstallationView>> installations,
-    IDesktopDialogs dialogs, Func<Func<CancellationToken, Task>, Task> run, Action<string> status) : ObservableObject
+    IDesktopDialogs dialogs, Func<Func<CancellationToken, Task>, Task> run, Action<string> status,
+    Func<CancellationToken, Task>? refreshLocal = null) : ObservableObject
 {
     private LocalArchivePlan? _plan;
     private LocalRestorePlan? _restore;
@@ -61,25 +62,34 @@ public partial class OrganizationFeatureViewModel(Func<LocalOrganizationWorkspac
         var installation = selection() ?? throw new ArgumentException("请先选择本机JSON已登记的完整安装。");
         var plan = await local.PreviewAsync(installation, SourceScope, TargetRoot, Company, JapaneseTitle, ct);
         if (context != _context) throw new InvalidOperationException("预览期间选择或条件已改变，请重新生成计划。");
-        RunDirectory = local.RunDirectory(plan.Id);
+        PresentPlan(plan);
+    });
+
+    public void PresentPlan(LocalArchivePlan plan)
+    {
+        Invalidate();
+        RunDirectory = workspace().RunDirectory(plan.Id);
         _plan = plan; PlanHash = LocalArchiveFormat.Hash(plan); Preview = JsonSerializer.Serialize(plan, VndbJson.Options);
         Summary = $"{plan.Company} / {plan.Title}\n\n来源：{plan.SourcePath}\n目标：{plan.DestinationPath}\n\n完整容器：{plan.Before.Files} 个文件 · {plan.Components.Count} 个组件\n依赖线索：{plan.Dependencies.Count} 项（请展开完整计划核对）"; ProofChanged();
         status("计划只读预览完成。核对来源、目标、全部组件与依赖线索，再输入SHA256批准。");
-    });
+    }
     [RelayCommand(CanExecute = nameof(CanExecutePlan))] private Task ExecuteAsync() => RunAsync(async ct =>
     {
         var plan = _plan ?? throw new ArgumentException("请先生成计划。");
         var runner = workspace().Runner(Progress().Report); var approval = Approval; var directory = RunDirectory;
         Approval = "";
         var result = await Task.Run(() => runner.ExecuteAsync(plan, approval, directory, ct), ct);
-        status("整理状态：" + result.State + "；启动配置路径如有改变须重新选择保存。");
+        if (result.State == "archived" && refreshLocal is not null) await refreshLocal(ct);
+        status("整理状态：" + result.State + "；如遇启动问题，可重新检查引擎与路径。");
         Preview = JsonSerializer.Serialize(result, VndbJson.Options);
         Summary = "整理状态：" + result.State + "。详细证据保存在本机回执中。";
     });
     [RelayCommand] private Task ResumeAsync() => RunAsync(async ct =>
     {
         var runner = workspace().Runner(Progress().Report); var directory = RunDirectory;
-        var result = await Task.Run(() => runner.ResumeAsync(directory, ct), ct); status("续跑／回执核对：" + result.State);
+        var result = await Task.Run(() => runner.ResumeAsync(directory, ct), ct);
+        if (result.State is "archived" or "restored" && refreshLocal is not null) await refreshLocal(ct);
+        status("续跑／回执核对：" + result.State);
     });
     [RelayCommand] private Task CancelPlanAsync() => RunAsync(async ct =>
     {
@@ -100,7 +110,9 @@ public partial class OrganizationFeatureViewModel(Func<LocalOrganizationWorkspac
         var restore = _restore ?? throw new ArgumentException("请先预览复原。");
         var runner = workspace().Runner(Progress().Report); var approval = Approval; var directory = RunDirectory;
         Approval = "";
-        var result = await Task.Run(() => runner.RestoreAsync(restore, approval, directory, ct), ct); status("复原：" + result.State);
+        var result = await Task.Run(() => runner.RestoreAsync(restore, approval, directory, ct), ct);
+        if (result.State == "restored" && refreshLocal is not null) await refreshLocal(ct);
+        status("复原：" + result.State);
     });
     [RelayCommand] private Task ChooseRunAsync() => RunAsync(async _ =>
     { if (await dialogs.FolderAsync("选择本机整理回执目录") is { } folder) RunDirectory = folder; });

@@ -67,9 +67,19 @@ public static class PlayRules
     public static string Hash(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
     public static string BatchHash(PlayImportBatch batch) => Hash(JsonSerializer.SerializeToUtf8Bytes(batch, VndbJson.Options));
     // '+' distinguishes base games and fandiscs; width/spacing must not merge those identities.
-    public static string NormalizeTitle(string title) => string.Concat(title.Normalize(NormalizationForm.FormKC)
-        .EnumerateRunes().Where(r => Rune.IsLetterOrDigit(r) || r.Value == '+')
-        .Select(r => Rune.ToUpperInvariant(r).ToString()));
+    public static string NormalizeTitle(string title)
+    {
+        var normalized = title.Normalize(NormalizationForm.FormKC);
+        var result = new StringBuilder(normalized.Length);
+        Span<char> buffer = stackalloc char[2];
+        foreach (var rune in normalized.EnumerateRunes())
+            if (Rune.IsLetterOrDigit(rune) || rune.Value == '+')
+            {
+                var count = Rune.ToUpperInvariant(rune).EncodeToUtf16(buffer);
+                result.Append(buffer[..count]);
+            }
+        return result.ToString();
+    }
     public static IReadOnlyDictionary<string, string> TitleMap(ILibraryStore store)
     {
         var pairs = new List<(string Title, string Id)>();

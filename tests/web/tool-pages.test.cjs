@@ -4,6 +4,8 @@ const root=path.join(__dirname,'../../src/Vndb.Web/wwwroot');
 class Element {
  constructor(tag='div'){this.tagName=tag.toUpperCase();this.children=[];this.dataset={};this.hidden=false;this.disabled=false;this._text='';this._value=undefined;this.classList={toggle(){},add(){},remove(){}};}
  append(...nodes){for(const n of nodes){if(n.tagName==='#FRAGMENT'){this.append(...n.children);continue;}n.parentNode=this;this.children.push(n);}}
+ insertBefore(node,before){if(node.parentNode){const i=node.parentNode.children.indexOf(node);if(i>=0)node.parentNode.children.splice(i,1);}const i=before?this.children.indexOf(before):-1;node.parentNode=this;this.children.splice(i<0?this.children.length:i,0,node);return node;}
+ remove(){if(this.parentNode){const i=this.parentNode.children.indexOf(this);if(i>=0)this.parentNode.children.splice(i,1);this.parentNode=null;}}
  prepend(...nodes){this.children.unshift(...nodes);}
  replaceChildren(...nodes){this.children=[];this._text='';this.append(...nodes);}
  set textContent(v){this._text=String(v??'');this.children=[];} get textContent(){return this._text+this.children.map(n=>n.textContent).join(' ');}
@@ -25,11 +27,39 @@ function page(name,route,tab='imports',personalOrganization=false){
  vm.createContext(context);
  const adapter=context.VnView;vm.runInContext(fs.readFileSync(path.join(root,'library-view.js'),'utf8'),context,{filename:'library-view.js'});
  context.VnView={...adapter,card:context.VnView.card,itemBadges:context.VnView.itemBadges,progressLabel:context.VnView.progressLabel,historyControl:context.VnView.historyControl,shelfQuickViews:context.VnView.shelfQuickViews,personalCompany:context.VnView.personalCompany};
- for(const file of ['tool-feedback.js','import-input.js','vn-details.js','releases.js',...(personalOrganization?['personal-organization.js']:[]),...(name==='manage'?['dataset-sync.js']:[]),name+'.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context,{filename:file});
+ for(const file of ['tool-feedback.js','import-input.js','vn-details.js','releases.js',...(personalOrganization?['personal-organization.js']:[]),...(name==='manage'?['dataset-sync.js','import-progress.js']:[]),name+'.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context,{filename:file});
  return {elements,tabs,calls,intervals,context,buttons:id=>elements[id].querySelectorAll('button'),text:id=>elements[id].textContent};
 }
 const info={import_limits:{maximum_bytes:1048576,maximum_items:500}};
 const batch=(id='import-original')=>({id,state:'queued',accepted:true,total:1,completed:0,items:[{index:0,title:'合成タイトル',status:'preview'}]});
+
+test('import polling updates keyed text while retaining expanded results, focus and original uncertain writes',async()=>{
+ let complete=false,lose=true;const current=()=>({...batch(),state:complete?'complete':'queued',completed:complete?1:0});
+ const p=page('manage',async c=>{
+  if(c.url.endsWith('/info'))return info;if(c.url.endsWith('/imports'))return [current()];if(c.url.endsWith('/metadata/jobs'))return [];
+  if(c.url.endsWith('/pause')){complete=true;if(lose)throw TypeError('synthetic lost reply');return current();}throw Error(c.url);
+ });await drain();
+ const original=p.elements.batches.children[0],details=original.querySelector('details'),button=p.buttons('batches').find(b=>b.textContent==='暂停导入');details.open=true;p.context.document.activeElement=button;
+ p.intervals[0]();await drain();assert.equal(p.elements.batches.children[0],original);assert.equal(original.querySelector('details'),details);assert.equal(details.open,true);assert.equal(p.buttons('batches').find(b=>b.textContent==='暂停导入'),button);
+ await button.onclick();p.intervals[0]();await drain();assert.match(p.text('batches'),/处理 1 \/ 1/);assert.equal(details.open,true);
+ const retry=p.buttons('batches').find(b=>b.textContent==='按原操作重试');assert.equal(retry.hidden,false);lose=false;await retry.onclick();
+ const writes=p.calls.filter(c=>c.method==='POST');assert.equal(writes.length,2);assert.deepEqual(writes[0],writes[1]);
+ p.context.document.activeElement=null;p.intervals[0]();await drain();assert.equal(p.elements.batches.children[0],original);assert.equal(details.open,true);
+ assert.equal(p.buttons('batches').some(b=>b.textContent==='暂停导入'),false);
+});
+
+test('slow import polling remains single-flight, hidden pages stay idle, and focus defers a state action change',async()=>{
+ let delay=false,release,paused=false;const p=page('manage',async c=>{
+  if(c.url.endsWith('/info'))return info;if(c.url.endsWith('/metadata/jobs'))return [];
+  if(c.url.endsWith('/imports')){if(delay)return new Promise(r=>release=r);return [{...batch(),state:paused?'paused':'queued'}];}throw Error(c.url);
+ });await drain();
+ const button=p.buttons('batches').find(b=>b.textContent==='暂停导入');p.context.document.activeElement=button;paused=true;
+ p.intervals[0]();await drain();assert.equal(p.buttons('batches').find(b=>b.textContent==='暂停导入'),button);
+ p.context.document.activeElement=null;p.intervals[0]();await drain();assert.ok(p.buttons('batches').find(b=>b.textContent==='继续导入'));
+ const before=p.calls.filter(c=>c.url.endsWith('/imports')).length;delay=true;p.intervals[0]();await drain();for(let i=0;i<5;i++)p.intervals[0]();await drain();
+ assert.equal(p.calls.filter(c=>c.url.endsWith('/imports')).length,before+1);release([batch()]);await drain();
+ p.context.document.visibilityState='hidden';const count=p.calls.length;for(let i=0;i<5;i++)p.intervals[0]();await drain();assert.equal(p.calls.length,count);
+});
 const file=(name,data)=>({name,size:JSON.stringify(data).length,text:async()=>typeof data==='string'?data:JSON.stringify(data)});
 const play={id:'play-a',details:{title:'合成作品',status:'played',started_on:null,duration_minutes:null},revision:3};
 const time={play_id:'play-a',base_minutes:null,session_seconds:10,adjustment_seconds:0,total_seconds:null,pending_sessions:0,revision:3};

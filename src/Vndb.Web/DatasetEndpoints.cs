@@ -11,6 +11,11 @@ public static class DatasetEndpoints
         var group = app.MapGroup("/api/v1/datasets").WithTags("Official public datasets");
         group.MapGet("", (SqliteLibraryStore store) => store.DatasetJobs());
         group.MapGet("/sync", (DatasetImports imports) => imports.SyncStatus());
+        group.MapGet("/maintenance", (DatasetImports imports) => imports.MaintenanceStatus());
+        group.MapPost("/maintenance/preview", (DatasetImports imports, HttpContext ctx, CancellationToken ct) =>
+            imports.PreviewCleanupAsync(ctx.Request.Headers["Idempotency-Key"].ToString(), ct));
+        group.MapPost("/maintenance/cleanup", (DatasetCleanupRequest request, DatasetImports imports, HttpContext ctx, CancellationToken ct) =>
+            imports.CleanupAsync(request, ctx.Request.Headers["Idempotency-Key"].ToString(), ct));
         group.MapPost("/sync/check", (DatasetImports imports, HttpContext ctx, CancellationToken ct) =>
             imports.CheckLatestAsync(ctx.Request.Headers["Idempotency-Key"].ToString(), ct)).RequireRateLimiting("upstream");
         group.MapPost("/sync/update", (DatasetImports imports, HttpContext ctx, CancellationToken ct) =>

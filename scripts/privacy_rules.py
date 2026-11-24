@@ -7,7 +7,7 @@ BLOCKED_PARTS = {'artifacts', 'tmp', 'bin', 'obj', 'testresults', 'secrets', 'ba
 BLOCKED_NAMES = {'client.json', 'device.json', 'desktop-settings.json', 'launch-profiles.json', 'credential.bin', 'active-session.json', 'session.lock'}
 BLOCKED_PARTS.update({'play-activity', 'local-checks', 'presence-receipts', 'presence-sent', 'organization-state', 'legacy-records'})
 BLOCKED_NAMES.update({'local-library.json', 'credential.json', 'presence-pending.json', 'local-presence-seed.json', 'launch-selection-needed.json', 'legacy-migration.json', 'local-data-migration.json', 'local-data-verification.json', 'local-mapping-corrections.json'})
-BLOCKED_PARTS.add('registry-repairs')
+BLOCKED_PARTS.update({'registry-repairs', 'engine-path-repairs', 'dataset-cleanups'})
 BLOCKED_NAMES.update({'shelf-preferences.json', 'launch-history.json'})
 BLOCKED_NAMES.update({'search-history-lookup.json', 'search-history-catalog.json'})
 BLOCKED_NAMES.add('catalog-producers.json')

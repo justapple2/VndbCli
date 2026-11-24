@@ -32,6 +32,8 @@ JSON为snake_case；时间戳ISO8601，事件按UTC保存，日历日期`YYYY-MM
 | `metadata_format_versions`、`metadata_import_available` | 元数据格式与导入支持 |
 | `import_limits.maximum_bytes`、`maximum_items` | 活跃导入限额 |
 
+查询读取保持本库优先：本库命中和 `local_only` 不等待其他联网查询；同一缺失查询进入联网段后复核本库，并复用已有查询结果。`explicit_refresh` 仍明确访问上游，不绕过原有节流、鉴权或错误处理。进程负结果缓存有界且保留有效期，协议／联网失败不会保存为空结果。
+
 ## 2. 元数据查询
 
 以下路径均相对`/api/v1`：
@@ -352,7 +354,19 @@ GET /api/v1/collection/stats返回public_novels、personal_items、played、unpl
 
 响应为`DatasetJob`，含`id/source/state/phase/revision/created_at/sha256/snapshot_at/total/processed/written/kept/download_bytes/error/completed_at/earliest_resume_at`。`queued`只表示接收，完成状态和计数需另行读取；关闭页面不取消任务。
 
-进度更新可能令控制请求返回409，先刷新修订；写入结果不明时保持原请求及幂等键。同包或同日期重复提交返回已有任务，同一时间只允许一个活动任务，包含暂停和失败状态。损坏上传只形成失败任务，不执行包内内容。使用、空间与恢复条件见[公共资料目录](CATALOG.md)。
+进度更新可能令控制请求返回409，先刷新修订；写入结果不明时保持原请求及幂等键。同包或同日期重复提交返回已有任务，同一时间只允许一个活动任务，包含暂停和失败状态。上传会先验证完整内容身份，相同键不同内容返回409；相同内容重复上传复用已登记任务／输入，未接收临时文件清理。损坏上传只形成失败任务，不执行包内内容。使用、空间与恢复条件见[公共资料目录](CATALOG.md)。
+
+### 容量摘要与手动清理
+
+`info.capabilities` 包含 `dataset_maintenance`。保持 API v1 与 schema15，POST 沿用上述管理鉴权和幂等键，不接收文件路径。
+
+| 接口 | 说明 |
+| --- | --- |
+| `GET /api/v1/datasets/maintenance` | 数据卷 `available_bytes`、`input_bytes/stage_bytes` 及数量，`completed_snapshot_at`、`active_job`、`wait_reason`；只读，无外网请求 |
+| `POST /api/v1/datasets/maintenance/preview` | 无请求体；返回 `id/sha256/entries/reclaimable_bytes`。同键返回原预览；新预览使用新键 |
+| `POST /api/v1/datasets/maintenance/cleanup` | `{"preview_id":"预览ID","sha256":"预览证明"}`；返回 `preview_id/removed/released_bytes`；同键重试复用回执 |
+
+`entries` 仅含不透明 `id`、`kind`、`bytes`、可选 `job_id`；kind 为 `unreferenced_input`、`unreferenced_stage` 或 `completed_stage`，不返回服务器目录。生成预览不清理文件。执行前核对引用和文件证明，活动／暂停／失败任务存在或证明变化返回409；原包、数据库、封面及完整恢复材料不在清理范围。清理中断保留原预览与意图，可用同一内容重试，不得修改证明继续执行。
 
 ## 官方资料更新与可选调度
 

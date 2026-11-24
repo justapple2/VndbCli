@@ -33,7 +33,12 @@ public partial class MainViewModel
         get => LaunchComponents.FirstOrDefault(c => c.Id == ComponentId);
         set { if (value is not null && LaunchComponents.Any(c => c.Id == value.Id)) ComponentId = value.Id; }
     }
-    partial void OnComponentIdChanged(string value) => OnPropertyChanged(nameof(SelectedLaunchComponent));
+    partial void OnComponentIdChanged(string value)
+    {
+        LaunchRepair.Invalidate();
+        InvalidateRegistry();
+        OnPropertyChanged(nameof(SelectedLaunchComponent));
+    }
     public bool HasSavedLaunch => SelectedProfile is not null;
     public bool LaunchDraftChanged => SelectedProfile is { } p && (LaunchTitle != p.Title || Executable != p.Executable || WorkingDirectory != p.WorkingDirectory ||
         ComponentId != (p.ComponentId ?? "") || SelectedInstallation is { } installation && installation.Installation.Id != p.InstallationId ||

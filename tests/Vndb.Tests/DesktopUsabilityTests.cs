@@ -98,8 +98,14 @@ public sealed class DesktopUsabilityTests
         var service = new RegistryRepair(registry, dir.Path);
         var plan = service.Preview([new(Location(), new(old)), new(Location("New"), new(old))], old, target);
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.ApplyAsync(plan, Ct));
+        var statuses = new RegistryRepair(registry, dir.Path).InspectRun(await service.ReadRunAsync(plan.Id, Ct));
+        Assert.Equal("已更新／可恢复", statuses[0].State);
+        Assert.Equal("原值／未写入或已恢复", statuses[1].State);
         Assert.Contains(plan.Id, service.Runs()); registry.FailAt = null; await service.RestoreAsync(await service.ReadRunAsync(plan.Id, Ct), Ct);
         Assert.Equal(old, registry.Read(Location())!.Data); Assert.Null(registry.Read(Location("New"))); Assert.Equal("leave this alone", registry.Read(Location("Other"))!.Data);
+        var intent = Path.Combine(dir.Path, "registry-repairs", plan.Id, "intent.json");
+        await File.WriteAllTextAsync(intent, System.Text.Json.JsonSerializer.Serialize(plan with { Source = old + "-changed" }, Vndb.Core.VndbJson.Options), Ct);
+        await Assert.ThrowsAsync<IOException>(() => service.RestoreAsync(plan, Ct));
     }
     [Fact]
     public async Task RegistryConcurrentChangesStopBeforeWriteOrRestore()

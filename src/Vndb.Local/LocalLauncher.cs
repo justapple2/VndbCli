@@ -9,6 +9,7 @@ public sealed record LaunchProfile(string Id, string Title, string Executable, I
     string WorkingDirectory, string Sha256, string? InstallationId = null, string? ComponentId = null,
     string? TrackedExecutable = null, string? TrackedSha256 = null, int MatchTimeoutSeconds = 30, LocaleLaunch? Locale = null);
 public sealed record TrackedLaunch(int Pid, ProcessIdentity? Identity, LaunchProfile Profile, Process Process);
+public sealed record LaunchProfileRepair(LaunchProfile Before, LaunchProfile After, string Source, string Target);
 public enum LaunchMethod { Profile, Direct, GlobalLocale }
 
 /// <summary>Local opt-in profiles only. Metadata imports never create launch authority.</summary>
@@ -32,14 +33,67 @@ public sealed class LocalLauncher(string directory)
     }
     public async Task RebaseAsync(string installationId, string source, string target, CancellationToken ct = default)
     {
-        string Map(string path) => LocalFiles.Same(path, source) ? target : LocalFiles.Within(source, path) ? Path.Combine(target, Path.GetRelativePath(source, path)) : path;
         using var lease = await LocalFileLease.AcquireAsync(Path.GetDirectoryName(_file)!, "launch-profiles", ct);
 
         {
             var profiles = await ReadAsync(ct);
-            var changed = profiles.Select(p => p.InstallationId != installationId ? p : p with { Executable = Map(p.Executable), WorkingDirectory = Map(p.WorkingDirectory), TrackedExecutable = p.TrackedExecutable is { } tracked ? Map(tracked) : null }).ToArray();
+            var changed = profiles.Select(p => p.InstallationId == installationId ? Remap(p, source, target) : p).ToArray();
             if (!profiles.SequenceEqual(changed)) await JsonSnapshotStore.AtomicWriteAsync(_file, changed, true, ct);
         }
+    }
+
+    private static LaunchProfile Remap(LaunchProfile profile, string source, string target)
+    {
+        string Map(string value, bool requireExisting = false)
+        {
+            if (!Path.IsPathFullyQualified(value) || RegistryRepair.MapPath(value, source, target) is not { } mapped) return value;
+            if (requireExisting)
+            {
+                LocalFiles.CheckAncestors(mapped);
+                if (!LocalFiles.Exists(mapped)) return value;
+            }
+            return mapped;
+        }
+        var arguments = profile.Arguments.Select(a => Map(a, true)).ToArray();
+        return profile with
+        {
+            Executable = Map(profile.Executable), WorkingDirectory = Map(profile.WorkingDirectory),
+            TrackedExecutable = profile.TrackedExecutable is { } tracked ? Map(tracked) : null,
+            Arguments = arguments.SequenceEqual(profile.Arguments) ? profile.Arguments : arguments
+        };
+    }
+
+    public static LaunchProfileRepair? PreviewPathRepair(LaunchProfile profile, string source, string target)
+    {
+        if (profile.InstallationId is null) throw new ArgumentException("请先保存与本机安装关联的启动配置。");
+        source = LocalFiles.Full(source); target = LocalFiles.Full(target);
+        if (LocalFiles.Same(source, target) || LocalFiles.Exists(source)) throw new IOException("旧目录仍存在或与当前目录相同，请核对安装版本。");
+        LocalFiles.CheckAncestors(target);
+        if (!Directory.Exists(target)) throw new DirectoryNotFoundException(target);
+        var after = Remap(profile, source, target);
+        return after == profile ? null : new(profile, after, source, target);
+    }
+
+    public async Task<LaunchProfile> ApplyPathRepairAsync(LaunchProfileRepair plan, CancellationToken ct)
+    {
+        using var lease = await LocalFileLease.AcquireAsync(Path.GetDirectoryName(_file)!, "launch-profiles", ct);
+        var profiles = (await ReadAsync(ct)).ToArray();
+        var index = Array.FindIndex(profiles, p => p.Id == plan.Before.Id);
+        if (index < 0 || LocalArchiveFormat.Hash(profiles[index]) != LocalArchiveFormat.Hash(plan.Before) ||
+            PreviewPathRepair(profiles[index], plan.Source, plan.Target) is not { } verified ||
+            LocalArchiveFormat.Hash(verified.After) != LocalArchiveFormat.Hash(plan.After))
+            throw new IOException("启动配置或目标路径已变化，请重新预览。");
+        var profile = verified.After;
+        Check(profile.Executable, profile.WorkingDirectory);
+        if (await HashAsync(profile.Executable, ct) != profile.Sha256) throw new IOException("目标程序摘要与已保存配置不同，请手动核对程序。");
+        if (profile.TrackedExecutable is { } tracked)
+        {
+            Check(tracked, Path.GetDirectoryName(tracked)!);
+            if (await HashAsync(tracked, ct) != profile.TrackedSha256) throw new IOException("实际游戏程序摘要不同，请手动核对。");
+        }
+        profiles[index] = profile;
+        await JsonSnapshotStore.AtomicWriteAsync(_file, profiles, true, ct);
+        return profile;
     }
     private static bool ArchiveHash(string? value) => value?.Length == 64 && value.All(char.IsAsciiHexDigit);
 

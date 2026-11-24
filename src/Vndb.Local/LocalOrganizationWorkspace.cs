@@ -11,6 +11,36 @@ public sealed class LocalOrganizationWorkspace(string directory, ClientDeviceIde
         new(directory ?? ClientSettings.UserDirectory, await LocalDeviceIdentity.LoadOrCreateAsync(directory, ct));
     public OrganizationRunner Runner(Action<string>? progress = null) => new(new LocalOrganizationServer(_library, _launcher, identity.Id), "local:" + identity.Id, identity.Id, progress);
     public string RunDirectory(string id) => Path.Combine(directory, "archive-runs", id);
+    public Task<string?> PreviousRootAsync(LocalInstallation installation, CancellationToken ct) =>
+        new LocalOrganizationServer(_library, _launcher, identity.Id).PreviousRootAsync(installation, ct);
+    public Task<InstallRepairRestore?> PreviewInstallRestoreAsync(string installationId, string root, CancellationToken ct) =>
+        new LocalOrganizationServer(_library, _launcher, identity.Id).ResolveInstallRepairAsync(installationId, root, ct);
+    public async Task RestoreInstallAsync(InstallRepairRestore preview, CancellationToken ct)
+    {
+        var current = await PreviewInstallRestoreAsync(preview.Repair.InstallationId, preview.Root, ct);
+        if (current is null || LocalArchiveFormat.Hash(current) != LocalArchiveFormat.Hash(preview)) throw new IOException("恢复目标或备份已变化，请重新预览。");
+        await new LaunchRepair(directory).RestoreResolvedAsync(current, ct);
+    }
+
+    public Task<LocalArchivePlan> PreviewEngineAliasAsync(LocalInstallationView installation, string componentRoot, string? entry,
+        string alias, CancellationToken ct)
+    {
+        EnsureDevice(installation);
+        return Task.Run(() =>
+        {
+            var root = LocalFiles.Full(installation.Installation.Details.RootPath);
+            if ((!LocalFiles.Same(root, componentRoot) && !LocalFiles.Within(root, componentRoot)) || LaunchRepair.Detect(componentRoot, entry) != GameEngine.AdvHd)
+                throw new InvalidOperationException("短目录预览仅用于已确认的 AdvHD 安装。");
+            if (alias.Length is < 1 or > 32 || !alias.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_'))
+                throw new ArgumentException("短目录名仅支持 1–32 个英文字母、数字、连字符和下划线。");
+            var companyDirectory = Path.GetDirectoryName(root)!;
+            var scope = Path.GetDirectoryName(companyDirectory) ?? throw new ArgumentException("需要会社／游戏两级目录。");
+            var company = Path.GetFileName(companyDirectory);
+            if (!GameDirectoryNaming.IsCompatibleName(company) || Path.Combine(companyDirectory, alias).Any(c => !char.IsAscii(c)))
+                throw new ArgumentException("上层目录也需兼容 ASCII。请在目录整理中明确选择兼容目标根和会社目录。");
+            return OrganizationPlanner.Create(installation, new(scope, scope), company, installation.Installation.Details.Title, ct, directoryAlias: alias);
+        }, ct);
+    }
     public Task<DirectoryScan> ScanAsync(string scope, IReadOnlyList<LocalInstallationView> known, CancellationToken ct) =>
         Task.Run(() => DirectoryScanner.Scan(scope, known: known.Where(i => i.Installation.Details.DeviceId == identity.Id).ToArray(), ct: ct), ct);
     public Task<LocalArchivePlan> PreviewAsync(LocalInstallationView installation, string scope, string target, string company, string title, CancellationToken ct)

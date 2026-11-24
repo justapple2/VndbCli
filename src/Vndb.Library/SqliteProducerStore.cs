@@ -6,17 +6,32 @@ namespace Vndb.Library;
 
 public sealed partial class SqliteLibraryStore
 {
-    public StoredProducer? GetProducer(string id) => FindProducers("").FirstOrDefault(p => p.Producer.Id == VndbId.Normalize(id, 'p'));
+    public StoredProducer? GetProducer(string id)
+    {
+        using var read = new LibraryReadScope(this, "producer-get");
+        using var command = read.Query("SELECT metadata_json,updated_at FROM producers WHERE id=$id", ("$id", VndbId.Normalize(id, 'p')));
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? new(read.Decode<Producer>(reader.GetString(0)), DateTimeOffset.Parse(reader.GetString(1), CultureInfo.InvariantCulture)) : null;
+    }
+    internal IReadOnlyList<StoredProducer> GetProducers(IReadOnlyList<string> ids)
+    {
+        if (ids.Count == 0) return [];
+        using var read = new LibraryReadScope(this, "producer-batch");
+        using var command = read.Query("SELECT metadata_json,updated_at FROM producers WHERE id IN (SELECT value FROM json_each($ids))",
+            ("$ids", Json(ids.Select(id => VndbId.Normalize(id, 'p')).Distinct().ToArray())));
+        using var reader = command.ExecuteReader(); var rows = new List<StoredProducer>();
+        while (reader.Read()) rows.Add(new(read.Decode<Producer>(reader.GetString(0)), DateTimeOffset.Parse(reader.GetString(1), CultureInfo.InvariantCulture)));
+        return rows;
+    }
     public IReadOnlyList<StoredProducer> FindProducers(string query)
     {
-        using var connection = Open();
-        using var command = Command(connection, null, "SELECT metadata_json,updated_at FROM producers ORDER BY id");
+        using var read = new LibraryReadScope(this, "producer-search");
+        using var command = read.Query("SELECT metadata_json,updated_at FROM producers ORDER BY id");
         using var reader = command.ExecuteReader();
         var result = new List<StoredProducer>();
         while (reader.Read())
         {
-            var producer = JsonSerializer.Deserialize<Producer>(reader.GetString(0), VndbJson.Options)
-                ?? throw new InvalidDataException("会社资料无效。");
+            var producer = read.Decode<Producer>(reader.GetString(0));
             if (ProducerMatches(producer, query)) result.Add(new(producer, DateTimeOffset.Parse(reader.GetString(1), CultureInfo.InvariantCulture)));
         }
         return result;

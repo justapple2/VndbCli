@@ -47,10 +47,13 @@ public sealed class RegistrationTests
         if (syncBeforeArchive) await Map();
         var run = workspace.RunDirectory(plan.Id); var runner = workspace.Runner();
         Assert.Equal("archived", (await runner.ExecuteAsync(plan, LocalArchiveFormat.Hash(plan), run, Ct)).State);
+        var moved = Assert.Single((await local.ReadAsync(Ct)).Installations);
+        Assert.Equal(game, await workspace.PreviousRootAsync(moved.Installation, Ct));
         if (!syncBeforeArchive) await Map();
         await File.WriteAllTextAsync(Path.Combine(plan.DestinationPath, "save.dat"), "new save retained", Ct);
         var restore = await runner.PreviewRestoreAsync(run, Ct);
         Assert.Equal("restored", (await runner.RestoreAsync(restore, LocalArchiveFormat.Hash(restore), run, Ct)).State);
+        Assert.Null(await workspace.PreviousRootAsync(Assert.Single((await local.ReadAsync(Ct)).Installations).Installation, Ct));
         Assert.Equal("synthetic, never executed", await File.ReadAllTextAsync(Path.Combine(game, "game.exe"), Ct));
         Assert.Equal("new save retained", await File.ReadAllTextAsync(Path.Combine(game, "save.dat"), Ct));
         Assert.False(Directory.Exists(plan.DestinationPath));

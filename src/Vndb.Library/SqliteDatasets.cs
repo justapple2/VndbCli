@@ -28,6 +28,38 @@ public sealed partial class SqliteLibraryStore
         using var reader = command.ExecuteReader(); var jobs = new List<DatasetJob>(); while (reader.Read()) jobs.Add(Read<DatasetWork>(reader.GetString(0)).Job); return jobs;
     }
     internal DatasetWork Dataset(string id) { using var db = Open(); return Dataset(db, null, id); }
+    internal IReadOnlyList<DatasetWork> DatasetWorks()
+    {
+        using var db = Open(); using var command = Command(db, null, "SELECT record_json FROM dataset_jobs ORDER BY rowid");
+        using var reader = command.ExecuteReader(); var works = new List<DatasetWork>();
+        while (reader.Read()) works.Add(Read<DatasetWork>(reader.GetString(0)));
+        return works;
+    }
+    internal DatasetCleanupResult CommitDatasetCleanup(DatasetCleanupRequest request, string key, Func<IReadOnlyList<DatasetWork>, DatasetCleanupResult> clean) =>
+        Mutate("dataset/cleanup", key, request, (db, tx) =>
+        {
+            using var query = Command(db, tx, "SELECT record_json FROM dataset_jobs");
+            var works = new List<DatasetWork>();
+            using (var reader = query.ExecuteReader()) while (reader.Read()) works.Add(Read<DatasetWork>(reader.GetString(0)));
+            return clean(works);
+        });
+    internal DatasetCleanupResult? DatasetCleanupReceipt(DatasetCleanupRequest request, string key)
+    {
+        using var db = Open();
+        var hash = PlayRules.Hash(System.Text.Encoding.UTF8.GetBytes(Json(request)));
+        return TryOperationReceipt<DatasetCleanupResult>(db, null, "dataset/cleanup", key, hash, out var result) ? result : null;
+    }
+    internal bool HasDatasetReceipt(string key)
+    {
+        using var db = Open(); using var query = Command(db, null, "SELECT 1 FROM operation_receipts WHERE scope='dataset/create' AND key=$key", ("$key", key));
+        return query.ExecuteScalar() is not null;
+    }
+    internal DatasetJob ReplayDatasetUpload(string key, string sha)
+    {
+        using var db = Open(); var hash = PlayRules.Hash(System.Text.Encoding.UTF8.GetBytes(Json(new { source = "upload", sha })));
+        return TryOperationReceipt<DatasetJob>(db, null, "dataset/create", key, hash, out var result) ? result :
+            throw new PlayConflictException("原上传回执已变化，请核对后重新提交。");
+    }
     internal DatasetWork? ActiveDataset()
     {
         using var db = Open(); using var command = Command(db, null, "SELECT record_json FROM dataset_jobs WHERE state NOT IN ('completed','cancelled') LIMIT 1");

@@ -11,7 +11,7 @@ Push-Location -LiteralPath $projectRoot
 try {
     $privateRoot = if ($env:VN_PRIVATE_ROOT) { $env:VN_PRIVATE_ROOT } else { Join-Path (Split-Path -Parent $projectRoot) 'VndbCli.private' }
     $logRoot = Join-Path $privateRoot 'build-logs'
-    if (-not $OutputRoot) { $OutputRoot = Join-Path $privateRoot ('releases/0.6.1/runtime/' + (New-VnGeneration)) }
+    if (-not $OutputRoot) { $OutputRoot = Join-Path $privateRoot ('releases/0.6.2/runtime/' + (New-VnGeneration)) }
     New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
     $releaseRoot = Join-Path $OutputRoot $Runtime
     $stage = New-VnRelease $releaseRoot 'runtime' $Runtime

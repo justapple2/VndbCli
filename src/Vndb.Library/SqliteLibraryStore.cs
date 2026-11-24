@@ -6,6 +6,8 @@ namespace Vndb.Library;
 
 public sealed partial class SqliteLibraryStore : ILibraryStore
 {
+    private static readonly System.Diagnostics.Metrics.Meter SqlMeter = new("Vndb.Library.Sql");
+    private static readonly System.Diagnostics.Metrics.Counter<long> SqlCommands = SqlMeter.CreateCounter<long>("vndb.library.sql.commands");
     private readonly string _connectionString;
     public string DataDirectory { get; }
     public SqliteLibraryStore(string dataDirectory)
@@ -107,9 +109,9 @@ public sealed partial class SqliteLibraryStore : ILibraryStore
     public LibraryEntry? Get(string id)
     {
         id = VndbId.Normalize(id, 'v');
-        using var connection = Open();
-        using var command = Command(connection, null, "SELECT entry_json FROM novels WHERE id=$id", ("$id", id));
-        return command.ExecuteScalar() is string json ? Deserialize(json) : null;
+        using var read = new LibraryReadScope(this, "novel-get");
+        using var command = read.Query("SELECT entry_json FROM novels WHERE id=$id", ("$id", id));
+        return command.ExecuteScalar() is string json ? read.Decode<LibraryEntry>(json) : null;
     }
     public void Save(LibraryEntry entry)
         => SaveMetadataBatch([entry]);
@@ -199,20 +201,18 @@ public sealed partial class SqliteLibraryStore : ILibraryStore
     {
         LibraryRules.ValidatePage(page, limit);
         producer = string.IsNullOrWhiteSpace(producer) ? null : VndbId.Normalize(producer, 'p');
-        using var connection = Open();
-        using var transaction = connection.BeginTransaction(deferred: true);
+        using var read = new LibraryReadScope(this, "novel-list");
         const string where = "WHERE ($q='' OR instr(n.search_text,$q)>0) AND ($producer='' OR EXISTS(SELECT 1 FROM novel_developers d WHERE d.novel_id=n.id AND d.producer_id=$producer))";
         (string, object?)[] filter = [("$q", query?.Trim().ToLowerInvariant() ?? ""), ("$producer", producer ?? "")];
-        using var count = Command(connection, transaction, "SELECT count(*) FROM novels n " + where, filter);
+        using var count = read.Query("SELECT count(*) FROM novels n " + where, filter);
         var total = Convert.ToInt32(count.ExecuteScalar());
         var personal = !string.IsNullOrWhiteSpace(query);
-        using var select = Command(connection, transaction, (personal ? PersonalOrderCte : "") + "SELECT n.entry_json FROM novels n " + (personal ? PersonalOrderJoin : "") + where + " ORDER BY " + (personal ? PersonalOrder : "n.updated_at DESC,n.id") + " LIMIT $limit OFFSET $offset",
+        using var select = read.Query((personal ? PersonalOrderCte : "") + "SELECT n.entry_json FROM novels n " + (personal ? PersonalOrderJoin : "") + where + " ORDER BY " + (personal ? PersonalOrder : "n.updated_at DESC,n.id") + " LIMIT $limit OFFSET $offset",
             [.. filter, ("$limit", limit), ("$offset", (page - 1) * limit)]);
         using var reader = select.ExecuteReader();
         var entries = new List<LibraryEntry>();
-        while (reader.Read()) entries.Add(Deserialize(reader.GetString(0)));
+        while (reader.Read()) entries.Add(read.Decode<LibraryEntry>(reader.GetString(0)));
         reader.Close();
-        transaction.Commit();
         return new(entries, page, limit, total, (long)page * limit < total);
     }
     public IReadOnlyList<ProducerCount> Producers()
@@ -253,6 +253,7 @@ public sealed partial class SqliteLibraryStore : ILibraryStore
         params (string Name, object? Value)[] parameters)
     {
         var command = connection.CreateCommand();
+        SqlCommands.Add(1);
         command.Transaction = transaction;
         command.CommandText = sql;
         foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value ?? DBNull.Value);

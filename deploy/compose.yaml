@@ -1,7 +1,7 @@
 name: vndb-local
 services:
   library:
-    image: vndb-local:0.6.1
+    image: vndb-local:0.6.2
     build:
       context: ./release
       dockerfile: Dockerfile

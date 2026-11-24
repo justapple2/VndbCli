@@ -8,6 +8,7 @@ public sealed class CatalogQueries(ILibraryStore store, CatalogEnricher catalog,
     VndbClient upstream, LibraryImporter importer, TimeProvider time) : IDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly object _cacheLock = new();
     private readonly Dictionary<string, (MetadataResponse Response, DateTimeOffset At)> _queries = [];
 
     public static MetadataSnapshot Snapshot(LibraryEntry entry) => MetadataImports.Snapshot(entry);
@@ -60,16 +61,22 @@ public sealed class CatalogQueries(ILibraryStore store, CatalogEnricher catalog,
         if (kind.EndsWith("search", StringComparison.Ordinal) && q.Query.Length == 0)
             throw new ArgumentException("联网搜索需要标题或会社名；浏览本地库请使用 GET。");
         var key = System.Text.Json.JsonSerializer.Serialize(new { kind, id, query = q with { Mode = "local_first" } }, VndbJson.Options);
+        ct.ThrowIfCancellationRequested();
+        MetadataResponse? ReadKnown()
+        {
+            if (q.Mode == "explicit_refresh") return null;
+            var local = Local(kind, q, id);
+            if (!local.NeedsRemote || q.Mode == "local_only") return local;
+            lock (_cacheLock)
+                return _queries.TryGetValue(key, out var remembered) && time.GetUtcNow() - remembered.At < TimeSpan.FromHours(6)
+                    ? remembered.Response with { Source = "query_cache" } : null;
+        }
+        if (ReadKnown() is { } known) return known;
         await _gate.WaitAsync(ct);
         try
         {
-            if (q.Mode != "explicit_refresh")
-            {
-                var local = Local(kind, q, id);
-                if (!local.NeedsRemote || q.Mode == "local_only") return local;
-                if (_queries.TryGetValue(key, out var remembered) && time.GetUtcNow() - remembered.At < TimeSpan.FromHours(6))
-                    return remembered.Response with { Source = "query_cache" };
-            }
+            // A preceding request may have persisted this miss while we waited for upstream ownership.
+            if (ReadKnown() is { } refreshed) return refreshed;
             if (q.PageSize > 20) throw new ArgumentException("联网查询每页最多 20 条，本地浏览最多 100 条。");
             IReadOnlyList<MetadataSnapshot> items; bool more = false;
             if (kind.StartsWith("producer_", StringComparison.Ordinal) && kind != "producer_vns")
@@ -122,8 +129,11 @@ public sealed class CatalogQueries(ILibraryStore store, CatalogEnricher catalog,
                     items.Select(i => i.VndbId).ToArray(), more, response.FetchedAt.Value));
             }
             // Bounded process cache includes genuine negative results. Errors are never cached.
-            if (_queries.Count >= 512) _queries.Remove(_queries.MinBy(p => p.Value.At).Key);
-            _queries[key] = (response, time.GetUtcNow());
+            lock (_cacheLock)
+            {
+                if (_queries.Count >= 512) _queries.Remove(_queries.MinBy(p => p.Value.At).Key);
+                _queries[key] = (response, time.GetUtcNow());
+            }
             return response;
         }
         finally { _gate.Release(); }
@@ -138,8 +148,8 @@ public sealed class CatalogQueries(ILibraryStore store, CatalogEnricher catalog,
         if (direct.Total > 0 || r.Query.Length == 0)
             return new(direct.Results, direct.Total, direct.Page, direct.PageSize, direct.More, "local");
         var key = CatalogRules.Key(r.Query);
-        var associated = catalog.Rows().Where(row => row.Source.Key.Contains(key, StringComparison.Ordinal))
-            .SelectMany(row => row.Source.NovelIds).ToHashSet(StringComparer.Ordinal);
+        var associated = store is SqliteLibraryStore associations ? associations.AssociatedNovelIds(key) :
+            catalog.Rows().Where(row => row.Source.Key.Contains(key, StringComparison.Ordinal)).SelectMany(row => row.Source.NovelIds).ToHashSet(StringComparer.Ordinal);
         if (store is SqliteLibraryStore sqlite)
         {
             var normalized = sqlite.FindNormalized(key, associated, r.Producer, r.Page, r.Limit);

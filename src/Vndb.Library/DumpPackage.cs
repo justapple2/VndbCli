@@ -89,6 +89,10 @@ public static class DumpPackage
     }
     public static void EnsureSpace(string path, long minimum)
     {
+        if (AvailableSpace(path) < minimum) throw new IOException("暂存/数据库空间不足，保留已有资料。");
+    }
+    public static long AvailableSpace(string path)
+    {
         var full = Path.GetFullPath(path);
         var drive = DriveInfo.GetDrives().Where(d =>
         {
@@ -97,7 +101,7 @@ public static class DumpPackage
                 full.StartsWith(Path.EndsInDirectorySeparator(name) ? name : name + Path.DirectorySeparatorChar,
                     OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
         }).OrderByDescending(d => d.Name.Length).FirstOrDefault() ?? new DriveInfo(Path.GetPathRoot(full)!);
-        if (drive.AvailableFreeSpace < minimum) throw new IOException("暂存/数据库空间不足，保留已有资料。");
+        return drive.AvailableFreeSpace;
     }
     public static SqliteConnection OpenStage(string directory)
     {

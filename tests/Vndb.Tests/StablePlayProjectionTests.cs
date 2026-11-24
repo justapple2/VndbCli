@@ -122,7 +122,7 @@ public sealed class StablePlayProjectionTests
         }
         var measurements = new List<object>(); var commands = 0L; var thread = Environment.CurrentManagedThreadId;
         using var listener = new MeterListener { InstrumentPublished = (instrument, l) => { if (instrument.Meter.Name == "Vndb.Library.Reads") l.EnableMeasurementEvents(instrument); } };
-        listener.SetMeasurementEventCallback<long>((_, value, _, _) => { if (Environment.CurrentManagedThreadId == thread) commands += value; }); listener.Start();
+        listener.SetMeasurementEventCallback<long>((instrument, value, _, _) => { if (instrument.Name == "vndb.library.read.commands" && Environment.CurrentManagedThreadId == thread) commands += value; }); listener.Start();
         foreach (var size in new[] { 10, 24, 100 })
         {
             commands = 0; var watch = Stopwatch.StartNew(); var page = store.ReadItems(page: 2, pageSize: size); watch.Stop();
@@ -133,7 +133,7 @@ public sealed class StablePlayProjectionTests
         measurements.Add(new { operation = "plays", size = plays.Count, commands, milliseconds = playsWatch.Elapsed.TotalMilliseconds });
         Assert.Equal(401, store.ReadItems(query: "テスト会社").Total); Assert.Equal(0, store.ReadItems(unmatched: true).Total);
         Assert.Throws<ArgumentException>(() => store.ReadItems(page: 0));
-        var evidence = Path.Combine(Path.GetDirectoryName(TestDirectory.ScratchRoot)!, "gap-p2-3-20261026", "read-measurement-" + Guid.NewGuid().ToString("N") + ".json");
+        var evidence = Path.Combine(TestDirectory.ArtifactRoot, "stable-play", "read-measurement-" + Guid.NewGuid().ToString("N") + ".json");
         Directory.CreateDirectory(Path.GetDirectoryName(evidence)!); File.WriteAllText(evidence, JsonSerializer.Serialize(measurements, VndbJson.Options));
     }
 }

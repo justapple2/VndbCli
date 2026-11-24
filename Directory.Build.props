@@ -5,7 +5,7 @@
     <BaseOutputPath>$(VnPrivateRoot)build/$(MSBuildProjectName)/bin/</BaseOutputPath>
     <BaseIntermediateOutputPath>$(VnPrivateRoot)build/$(MSBuildProjectName)/obj/</BaseIntermediateOutputPath>
     <TargetFramework>net10.0</TargetFramework>
-    <Version>0.6.1</Version>
+    <Version>0.6.2</Version>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <Authors>VNDB Local contributors</Authors>
     <Copyright>Copyright (c) 2026 VNDB Local contributors</Copyright>

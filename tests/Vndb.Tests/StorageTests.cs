@@ -8,6 +8,7 @@ namespace Vndb.Tests;
 internal sealed class TestDirectory : IDisposable
 {
     public static string ScratchRoot => System.IO.Path.Combine(Environment.GetEnvironmentVariable("VN_PRIVATE_ROOT") ?? DefaultPrivateRoot(), "test-scratch");
+    public static string ArtifactRoot => Environment.GetEnvironmentVariable("VN_TEST_ARTIFACTS") ?? System.IO.Path.Combine(System.IO.Path.GetDirectoryName(ScratchRoot)!, "test-reports");
     private static string DefaultPrivateRoot([System.Runtime.CompilerServices.CallerFilePath] string source = "") =>
         System.IO.Path.GetFullPath("../../../VndbCli.private", System.IO.Path.GetDirectoryName(source)!);
     public string Path { get; } = System.IO.Path.Combine(ScratchRoot, "test-" + Guid.NewGuid().ToString("N"));

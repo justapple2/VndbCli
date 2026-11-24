@@ -305,12 +305,32 @@ public static class Program
             arguments.Text = "SiglusEngine.exe"; Check(vm.ArgumentsJson.Contains("SiglusEngine.exe"), "custom wrapper argument binding");
             window.GetVisualDescendants().OfType<Expander>().Single(e => Equals(e.Header, "高级：参数、组件ID与候选程序")).IsExpanded = true; await Render(window);
             Check(window.GetVisualDescendants().OfType<Button>().Any(b => ReferenceEquals(b.Command, vm.DiscoverExecutablesCommand)), "executable discovery command binding");
-            var repair = window.GetVisualDescendants().OfType<Expander>().Single(e => Equals(e.Header, "迁移后的注册信息检查／路径修复"));
+            var repair = window.GetVisualDescendants().OfType<Expander>().Single(e => Equals(e.Header, "启动诊断与修复"));
             repair.IsExpanded = true; await Render(window);
+            Check(window.GetVisualDescendants().OfType<TextBlock>().Any(t => t.Text == vm.LaunchRepair.NextStep), "repair next step precedes advanced operations");
+            Save(window, output, "launch-repair-overview.png");
+            window.GetVisualDescendants().OfType<Expander>().Single(e => Equals(e.Header, "旧位置与当前目录（启动配置和注册表共用）")).IsExpanded = true;
+            window.GetVisualDescendants().OfType<Expander>().Single(e => Equals(e.Header, "厂商注册表路径修复")).IsExpanded = true; await Render(window);
             var oldPath = window.GetVisualDescendants().OfType<TextBox>().Single(t => Avalonia.Automation.AutomationProperties.GetName(t) == "注册表旧目录");
             oldPath.Text = @"E:\Synthetic\Old"; Check(vm.RegistrySource == oldPath.Text, "registry path preview binding without registry access");
             Check(window.GetVisualDescendants().OfType<Button>().Any(b => ReferenceEquals(b.Command, vm.ApplyRegistryCommand) && !b.IsEffectivelyEnabled), "registry apply requires explicit approval");
-            Save(window, output, "registry-preview.png"); vm.Section = 6; await Render(window);
+            Check(window.GetVisualDescendants().OfType<Button>().Any(b => ReferenceEquals(b.Command, vm.LaunchRepair.InspectCommand)) &&
+                !vm.LaunchRepair.ApplyCommand.CanExecute(null) && !vm.LaunchRepair.HasAdvHdDiagnosis, "launch diagnostics open without any approved or inferred write");
+            Save(window, output, "registry-preview.png");
+            foreach (var repairTheme in new[] { "Light", "Dark" })
+            foreach (var repairWidth in new[] { 800, 1280 })
+            {
+                await vm.SetThemeAsync(repairTheme);
+                var repairVariant = repairTheme == "Dark" ? ThemeVariant.Dark : ThemeVariant.Light;
+                var repairWindow = new Window { RequestedThemeVariant = repairVariant, Width = repairWidth, Height = 640, Content = new ScrollViewer { Content = new RegistryRepairView { DataContext = vm }, Padding = new Thickness(20) } };
+                repairWindow.Show(); await Render(repairWindow);
+                var inspect = repairWindow.GetVisualDescendants().OfType<Button>().Single(b => ReferenceEquals(b.Command, vm.LaunchRepair.InspectCommand));
+                Check(repairWindow.ActualThemeVariant == repairVariant && inspect.Bounds.Width > 0 && repairWindow.GetVisualDescendants().OfType<Expander>().All(e => !e.IsExpanded), "repair overview adapts to " + repairTheme + " " + repairWidth);
+                inspect.Focus(); repairWindow.KeyPress(Key.Tab, RawInputModifiers.None, PhysicalKey.Tab, null); repairWindow.KeyRelease(Key.Tab, RawInputModifiers.None, PhysicalKey.Tab, null); await Render(repairWindow);
+                Check(repairWindow.FocusManager?.GetFocusedElement() is not null, "repair keyboard traversal retains focus");
+                Save(repairWindow, output, "repair-" + repairTheme + "-" + repairWidth + ".png"); repairWindow.Close();
+            }
+            vm.Section = 6; await Render(window);
             window.GetVisualDescendants().OfType<Expander>().Single(e => Equals(e.Header, "高级：包装器与实际进程")).IsExpanded = true;
             window.GetVisualDescendants().OfType<Expander>().Single(e => Equals(e.Header, "高级：同步、导出与冲突")).IsExpanded = true; await Render(window);
             var actual = window.GetVisualDescendants().OfType<TextBox>().Single(t => Avalonia.Automation.AutomationProperties.GetName(t) == "实际游戏路径");

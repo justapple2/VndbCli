@@ -13,16 +13,21 @@ public sealed partial class SqliteLibraryStore
             throw new ArgumentException("写入需要 1–160 字符的 Idempotency-Key（字母、数字、.-_）。");
         var hash = PlayRules.Hash(System.Text.Encoding.UTF8.GetBytes(Json(payload)));
         using var db = Open(); using var tx = db.BeginTransaction();
+        if (TryOperationReceipt<T>(db, tx, scope, key, hash, out var cached)) return cached;
+        var result = action(db, tx);
+        Execute(db, tx, "INSERT INTO operation_receipts VALUES($scope,$key,$hash,$result)", ("$scope", scope), ("$key", key), ("$hash", hash), ("$result", Json(result)));
+        tx.Commit(); return result;
+    }
+    private static bool TryOperationReceipt<T>(SqliteConnection db, SqliteTransaction? tx, string scope, string key, string hash, out T result)
+    {
         using var find = Command(db, tx, "SELECT payload_sha,result_json FROM operation_receipts WHERE scope=$scope AND key=$key", ("$scope", scope), ("$key", key));
         using (var reader = find.ExecuteReader())
             if (reader.Read())
             {
                 if (reader.GetString(0) != hash) throw new PlayConflictException("同一操作键对应不同内容，未执行写入。");
-                return Read<T>(reader.GetString(1));
+                result = Read<T>(reader.GetString(1)); return true;
             }
-        var result = action(db, tx);
-        Execute(db, tx, "INSERT INTO operation_receipts VALUES($scope,$key,$hash,$result)", ("$scope", scope), ("$key", key), ("$hash", hash), ("$result", Json(result)));
-        tx.Commit(); return result;
+        result = default!; return false;
     }
     private static LibraryItem Item(SqliteConnection db, SqliteTransaction? tx, string id)
     {

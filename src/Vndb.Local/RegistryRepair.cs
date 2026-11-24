@@ -11,6 +11,7 @@ public sealed record RegistryEntry(RegistryLocation Location, RegistryText Value
 public sealed record RegistryChange(RegistryLocation Location, RegistryText? Before, RegistryText After);
 public sealed record RegistryRepairPlan(string Id, string Source, string Target, IReadOnlyList<RegistryChange> Changes);
 public sealed record RegistrySearch(IReadOnlyList<RegistryEntry> Entries, IReadOnlyList<string> Warnings);
+public sealed record RegistryChangeStatus(RegistryChange Change, string State);
 public interface IGameRegistry
 {
     RegistrySearch Find(string term, CancellationToken ct);
@@ -32,20 +33,19 @@ public sealed partial class RegistryRepair(IGameRegistry registry, string direct
     }
     public static string? MapPath(string value, string source, string target)
     {
-        source = Path.TrimEndingDirectorySeparator(Path.GetFullPath(source)); target = Path.TrimEndingDirectorySeparator(Path.GetFullPath(target));
+        source = LocalFiles.Full(source); target = LocalFiles.Full(target);
         if (source.Length < 4 || target.Length < 4) throw new ArgumentException("需要完整游戏目录，不能使用磁盘根目录。");
-        if (value.Equals(source, StringComparison.OrdinalIgnoreCase)) return target;
-        if (value.StartsWith(source + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+        var quoted = value.Length > 1 && value[0] == '"' && value[^1] == '"';
+        var path = quoted ? value[1..^1] : value;
+        if (!path.StartsWith(source, StringComparison.OrdinalIgnoreCase) || path.IndexOfAny(['"', '*', '?', '<', '>', '|', '\0']) >= 0) return null;
+        try
         {
-            try
-            {
-                var canonical = LocalFiles.Full(value);
-                if (!LocalFiles.Within(source, canonical)) return null;
-                return target + value[source.Length..];
-            }
-            catch (ArgumentException) { return null; }
+            var canonical = LocalFiles.Full(path);
+            if (!LocalFiles.Same(source, canonical) && !LocalFiles.Within(source, canonical)) return null;
+            var mapped = target + path[source.Length..];
+            return quoted ? "\"" + mapped + "\"" : mapped;
         }
-        return null;
+        catch (ArgumentException) { return null; }
     }
     public RegistryRepairPlan Preview(IEnumerable<RegistryEntry> entries, string source, string target)
     {
@@ -59,8 +59,8 @@ public sealed partial class RegistryRepair(IGameRegistry registry, string direct
             var mapped = MapPath(entry.Value.Data, source, target);
             if (mapped is null) continue;
             var before = registry.Read(entry.Location); var after = entry.Value with { Data = mapped };
-            if (before is not null && before != after && MapPath(before.Data, source, target) is null)
-                throw new IOException("现有注册值不属于指定旧游戏目录，停止覆盖。请核对游戏和键值。");
+            if (before is not null && before != after && before != entry.Value)
+                throw new IOException("现有注册值与读取的候选不同，请重新查找或核对 REG 来源。");
             if (before != after) changes.Add(new(entry.Location, before, after));
         }
         if (changes.Count == 0 || changes.Count > 200 || changes.Select(c => $"{c.Location.Hive}:{c.Location.View}:{c.Location.Key}:{c.Location.Name}").Distinct(StringComparer.OrdinalIgnoreCase).Count() != changes.Count)
@@ -70,6 +70,8 @@ public sealed partial class RegistryRepair(IGameRegistry registry, string direct
     public async Task<string> ApplyAsync(RegistryRepairPlan plan, CancellationToken ct)
     {
         ValidatePlan(plan);
+        LocalFiles.CheckAncestors(plan.Target);
+        if (!Directory.Exists(plan.Target)) throw new DirectoryNotFoundException("当前游戏目录已不存在，请重新预览。");
         foreach (var change in plan.Changes)
             if (registry.Read(change.Location) != change.Before) throw new IOException("注册信息已改变，请重新预览。尚未写入。");
         var run = Path.Combine(directory, "registry-repairs", plan.Id); LocalFiles.CheckAncestors(directory);
@@ -90,6 +92,8 @@ public sealed partial class RegistryRepair(IGameRegistry registry, string direct
     public async Task RestoreAsync(RegistryRepairPlan plan, CancellationToken ct)
     {
         ValidatePlan(plan);
+        var saved = await ReadRunAsync(plan.Id, ct);
+        if (LocalArchiveFormat.Hash(plan) != LocalArchiveFormat.Hash(saved)) throw new IOException("恢复记录已变化，请重新预览。");
         foreach (var change in plan.Changes)
         {
             var current = registry.Read(change.Location);
@@ -120,6 +124,20 @@ public sealed partial class RegistryRepair(IGameRegistry registry, string direct
     public IReadOnlyList<string> Runs() => Directory.Exists(Path.Combine(directory, "registry-repairs"))
         ? Directory.EnumerateDirectories(Path.Combine(directory, "registry-repairs")).Where(p => Guid.TryParseExact(Path.GetFileName(p), "D", out _))
             .OrderByDescending(p => File.GetLastWriteTimeUtc(Path.Combine(p, "intent.json"))).Take(100).Select(p => Path.GetFileName(p)!).ToArray() : [];
+    public IReadOnlyList<RegistryChangeStatus> InspectRun(RegistryRepairPlan plan)
+    {
+        ValidatePlan(plan);
+        return plan.Changes.Select(change =>
+        {
+            try
+            {
+                var current = registry.Read(change.Location);
+                return new RegistryChangeStatus(change, current == change.Before ? "原值／未写入或已恢复" : current == change.After ? "已更新／可恢复" : "外部已更改／停止恢复");
+            }
+            catch (Exception e) when (e is UnauthorizedAccessException or System.Security.SecurityException or IOException)
+            { return new RegistryChangeStatus(change, "无法读取／请核对权限"); }
+        }).ToArray();
+    }
     public async Task<RegistryRepairPlan> ReadRunAsync(string id, CancellationToken ct)
     {
         if (!Guid.TryParseExact(id, "D", out _)) throw new ArgumentException("请选择本机恢复记录。");
@@ -190,29 +208,40 @@ public sealed partial class RegistryRepair(IGameRegistry registry, string direct
 [SupportedOSPlatform("windows")]
 public sealed class WindowsGameRegistry : IGameRegistry
 {
-    public RegistrySearch Find(string term, CancellationToken ct)
+    public RegistrySearch Find(string term, CancellationToken ct) => Find(term, null, ct);
+
+    public RegistrySearch Find(string term, string? oldRoot, CancellationToken ct)
     {
-        if (term.Trim().Length < 2) throw new ArgumentException("请输入至少2字的会社或游戏名关键词。");
-        var results = new List<RegistryEntry>(); var warnings = new List<string>(); var seen = 0;
+        term = term.Trim();
+        if (oldRoot is not null) oldRoot = LocalFiles.Full(oldRoot);
+        if (oldRoot is null && term.Length < 2) throw new ArgumentException("请输入旧目录，或至少2字的会社／游戏名关键词。");
+        var results = new List<RegistryEntry>(); var warnings = new List<string>();
         foreach (var hive in new[] { "HKCU", "HKLM" })
-        foreach (var view in new[] { 32, 64 })
+        foreach (var view in hive == "HKCU" ? new[] { 32 } : new[] { 32, 64 })
         {
+            var seen = 0;
             using var root = Open(hive, view); var queue = new Queue<(string Key, int Depth)>(); queue.Enqueue(("Software", 0));
             while (queue.TryDequeue(out var row))
             {
                 ct.ThrowIfCancellationRequested();
-                if (++seen > 30000 || results.Count >= 200) return new(results, ["搜索达到边界，请缩小关键词；结果可能不完整。"]);
+                if (results.Count >= 200) return new(results, ["搜索达到候选上限，结果可能不完整。"]);
+                if (++seen > 15000) { warnings.Add("部分注册表视图达到搜索上限，结果可能不完整。"); break; }
                 try
                 {
                     using var key = root.OpenSubKey(row.Key, false); if (key is null) continue;
                     var location = new RegistryLocation(hive, view, row.Key, "");
                     var allowed = false; try { RegistryRepair.Validate(location); allowed = true; } catch (ArgumentException) { }
-                    if (allowed && row.Key.Contains(term.Trim(), StringComparison.OrdinalIgnoreCase))
+                    if (allowed && (term.Length < 2 || row.Key.Contains(term, StringComparison.OrdinalIgnoreCase)))
                         foreach (var name in key.GetValueNames())
                         {
-                            if (key.GetValueKind(name) is not (RegistryValueKind.String or RegistryValueKind.ExpandString)) continue;
-                            var entry = location with { Name = name }; var value = Read(entry);
-                            if (value is not null) results.Add(new(entry, value));
+                            if (name.Length > 512 || name.Any(char.IsControl)) continue;
+                            var kind = key.GetValueKind(name);
+                            if (kind is not (RegistryValueKind.String or RegistryValueKind.ExpandString)) continue;
+                            if (key.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames) is not string value ||
+                                oldRoot is not null && RegistryRepair.MapPath(value, oldRoot, oldRoot) is null) continue;
+                            var entry = location with { Name = name };
+                            results.Add(new(entry, new(value, (int)kind)));
+                            if (results.Count >= 200) break;
                         }
                     if (row.Depth >= 6) continue;
                     foreach (var name in key.GetSubKeyNames())
