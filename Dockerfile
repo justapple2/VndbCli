@@ -18,7 +18,7 @@ WORKDIR /data
 COPY --from=build /out/cli/ /app/
 COPY --from=build /src/LICENSE /src/NOTICE /src/THIRD-PARTY-NOTICES.md /app/
 COPY --from=build /src/licenses/ /app/licenses/
-LABEL org.opencontainers.image.version="0.6.2" org.opencontainers.image.licenses="Apache-2.0"
+LABEL org.opencontainers.image.version="0.7.0" org.opencontainers.image.licenses="Apache-2.0"
 USER $APP_UID
 ENTRYPOINT ["dotnet", "/app/vndb.dll"]
 CMD ["--help"]
@@ -30,7 +30,7 @@ COPY --from=build /out/admin/ ./admin/
 COPY --from=build /out/cli/ ./cli/
 COPY --from=build /src/LICENSE /src/NOTICE /src/THIRD-PARTY-NOTICES.md ./
 COPY --from=build /src/licenses/ ./licenses/
-LABEL org.opencontainers.image.version="0.6.2" org.opencontainers.image.licenses="Apache-2.0"
+LABEL org.opencontainers.image.version="0.7.0" org.opencontainers.image.licenses="Apache-2.0"
 ENV ASPNETCORE_HTTP_PORTS=8080 Library__DataDirectory=/data DOTNET_NOLOGO=1
 EXPOSE 8080
 USER $APP_UID

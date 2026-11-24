@@ -7,7 +7,7 @@ Push-Location -LiteralPath $projectRoot
 try {
     $privateRoot = if ($env:VN_PRIVATE_ROOT) { $env:VN_PRIVATE_ROOT } else { Join-Path (Split-Path -Parent $projectRoot) 'VndbCli.private' }
     $logRoot = Join-Path $privateRoot 'build-logs'
-    if (-not $OutputRoot) { $OutputRoot = Join-Path $privateRoot ('releases/0.6.2/desktop/' + (New-VnGeneration) + '/win-x64') }
+    if (-not $OutputRoot) { $OutputRoot = Join-Path $privateRoot ('releases/0.7.0/desktop/' + (New-VnGeneration) + '/win-x64') }
     New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
     $stage = New-VnRelease $OutputRoot 'desktop' 'win-x64'
     & dotnet publish src/Vndb.Desktop/Vndb.Desktop.csproj -c Release -r win-x64 --self-contained true `

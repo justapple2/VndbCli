@@ -1,94 +1,100 @@
-# Docker／NAS部署与运维
+# Docker／NAS 部署与运维
 
-适用版本：0.6.1，API v1，SQLite schema15。推荐在开发机交叉发布，NAS仅构建运行时镜像。Web、资料补全队列和SQLite在一个服务内运行，无需另部署数据库、消息队列或自动化服务。以下目录、域名及代际名均为示例。
+适用版本：0.7.0，API v1，SQLite schema15。推荐在开发机发布 Linux runtime，NAS 只构建运行时镜像。Web、SQLite 和后台任务运行在同一服务内。以下目录、地址和代际名均为示例，按实际环境替换。
 
 ## 1. 部署内容与准备条件
 
-NAS需要Docker Engine及`docker compose`，有权管理本项目的管理员、可持久读写的本机磁盘目录，以及访问VNDB API／图片源和微软基础镜像仓库的网络。SQLite放本机卷；客户端通过HTTP API访问，不通过SMB／NFS直接读写数据库。
+NAS 需要 Docker Engine、`docker compose`、本机持久卷和管理本项目的权限。SQLite 不放 SMB／NFS 共享盘，客户端通过 API 访问。在线构建需能取得微软 .NET 基础镜像；查询补全及资料更新还需访问 VNDB 官方来源。
 
-| 交付物 | 用途 |
+| 文件 | 用途 |
 | --- | --- |
-| Linux runtime归档及其SHA收据 | `web/`、`cli/`、`admin/`、运行时Dockerfile及release-manifest |
-| [compose.yaml](../deploy/compose.yaml) | 单服务模板；默认仅绑定127.0.0.1:5187 |
-| [.env.example](../deploy/.env.example) | 绑定地址和宿主端口模板，不包含密钥 |
-| [backup.sh](../deploy/backup.sh) | 手动完整快照入口，不安装定时任务 |
+| 已封存的 Linux runtime 及 SHA 收据 | `web/`、`cli/`、`admin/`、Dockerfile、许可和发布清单 |
+| [compose.yaml](../deploy/compose.yaml) | 单服务模板；默认仅绑定 `127.0.0.1:5187` |
+| [.env.example](../deploy/.env.example) | 监听地址与端口，不含密钥 |
+| [backup.sh](../deploy/backup.sh) | 手动完整快照，不安装定时任务 |
 
-Linux x64 NAS选择`linux-x64`；脚本也支持`linux-arm64`，需匹配实际CPU并核对目标平台兼容性。桌面端和CLI说明见[桌面](DESKTOP.md)、[CLI](CLI.md)，接口见[Web API](WEB-API.md)。
+发布脚本支持 `linux-x64`、`linux-arm64`，必须匹配 NAS CPU；目标平台还需实际验证。Windows 桌面使用独立发布包。职责见[架构](ARCHITECTURE.md)，客户端说明见[桌面](DESKTOP.md)与 [CLI](CLI.md)。
 
 ## 2. 准备部署包
 
-从干净Git工作区发布，不在发布过程改源码。开发机使用仓库`global.json`指定的.NET10 SDK、PowerShell7、Python3。执行标准检查后顺序发布，避免共享中间文件被并行改写。产物和日志默认在仓库旁的`VndbCli.private`，可用`VN_PRIVATE_ROOT`指定库外根。
+从固定源码树构建，在发布期间保持源码不变。开发机需要 `global.json` 兼容的 .NET 10 SDK、PowerShell 7、Python 3、Node.js；Node.js 用于 Web 测试。构建、验证日志及产物默认在仓库旁 `VndbCli.private`，可用 `VN_PRIVATE_ROOT` 指定库外根。
+
+在仓库根按顺序执行，避免并发争用中间输出：
 
 ```powershell
-Remove-Item Env:VN_LIBRARY_KEY, Env:VNDB_API_TOKEN -ErrorAction SilentlyContinue
 ./scripts/Test.ps1
-# OutputRoot必须是全新目录；脚本会在下面创建linux-x64。
-./scripts/Publish-Runtime.ps1 -Runtime linux-x64 -OutputRoot ../VndbCli.private/releases/0.6.1/runtime/example-generation
-python -B scripts/release_guard.py verify ../VndbCli.private/releases/0.6.1/runtime/example-generation/linux-x64 --kind runtime
-python -B scripts/package_release.py runtime ../VndbCli.private/releases/0.6.1/runtime-example.tar.gz --runtime-root ../VndbCli.private/releases/0.6.1/runtime/example-generation/linux-x64
+./scripts/Publish-Runtime.ps1 -Runtime linux-x64 -OutputRoot ../VndbCli.private/releases/0.7.0/runtime/example-generation
+python -B scripts/release_guard.py verify ../VndbCli.private/releases/0.7.0/runtime/example-generation/linux-x64 --kind runtime
+python -B scripts/package_release.py runtime ../VndbCli.private/releases/0.7.0/runtime-example.tar.gz --runtime-root ../VndbCli.private/releases/0.7.0/runtime/example-generation/linux-x64
 ```
 
-脚本生成唯一binlog，核对Web／CLI／Admin实际依赖、SDK发布清单、源码提交／树摘要、RID和逐文件SHA256，再封存。打包器拒绝未封存、被改写或含私有文件的目录，也拒绝覆盖已有归档。保留失败暂存，另选新代际重试；不要往旧发布目录追加本机配置。根多阶段Dockerfile供源码构建参考，NAS推荐使用发布目录内的运行时Dockerfile。
+每次选择全新输出目录和归档名；失败后保留证据并另选代际，不覆盖封存目录。脚本检查实际 SDK 发布成员、依赖边界、版本、API／schema、源码身份及逐文件 SHA256。归档旁的 JSON 收据记录归档 SHA256；NAS 上传后重新核对，并检查归档成员没有绝对路径、`..` 或链接，再解压至新的构建上下文。构建上下文只包含 runtime，不包含数据、密钥或整个共享目录。
 
-## 3. 首次部署目录
+桌面与 CLI 可使用同一源码树串行发布：
 
-示例部署根为`/srv/vndb-local`，可改为NAS专用Docker配置目录中的本项目子目录。不要把整个共享目录当构建上下文。
+```powershell
+./scripts/Publish-Desktop.ps1
+./scripts/Publish.ps1 -Runtime win-x64
+```
+
+桌面发布目标为独立 Windows x64 目录；CLI 可按脚本支持的 RID 另行发布。保留整个客户端目录，不向发布目录追加运行数据。根 [Dockerfile](../Dockerfile)提供源码构建方式；低内存 NAS 推荐上述交叉发布方式。
+
+## 3. 首次部署目录与密钥
+
+示例根为 `/srv/vndb-local`：
 
 ```text
 /srv/vndb-local/
   compose.yaml
   .env
   backup.sh
-  release/                   # 已核验的runtime构建上下文
+  release/                   # 已核验的 runtime
     Dockerfile
     release-manifest.json
     web/ cli/ admin/
-  secrets/library_write_key  # 独立生成，绝不放入release/
+  secrets/library_write_key  # 独立管理密钥，只读挂载
   data/
-    library.db               # 首次启动生成
+    library.db
     covers/
-    service-instance-id      # 稳定实例身份，升级保留
+    service-instance-id
+    datasets/
     backups/
-  audit/                     # 私有部署／回退证据
 ```
 
-先传输归档、SHA收据、Compose模板、`.env.example`和backup.sh至项目目录。验证归档SHA256与可信收据一致，检查成员没有绝对路径、`..`或链接，再解压至新的`release/`，对照release-manifest核对内容。不能从含数据／密钥的目录执行`docker build .`。已有封存产物保留原样，不手工改Dockerfile或清单。
+将模板放到部署根，将核验后的 runtime 解压到 `release/`，与模板的 build context 保持一致。复制 `.env.example` 为 `.env`，修改 `VNDB_BIND_IP`、`VNDB_PORT`。默认回环绑定仅允许宿主访问；局域网部署改为 NAS 的实际局域网接口地址。
 
-以下初始化只用于**全新且没有data／secrets的项目**。有现存数据库时跳到升级流程，沿用原属主／密钥，不执行首次初始化：
+以下仅用于**全新、没有 data 和 secrets 的部署**。已有服务跳到升级章节，不重新生成密钥或实例身份：
 
 ```sh
 cd /srv/vndb-local
 if [ -e data ] || [ -e secrets ]; then
-  printf '已有data或secrets，停止初始化，请使用升级流程。\n' >&2
+  printf '已有数据或密钥，请使用升级流程。\n' >&2
+  exit 1
 else
   sudo install -d -m 0750 -o 1654 -g 1654 data
   sudo install -d -m 0700 secrets
 fi
 ```
 
-当前运行时镜像使用数字UID:GID `1654:1654`，新数据目录须允许该身份读写。FNOS ACL与普通Linux权限可能不同，应确认有效访问权限；不要凭NAS用户名猜UID，**不要对已有共享目录／数据库递归chown、chmod或设777**。
-
-用密码管理器或随机数工具生成独立应用管理密钥。NAS已有Python3时可用以下命令写入新文件，不把正文输出到终端：
+当前镜像使用数字 UID:GID `1654:1654`。新数据目录需允许该身份写入；已有目录应保留原有效属主／ACL，不递归修改共享权限。独立应用密钥可用以下方式创建，命令不输出正文；文件若已存在会拒绝覆盖：
 
 ```sh
 sudo python3 - <<'PY'
 import os, pathlib, secrets
-target = pathlib.Path('/srv/vndb-local/secrets/library_write_key')
-fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+path = pathlib.Path('/srv/vndb-local/secrets/library_write_key')
+fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
 with os.fdopen(fd, 'w') as output:
     output.write(secrets.token_urlsafe(48))
-os.chown(target, 1654, 1654)
-os.chmod(target, 0o400)
+os.chown(path, 1654, 1654)
+os.chmod(path, 0o400)
 PY
 ```
 
-它不是SSH密码或VNDB令牌。单独安全保管一份，向桌面／浏览器输入时通过管理员安全渠道取得，不粘贴进命令历史、工单或日志。升级不重新生成；生产环境缺少密钥时Web拒绝启动。
+密钥不是 NAS 账户密码或 VNDB 令牌，须独立安全保管。不要写进 `.env`、源码、镜像、命令历史或公开日志。容器通过只读文件挂载读取；Production 缺少应用密钥时拒绝启动。
 
-复制`.env.example`为项目`.env`后编辑：`VNDB_PORT`为宿主端口，默认`VNDB_BIND_IP=127.0.0.1`仅本机可访问。需要局域网客户端时改为NAS实际局域网接口IP。真实`.env`不进Git；面向可信局域网使用，跨非可信网络沿用已有HTTPS入口，不直接暴露公网HTTP。
+## 4. 构建、启动与确认
 
-## 4. 构建与启动
-
-以下在部署根运行；系统要求时给Docker命令加`sudo`。模板context为`./release`，必须与目录一致。
+在部署根执行；系统要求时为 Docker 命令使用相应权限：
 
 ```sh
 docker compose config --quiet
@@ -98,9 +104,9 @@ docker compose ps library
 docker compose logs --tail 100 library
 ```
 
-首次构建需取得`mcr.microsoft.com/dotnet/aspnet:10.0-noble`，不在NAS装SDK。容器内8080，宿主默认5187。模板包含只读根、可写`/data`、只读密钥挂载、64MiB tmpfs、cap-drop ALL、no-new-privileges、768MiB内存上限、2CPU及有界日志。健康检查有20秒起始宽限、30秒间隔；失败先看日志，Running不等于Healthy。
+镜像基于 `mcr.microsoft.com/dotnet/aspnet:10.0-noble`，NAS 无需 .NET SDK。容器内端口 8080，宿主默认 5187。模板采用只读根、可写 `/data`、只读密钥、64 MiB tmpfs、cap-drop ALL、no-new-privileges、768 MiB 内存上限、2 CPU 及有界日志。
 
-按实际绑定地址验证，默认绑定可执行：
+按实际绑定地址检查；默认回环绑定可执行：
 
 ```sh
 curl --fail http://127.0.0.1:5187/healthz
@@ -108,116 +114,126 @@ curl --fail http://127.0.0.1:5187/api/v1/info
 curl --fail http://127.0.0.1:5187/api/v1/stats
 ```
 
-若绑定特定局域网IP，相应替换URL，不能假定宿主回环也监听。浏览器打开根页面；写操作输入应用密钥。新库为空是正常状态，有权限的查询或JSON导入会逐步建库。
+绑定特定局域网 IP 时替换 URL，宿主回环不一定监听。Running 不等于 Healthy；健康检查有起始宽限，失败时先看本项目日志。`info` 应显示预期版本、API、schema、实例和能力。部署后还应读取已知作品 ID、测试标题搜索与个人记录，健康探针不代表数据库所有页均可读。
 
-## 5. 配置与后台任务
+浏览器打开服务根进入“我的书架”。新库为空是正常状态，有权限的查询、JSON 导入或官方包导入会逐步建库。浏览无需账号，写入需要独立应用密钥；系统没有多用户隔离，面向可信局域网，跨不可信网络需另行提供 HTTPS 访问入口。
 
-| 环境变量／模板项 | 当前值或含义 |
+## 5. 配置、数据导入与更新
+
+| 配置 | 默认／含义 |
 | --- | --- |
-| `VNDB_BIND_IP`、`VNDB_PORT` | Compose宿主监听地址／端口 |
-| `Library__DataDirectory` | `/data`，权威库及封面 |
-| `Library__WriteKeyFile` | `/run/secrets/library_write_key`；推荐文件挂载，优先于明文配置 |
+| `VNDB_BIND_IP`、`VNDB_PORT` | Compose 宿主监听地址和端口 |
+| `Library__DataDirectory` | `/data`，权威库、封面与任务数据 |
+| `Library__WriteKeyFile` | `/run/secrets/library_write_key`；优先使用只读文件 |
 | `ASPNETCORE_ENVIRONMENT` | `Production` |
-| `CatalogJobs__Enabled` | 默认true；关闭现有消费者不删除保存的任务 |
-| `MetadataImports__MaximumBytes` | 默认8388608；允许1024–33554432 |
-| `MetadataImports__MaximumItems` | 默认500；允许1–5000 |
+| `CatalogJobs__Enabled` | 默认 true；控制 Web 内既有后台任务 |
+| `MetadataImports__MaximumBytes` | 默认 8388608；范围 1024–33554432 |
+| `MetadataImports__MaximumItems` | 默认 500；范围 1–5000 |
 
-限额由`GET /api/v1/info`公布，HTTP信封另允许1MiB。客户端本机JSON与响应缓冲各有独立8MiB限制，提高Web限额不代表客户端也支持更大文件。已发送／不明批次保留原ID与原件，不能自动拆分重发。
+JSON 导入限额由 `/api/v1/info` 公布，HTTP 信封另允许 1 MiB。客户端本机 JSON 与 HTTP 响应还有独立限额，不能仅提高 Web 限额就发送任意大文件。结果不明的批次按原 ID 和内容重试。
 
-页面：`/`默认进入我的书架；`/?view=local`为公共资料目录，`/?view=plays`为游玩记录；`/manage.html`为书架／metadata导入；`/quality.html`为资料缺口；`/sessions.html`为会话／活动导入／冲突；`/openapi/v1.json`为v1机器规范。浏览不用账号，单管理密钥保护写入，无多用户隔离。
+| 入口 | 用途 |
+| --- | --- |
+| `/` | 个人书架；`/?view=local` 为公共资料目录 |
+| `/manage.html?tab=imports` | JSON 导入、官方更新、任务与容量管理 |
+| `/quality.html` | 资料缺口及候选核对 |
+| `/sessions.html` | 活动／会话导入及冲突 |
+| `/openapi/v1.json` | API v1 机器规范 |
 
-metadata在同一Web内持久排队，本地逐项处理与联网补全分开，联网任务至少间隔5秒；Core继续串行节流及有限重试。旧资料补全任务间隔支持3–3600秒。关闭页面不会取消队列；通过界面暂停／恢复明确任务，不另装轮询服务。接收成功不代表匹配或封面全部完成。
+在导入页可只“检查最新版”，或“检查并更新”。前者仅对固定官方来源发 HEAD 获取日期；后者将新日期交给原有导入队列。状态读取不联网，只有完整导入完成后才推进本库快照日期。可选定时同步默认关闭、默认间隔 7 天，可设置 1–30 天；需要启用既有后台任务，不添加宿主计划任务或新服务。
+
+联网补全、官方请求和重试沿用既定节流。关闭网页不取消已接收任务；暂停、失败需明确处理。预检至少预留 4 GiB 额外空间，数据库、封面、索引、已接收输入和完整备份另计。“容量与暂存”先预览再清理，不清除数据库、封面、官方原包或恢复所需输入。使用范围及同步语义见[公共资料目录](CATALOG.md)。
 
 ## 6. 手动完整备份与隔离恢复
 
-从部署根手动执行：
+在部署根执行：
 
 ```sh
 sh ./backup.sh
 ```
 
-脚本定位原容器／镜像ID，读取`data/library.db`的**文件**有效UID:GID，在该身份调用Admin snapshot。`data/backups/<时间戳>/`包含一致SQLite、全部已登记封面、原service-instance-id及snapshot-manifest。密钥只留指纹，正文另存；不只复制library.db，不删除在线WAL／SHM。验证清单后将快照复制到独立介质，同盘副本不能单独承担灾难恢复。
+脚本使用实际数据库文件属主调用 Admin，生成并校验 `data/backups/<唯一名称>/`。完整快照包括一致 SQLite、已登记封面、原 `service-instance-id`、恢复清单，以及可选的已验证任务输入。密钥正文不在快照内，仅记录指纹；须另行安全保管。不要直接复制在线主库、删除 WAL／SHM 或以管理员身份打开活库来修复权限。将验证过的快照复制到独立介质，同卷副本不是完整灾备。
 
-以下恢复到新隔离目录，不改变原服务；`SNAPSHOT`替换为实际快照，`RESTORE`不得已存在：
+隔离恢复只写**全新目录**，不改变原服务；替换示例快照名，目标不得存在：
 
 ```sh
 cd /srv/vndb-local
 OWNER=$(stat -c '%u:%g' data/library.db)
 SNAPSHOT=/data/backups/your-snapshot
 RESTORE=/data/backups/your-isolated-restore
+
 docker compose exec -T --user "$OWNER" library dotnet /app/admin/vndb-admin.dll \
   library restore "$SNAPSHOT" "$RESTORE" --data-dir /data \
   --key-file /run/secrets/library_write_key --offline-maintenance --json
 ```
 
-restore验证文件集合、SHA、封面登记、schema10–15、SQLite integrity／外键和原实例。密钥不匹配、文件损坏或目标已存在均失败保留原件。演练不自动切换数据卷；真实恢复需停写，单独审核目标挂载／属主／匹配镜像及原密钥，再检查健康和数据。不能生成新service-instance-id来“修复”恢复。
+restore 核验清单、文件集合、SHA、封面登记、SQLite 完整性／外键、schema 和实例；目标已存在或密钥不符会失败。当前工具读取 schema10–15 的一致快照，恢复本身不升级数据库。完整快照格式为 `vn-library-snapshot-v2`，也可读取 v1；旧工具未必能读取 v2，应保存匹配镜像。
 
-Admin的`library backup`只备份DB，不能替代完整snapshot；Admin是受控维护入口，客户端日常走API。旧含位置的数据库会被Web拒绝启动，不能直接放回活动目录或用旧位置接口上线。
+真正恢复时，先确认新目录、有效属主、原密钥及匹配镜像，再停止本项目写入并切换数据挂载；检查健康、实例、查询及个人资料后才继续使用。Admin 的单 DB `backup` 不替代完整 snapshot。备份客户端时另行退出桌面并保存整个 JSON 数据根；Web 快照不含游戏或本机启动路径。
 
-## 7. 后续升级与回退
+## 7. 升级与回退
 
-每次使用新封存代际和唯一镜像标签，即使产品版本相同也区分源码／代际。新目录如`releases/example-next/runtime/`，不覆盖现有release：
+每次发布使用新目录和唯一镜像标签，保留现有 `.env`、密钥、数据卷、端口及安全设置：
 
-1. 私有audit保存原Compose、镜像ID、UID:GID、端口／挂载／安全设置、密钥指纹及服务实例。只检查本项目，避免完整环境转储泄露密钥。
-2. 上传／核验新runtime，在原Web运行时先构建唯一标签镜像。例如从项目根执行`docker build --label org.opencontainers.image.revision=<完整提交> -t vndb-local:0.6.1-example-next -f releases/example-next/runtime/Dockerfile releases/example-next/runtime`；先替换占位符。
-3. 完整snapshot并隔离restore验证；短暂停原Web保存最终一致DB副本／逐行摘要。所有SQLite读取和备份用原文件属主，不用管理员身份打开活库。
-4. 只改Compose的image及build context，保留其余配置；执行`docker compose up -d --no-deps --no-build library`，有界等待Healthy。
-5. 比较info身份、schema、原始行、封面SHA、密钥及属主；核对新程序集／静态文件与封存清单，再用已有ID测API／CLI本地优先查询。区分合法任务推进和原数据丢失，不能只比较总数。
+1. 核对新 runtime 的封存收据，在旧 Web 运行期间构建新标签镜像，例如 `vndb-local:0.7.0-example-next`。构建上下文指向新 runtime，不覆盖旧代际。
+2. 保存本项目原 Compose、镜像 ID、实例、属主及完整快照，做隔离恢复验证。准备切换时短暂停写，补做最终一致备份，避免遗漏期间新增个人记录。
+3. 只更新 Compose 的 `image` 与 `build.context`，执行 `docker compose config --quiet`，再执行 `docker compose up -d --no-deps --no-build library`。
+4. 等待 Healthy，核对 `info`、已知作品及标题搜索、个人记录、封面和文件属主；将运行文件与发布清单比较。数据变化应区分正常任务推进与资料丢失。
 
-启动／数据保护校验失败时，恢复保留的原Compose和旧镜像，重新检查Healthy。schema或数据已改变时镜像回退不等于数据回退，需完整快照受控恢复。本版schema15；迁移后的镜像回退必须配套旧库快照，不能覆盖活库。验收前保留旧镜像、配置、备份及失败证据，不执行`down -v`、镜像清理或自动删备份。
+当前 schema15 的增量升级保留原有作品、个人记录和导入任务；`dataset_sync` 保存可选调度及日期检查状态，定时默认关闭。新版本可能自动迁移数据库，因此**镜像回退不等于数据回退**：数据库已升级时，须使用对应旧快照恢复到新目录后切换，不能把旧镜像直接指向新库。切换前保护升级后新产生的个人数据。
 
-## 8. 排障与审计
+确认升级前保留恢复点；不使用 `down -v`、自动删备份或无差别镜像清理作为升级步骤。旧含客户端位置的数据库不能重新启用位置 API，应按[数据边界](DATA-AND-PRIVACY.md)处理。
 
-| 现象 | 处理 |
-| --- | --- |
-| 连接失败 | 核对绑定IP／端口、容器及防火墙；默认回环不提供局域网访问 |
-| 401 | 检查应用管理密钥及X-Library-Request，不使用NAS管理员密码 |
-| 413／项数超限 | 先读info；只拆分未提交的新文件，待确认原件保持原ID |
-| 目录权限错误 | 记录原UID:GID／挂载／ACL，先诊断，不递归改共享权限 |
-| 启动隐私校验失败 | 保留原库及证据，按[数据边界](DATA-AND-PRIVACY.md)受控迁移 |
-| 队列慢／上游429 | 遵循既有节流退避，观察任务，不增加并发爬取器 |
-| 健康探针正常但文字搜索500 | 探针不代表全库可读；部署后同时验收作品ID读取与文字搜索。保留原库，在独立目录提取／重建并核对个人记录及完整性，通过后再受控切换，不能直接覆盖活库 |
-| 旧样式 | 核对响应和镜像代际再刷新；未提交稿件先保留，静态资源使用no-cache |
+## 8. 跨机器与离线部署
 
-真实连接配置、个人数据库、密钥与运维审计保存在私有位置，不加入源码或可分发包。客户端与Web的数据位置及备份范围见[数据与隐私](DATA-AND-PRIVACY.md)。
+区分两种用途：
 
-## 9. 版本兼容与离线恢复
+- **恢复同一个人库**：完整快照、原密钥、实例身份和匹配镜像一起保管；恢复后身份保持。
+- **建立独立新库**：使用通用应用、官方公共资料原包及其许可。首次启动生成新身份和密钥，不分发个人数据库或原服务配置。
 
-当前运行代码使用schema15。新工具可以读取清单与DB一致的schema10–15快照，恢复本身不升级数据库；旧镜像不能写入较新schema，回退必须配套对应旧快照并保护新增个人数据。旧含客户端位置的数据库不能直接放回活动服务。
+仅有 runtime 目录不能保证断网构建成功。离线部署前，在联网且平台匹配的机器上构建并保存应用镜像，同时保存 Compose、使用文档、快照或公共资料原包及各自校验收据：
 
-完整快照格式为`vn-library-snapshot-v2`，包含数据库、已登记封面、原实例、原镜像ID、可选密钥指纹以及公共目录／任务覆盖摘要。原密钥正文独立保管。新工具继续读取v1，旧工具不能读取v2，应将快照与匹配镜像一起保管。
+```sh
+docker save -o runtime-images.tar vndb-local:0.7.0
+sha256sum runtime-images.tar > runtime-images.tar.sha256
+```
 
-`backup.sh`默认包含未完成任务引用且校验通过的原包／规范暂存，不纳入未登记半包或废弃代际。完成的公共目录可直接随DB恢复后检索；下载未完成仍需重新下载，预检未完成从保存的原包重新预检。包含输入的快照若校验失败，应保留现场，不将普通DB快照当作离线续跑保证。任务管理见[公共资料目录](CATALOG.md)。
-
-没有外网时，先校验并加载已保管的镜像，再将快照恢复到全新目录；不以联网构建或拉取作为恢复步骤：
+离线机器先核验再加载，使用相同镜像标签配置 Compose，禁止联网拉取：
 
 ```sh
 sha256sum -c runtime-images.tar.sha256
 docker load -i runtime-images.tar
-NEW_IMAGE=vndb-local:your-verified-generation
-OWNER=1654:1654
-
-docker run --rm --network none --user "$OWNER" --read-only \
-  --mount type=bind,src=/srv/vndb-recovery,dst=/recovery \
-  --mount type=bind,src=/srv/vndb-secrets/library_write_key,dst=/run/secrets/library_write_key,readonly \
-  --entrypoint dotnet "$NEW_IMAGE" /app/admin/vndb-admin.dll \
-  library restore /recovery/snapshot /recovery/restored \
-  --data-dir /recovery --key-file /run/secrets/library_write_key --offline-maintenance --json
+docker compose up -d --no-build --pull never library
 ```
 
-`NEW_IMAGE`及`OWNER`应与快照对应，恢复父目录事先允许该数字UID:GID写入；目标`restored`不得存在。验证后将Compose数据挂载指向新恢复目录，保留原实例并只读挂载原密钥，使用已加载镜像启动。首次只读检查可关闭`CatalogJobs__Enabled`，核对健康、info身份、公共目录与已知个人记录后再受控启用写入。
+个人库可先在全新恢复父目录中执行以下离线恢复；父目录需允许快照对应的数字 UID:GID 写入，原密钥须已存在：
 
-将公共资料复制到另一机器建立独立库时，使用[离线部署与公共导入](OFFLINE-DISTRIBUTION.md)，不用个人快照和原服务身份进行初始化。
+```sh
+docker run --rm --network none --user 1654:1654 --read-only \
+  --cap-drop ALL --security-opt no-new-privileges \
+  --tmpfs /tmp:size=64m,mode=1777 \
+  --mount type=bind,src=/srv/vndb-recovery,dst=/recovery \
+  --mount type=bind,src=/srv/vndb-secrets/library_write_key,dst=/run/secrets/library_write_key,readonly \
+  --entrypoint dotnet vndb-local:0.7.0 /app/admin/vndb-admin.dll \
+  library restore /recovery/snapshot /recovery/restored --data-dir /recovery \
+  --key-file /run/secrets/library_write_key --offline-maintenance --json
+```
 
+示例镜像和 UID:GID 必须替换为快照对应值。恢复完成后按第 6 节切换数据挂载，可暂时关闭后台任务做只读确认。未完成资料任务只有在快照包含其已验证输入时才可能离线续跑；下载半包和未完成预检不能当作可恢复输入。
 
-### 个人分类存储迁移
+独立新库使用第 3 节初始化，再通过 `POST /api/v1/datasets/upload` 上传官方 `.tar.zst`，而不是使用 JSON 文件选择器。该接口接收 `application/octet-stream`，最大 512 MiB，需要管理密钥、`X-Library-Request: 1` 和稳定幂等键；具体契约见 [API](WEB-API.md#官方导出任务)。直到任务 `completed` 才算完成导入。公共包不含全部图片，也不会自动创建个人条目或游玩记录。
 
-`personal_organization`的历史迁移将schema13增量升级为14，新增个人收藏／虚拟集合／标签表；本版还会继续升级至schema15（见下节）；既有作品、个人记录和存在标记保留，数据库仍为原数据卷中的`library.db`。先按本说明创建并验证快照，再切换镜像。旧schema13镜像不能写入schema14及更高版本，镜像回退必须搭配原备份。个人分类同步要求Web与客户端均支持该可选能力；旧客户端的书架／个人条目CRUD仍可使用。客户端本机资源档案不进入Docker数据卷。
+## 9. 排障与资料保管
 
-### 官方资料同步状态迁移
+| 现象 | 检查 |
+| --- | --- |
+| 无法连接 | 绑定 IP／端口、容器健康和网络；默认回环不开放局域网访问 |
+| 401 | 应用管理密钥与请求头；不要使用 NAS 账户密码 |
+| 409 | 保留原稿和操作 ID，读取当前修订，区分冲突与结果不明 |
+| JSON 超限 | 读取 info；只拆分尚未提交的新文件，不改写待确认批次 |
+| 权限错误 | 数据文件原 UID:GID、挂载及 ACL；不递归放宽共享权限 |
+| 健康正常但搜索报错 | 保留原库，在独立副本核验完整性和个人记录，不直接覆盖活库 |
+| 上游限流／导入失败 | 遵守等待时间，核对原任务后明确恢复，不并发重复抓取 |
+| 界面仍是旧内容 | 核对镜像与资源代际，先保留未提交草稿再刷新 |
 
-启动时将schema14增量升级为15，仅新增单行`dataset_sync`操作配置表，保存可选调度、上次发现日期和限流／重试时间；原作品、个人记录、封面和导入队列保持。无需新环境变量、容器或宿主计划任务。定时默认关闭，在Web“资料管理 → 导入 → 可选定时同步”显式启用，使用现有`CatalogJobs:Enabled`后台任务（默认开启）。外网只需访问既有官方HTTPS域名`dl.vndb.org`。
-
-完整数据库快照会包含调度状态；恢复后仍遵守原检查周期和等待时间。向另一台机器分发公共资料继续使用公共导入包，不复制个人快照中的调度/服务身份。升级前按原规则验证完整备份；旧schema14镜像不能写schema15，回退需使用对应旧快照。输入与暂存仍保留在数据卷`datasets`，自动同步不会自动清理已接收旧输入；空间不足时原任务保留并等待人工处理。
-
-Web 导入页提供容量摘要与手动清理预览，`dataset_maintenance` 不增加数据库 schema 或新服务。上传、下载和预检以同一数据目录文件租约串行维护输入，重复上传仍验证完整内容，已接收同包不新增长期原包；空包、断开及超限的未接收尝试清理。保留至少4GiB准备空间及现有数据库／封面／完整备份额外空间。清理仅处理核验过的无引用临时文件与已完成暂存，保留原包及恢复所需输入。预览与中断意图位于数据卷 `dataset-cleanups`；异机部署使用正式公共资料包或完整备份，不依赖这些维护意图。
+源码和可分发包只保留项目说明、通用配置、程序与许可。真实连接配置、密钥、数据库、个人 JSON、运维记录和验证截图放在私有位置。数据目录与客户端备份范围见[数据与隐私](DATA-AND-PRIVACY.md)。

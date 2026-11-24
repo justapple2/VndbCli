@@ -1,8 +1,6 @@
 # Web API使用与交换契约
 
-适用版本0.6.1／API v1／schema15。**客户端使用`/api/v1`**，机器规范为运行中`/openapi/v1.json`；数据库schema不是客户端协议。示例使用虚构个人资料和`http://nas.local:5187/`，请替换为自己的服务。封面修复与官方更新分别通过`cover_repair`、`dataset_sync`可选能力协商。
-
-封面补全：`POST /api/v1/metadata/covers/repair`，请求`{"item_ids":["item-example"]}`（1–100个唯一且未移除的个人书架ID），沿用管理密钥、`X-Library-Request: 1`与`Idempotency-Key`。返回每项`item_id`、`vndb_id`、`state`和可选`job_id`。已有封面／确认无图／未关联分别为`ready`／`no_cover`／`unlinked`；其余复用原metadata队列，按VN ID去重。明确重试可重新排队已结束的失败任务，已有暂停任务保持暂停；用既有jobs入口查看和控制。请求不改个人关联、修订或游玩数据，也不遍历公共全库。网络补全按既有至少5秒间隔及有限退避执行，返回queued不代表图片已下载。
+适用版本：0.7.0／API v1／schema15。**客户端使用`/api/v1`**，机器规范为运行中`/openapi/v1.json`；数据库schema不是客户端协议。示例使用虚构个人资料和`http://nas.local:5187/`，请替换为自己的服务。封面修复与官方更新分别通过`cover_repair`、`dataset_sync`可选能力协商。
 
 ## 1. 连接、鉴权及公共规则
 
@@ -70,6 +68,10 @@ MetadataQuery示例：
 模式支持`local_only`、`local_first`、`explicit_refresh`。先查本库并利用查询缓存，有有效结果可直接返回，不保证补齐VNDB全量；`partial`提示局部资料。联网搜索需非空文字。refresh不修改个人感想／时间。
 
 MetadataResponse字段：`items`、`source`（library／query_cache／vndb）、`fetched_at`、`page`、`page_size`、`total`、`more`、`partial`、`needs_remote`、`pending_import`、`verification_status`及可选`warnings`。本机回退也沿用该结构，但pending与验证状态不同；不能只凭source认定已同步。
+
+### 封面补全
+
+封面补全：`POST /api/v1/metadata/covers/repair`，请求`{"item_ids":["item-example"]}`（1–100个唯一且未移除的个人书架ID），沿用管理密钥、`X-Library-Request: 1`与`Idempotency-Key`。返回每项`item_id`、`vndb_id`、`state`和可选`job_id`。已有封面／确认无图／未关联分别为`ready`／`no_cover`／`unlinked`；其余复用原metadata队列，按VN ID去重。明确重试可重新排队已结束的失败任务，已有暂停任务保持暂停；用既有jobs入口查看和控制。请求不改个人关联、修订或游玩数据，也不遍历公共全库。网络补全按既有至少5秒间隔及有限退避执行，返回queued不代表图片已下载。
 
 ### 个人书架的轻量读取
 
@@ -216,7 +218,7 @@ ImportBatchReceipt：id、payload_sha256、client_batch_id、state、accepted、
 | `GET /presence/devices/{id}` | PresenceHead：device_id、revision、items |
 | `POST /presence` | PresenceBatch，返回PresenceReceipt |
 
-设备ID是本机随机稳定GUID，不用机器名推断身份。当前没有`/devices/{id}/claim`端点；历史CLI兼容命令不代表Web提供它。
+设备 ID 是本机随机稳定 GUID，不用机器名推断身份。
 
 ```json
 {
@@ -254,21 +256,11 @@ SessionSample含id、device_id、play_id、started_at、checkpoint_at、ended_at
 
 PlayTimeSummary含play_id、base_minutes、session_seconds、adjustment_seconds、total_seconds、pending_sessions、revision。历史基数未知则保持null，会话累计与调整不改写原分钟；TimeAdjustment可正负秒，需原因及当前**时间汇总**revision，不是个人经历revision。人工计入／排除针对准确已结束会话，不把运行中样本当最终时间。
 
-## 7. 资料质量及隐私退役入口
+## 7. 资料质量与数据边界
 
 `GET /api/v1/quality`只读，参数device_id、kind、q、page=1、page_size=30；返回QualityPage（items、counts、total、page、page_size、more），不访问客户端文件系统或执行上游查询。
 
-以下前缀及其子路径一律410／local_only，**不是可用API**：
-
-- `/api/v1/installations`
-- `/api/v1/installation-bundles`
-- `/api/v1/legacy-locations`
-- `/api/v1/archive-runs`
-- `/api/v1/quality/installation-audits`
-- `/api/archives`
-- `/api/catalog/local`
-
-旧`/installations.html`、`/organization.html`跳转质量页。请求含本机目录、EXE、工作目录、工具配置、注册表或文件证据会被隐私边界拒绝；也不能把路径藏进notes／review／query。Web只接受作品信息、个人资料、必要设备／同步身份及存在布尔值。客户端不得把本机安装树作为“数据库备份”上传。
+Web 不提供本机安装、目录整理、注册表或游戏启动 API；位置类旧入口返回 410／local_only。请求中的目录、EXE、工作目录、工具配置及文件证据会被拒绝，也不能将这些内容放入备注或查询文字。Web 接收公开资料、个人资料、必要同步身份及存在布尔值；本机能力使用 Local JSON，边界见[架构](ARCHITECTURE.md)与[数据与隐私](DATA-AND-PRIVACY.md)。
 
 ## 8. 错误与重试
 
@@ -292,28 +284,7 @@ v1业务错误通常为`{code,title,status,trace_id}`；部分框架资源404或
 
 客户端`response_too_large`是独立响应缓冲错误，不是Web断线。网络中断／成功正文无法证明／写入成功但刷新失败时，不换键重做；先查已有回执或原操作重试。明确业务拒绝后才修改原稿并产生新操作。不要对所有POST设置无条件自动重放。
 
-## 9. 兼容`/api`入口
-
-这些服务现有Web页面，未全部纳入v1 OpenAPI；新集成优先v1，不把旧Library DTO当公开数据模型。旧路由可能使用ProblemDetails或旧分页／Source投影，与v1不同：
-
-| 路径组 | 当前方法及用途 |
-| --- | --- |
-| `/api/config`、`/api/stats`、`/api/producers` | GET配置／统计／会社 |
-| `/api/library` | GET本库列表，q／producer／page／limit |
-| `/api/library/{id}`、`/cover`、`/export` | GET旧资料／封面／单条导出 |
-| `/api/imports/{id}` | POST按ID入库，refresh可选 |
-| `/api/search` | GET本地；POST LibrarySearchRequest(query,producer,page,limit)，本地优先入库 |
-| `/api/remote/search` | GET但会联网入库，要求写请求头，标记Deprecation |
-| `/api/plays` | GET旧分页筛选；POST创建；`/{id}` GET／PUT；`/stats` GET |
-| `/api/plays/imports` | POST旧PlayImportBatch，background可选；不是metadata／activity通用入口 |
-| `/api/plays/{id}/queue`、`/enrich` | POST旧资料补全 |
-| `/api/catalog`、`/stats` | GET旧补全列表／统计 |
-| `/api/catalog/enrich`、`/search`、`/resolve` | POST旧补全／候选／关联 |
-| `/api/catalog/jobs` | POST排队；`/latest` GET；`/{id}/pause`、`/resume` POST；`/{id}/export` GET |
-
-旧游玩列表仍是历史投影，可能含工作表Source；第三方个人读取使用v1。旧DTO中用于历史迁移的location类型不意味着存在HTTP上传权限。接口权威来源为[端点代码](../src/Vndb.Web/V1Endpoints.cs)、[管理端点](../src/Vndb.Web/ManagementEndpoints.cs)、[活动端点](../src/Vndb.Web/ActivityEndpoints.cs)、[Contracts](../src/Vndb.Contracts/Metadata.cs)及运行中的OpenAPI。
-
-## 10. 发行版本
+## 9. 发行版本
 
 /info公布release_catalog能力，以下路由返回MetadataResponse，数据位于items[].novel.release_catalog（items、fetched_at）：
 
@@ -327,7 +298,7 @@ POST沿用写鉴权/限流。单作品每页25条，以r ID游标读取；最多
 
 普通刷新/旧JSON缺少release_catalog不会清掉已有目录；缺失字段不参与序列化及规范哈希。可通过原metadata渠道导入，冲突仍走候选审核，不覆盖个人记录。官方公共资料任务使用下述独立datasets入口。
 
-## 11. 公共目录、个人状态与本地存在
+## 10. 公共目录、个人状态与本地存在
 
 存在包含客户端确认的安装目录或安装包，不表示Web／当前客户端可以启动。包清单、检索根和相对路径不在API模型中。普通本库标题查询和公共目录默认按“曾玩过→已有→其余”全局排序后分页；公共目录可显式`sort=personal`或原有排序。精确ItemId状态先计算，再作VN级浏览汇总；异常关联及移除记录不能获得已玩优先级。详见[数据与隐私](DATA-AND-PRIVACY.md)。
 
@@ -416,3 +387,6 @@ GET /api/v1/collection/stats返回public_novels、personal_items、played、unpl
 `GET /items`及`GET /shelf`增加可选`favorite=true|false`、`label=<稳定分类ID>`，与原查询组合并在分页前生效。删除分类不移除个人条目、游玩或文件。旧客户端原个人条目CRUD不会清空这些分类。
 
 此小型个人组织使用独立整体修订，两个客户端并发修改不同条目也可能返回409。客户端保留原ID／内容，明确冲突后重读再编辑，不自动覆盖；请求结果不明时原ID重试可取得原回执。分类不改变个人条目修订、关联或游玩状态。本机资源档案无Web接口；路径、EXE、参数、适用本机补丁和手工应用状态仍只在Local JSON。
+
+
+接口以运行中 `/openapi/v1.json` 和 `src/Vndb.Contracts` 模型为准。新集成使用 `/api/v1`；Web 自身保留的 `/api` 兼容路由不作为新客户端集成入口。服务部署与版本核对见 [Docker 指南](DOCKER.md)。

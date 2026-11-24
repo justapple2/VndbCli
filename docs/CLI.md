@@ -1,10 +1,10 @@
 # CLI使用说明
 
-适用版本0.6.1。`vndb`面向命令行和脚本；日常查询、元数据同步与经过批准的本机整理复用共享模块。CLI不带数据库，不直接读NAS SQLite，不提供通用个人CRUD／游戏启动命令；个人编辑和启动使用[桌面](DESKTOP.md)，第三方集成使用[Web API](WEB-API.md)。
+适用版本：0.7.0。`vndb`面向命令行和脚本；日常查询、元数据同步与经过批准的本机整理复用共享模块。CLI不带数据库，不直接读NAS SQLite，不提供通用个人CRUD／游戏启动命令；个人编辑和启动使用[桌面](DESKTOP.md)，第三方集成使用[Web API](WEB-API.md)。
 
 ## 1. 安装与帮助
 
-使用匹配平台的CLI发布包，解压并保留整个目录。Windows为`vndb.exe`，Linux为`vndb`；可加入个人PATH或使用完整路径。发布脚本支持Windows／Linux多种RID，已交付实测Windows x64；其他目标需单独验证。
+使用匹配平台的CLI发布包，解压并保留整个目录。Windows为`vndb.exe`，Linux为`vndb`；可加入个人PATH或使用完整路径。发布脚本支持 Windows／Linux 多种 RID，选择与实际系统匹配的目标；支持发布不等于目标平台已经完成实机验证。
 
 ```powershell
 ./vndb.exe --help
@@ -131,7 +131,7 @@ vndb query-data preview --server http://nas.local:5187/ --json --output ./query-
 vndb query-data apply --server http://nas.local:5187/ --preview-json ./query-preview.json --approve <预览SHA256> --json
 ```
 
-show创建／读取本机随机稳定身份，不扫描游戏。`device claim`仅为历史兼容命令，当前Web未提供claim路由，不作为本版可用认领流程；不要用它修复本机映射。
+`device show` 创建或读取本机随机稳定身份，不扫描游戏；注册设备需要连接 Web 并提供应用密钥。
 
 `query-data preview`只读来源证明，未知pending留原处；apply按批准摘要复制已证明来源JSON并留清单，不删／覆盖旧原件。`--legacy-directory`可明确旧查询根。
 
@@ -148,7 +148,7 @@ vndb presence apply --server http://nas.local:5187/ --preview-json ./presence-pr
 
 ## 6. 本机登记与整理工作流
 
-以下`F:\VN`均为合成范围，不能直接当真实操作授权。先选定范围／目标并人工核对；输出放游戏目录外的私有工作区。
+以下 `F:\VN` 等路径均为示例。先选择实际范围和目标并核对，输出保存在游戏目录外的私有位置。
 
 ```powershell
 # 默认只预览；确认相同输入后追加--confirm才登记，不移动／启动。
@@ -186,7 +186,6 @@ plan、restore-plan、query-data／presence预览的批准SHA在stderr显示，�
 
 ```powershell
 vndb organize package-scan "F:\VN-Packages" --depth 3 --json
-vndb organize package-scan "F:\" --depth 6 --outside-installations --json
 vndb organize package-query "F:\VN-Packages" --relative-path "Studio/Game.7z" --server http://nas.local:5187/ --json
 # 从候选中明确选出一条metadata或书架条目另存chosen-item.json，不把整个带路径的扫描报告上传Web。
 vndb organize package-register --scan-root "F:\VN-Packages" --relative-path "Studio/Game.7z" --item-json ./chosen-item.json --json
@@ -222,17 +221,17 @@ vndb organize registration-sync --server http://nas.local:5187/ --json
 `observe` 只操作本机元数据与JSON，不联网、不提供常驻watch命令，不移动、删除、安装或启动游戏。修改范围前退出桌面客户端，使用与桌面相同的数据根；省略 `--identity-dir` 为默认用户文档目录。
 
 ```powershell
-vndb observe root-add --root "E:\SyntheticGames" --kind games --depth 2 --identity-dir "D:\SyntheticClient" --json
-vndb observe check --identity-dir "D:\SyntheticClient" --json
+vndb observe root-add --root "F:\ExampleGames" --kind games --depth 2 --identity-dir "F:\ExampleClient" --json
+vndb observe check --identity-dir "F:\ExampleClient" --json
 # 缺失需要间隔至少10秒后再次check；新候选约15秒稳定后等待人工匹配
-vndb observe candidates --identity-dir "D:\SyntheticClient" --json
-vndb observe status --identity-dir "D:\SyntheticClient" --json
+vndb observe candidates --identity-dir "F:\ExampleClient" --json
+vndb observe status --identity-dir "F:\ExampleClient" --json
 ```
 
 示例目录必须替换为实际存在、明确管理的本机NTFS目录。kind 为 games／packages；深度1–3，32个管理根上限，不能嵌套、选择盘根或包含客户端数据根。root-add 捕获目录／卷身份，保留桌面的启用开关状态，不在CLI创建后台宿主。check 只保存实际变化；输出含本机候选和观测信息，只能存放在库外私有位置，不能拿来导入Web。没有变动不会重复推进安装修订；Unknown不当作卸载，现有 presence 命令继续负责同步。
 
 
-## 个人分类与本机资源档案
+## 11. 个人分类与本机资源档案
 
 `personal status`读取当前服务作用域的分类快照／离线稿，`personal pull`读取Web，`personal queue --change-json change.json`登记明确变更而不联网，`personal sync`按原操作同步。使用既有`--server`／`--cache-dir`选择与桌面相同作用域；`VN_LIBRARY_KEY`提供Web管理密钥。明确冲突后可用`personal pull --resolve-conflict`保留旧稿并读取Web，结果不明不能放弃原操作。
 
